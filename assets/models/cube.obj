@@ -1,0 +1,22 @@
+# Original unit cube sample: six OBJ shapes, no normals or UVs.
+# The loader triangulates quads, generates flat normals, and supplies zero UVs.
+v -1 -1 -1
+v  1 -1 -1
+v  1  1 -1
+v -1  1 -1
+v -1 -1  1
+v  1 -1  1
+v  1  1  1
+v -1  1  1
+o front
+f 5 6 7 8
+o back
+f 2 1 4 3
+o right
+f 6 2 3 7
+o left
+f 1 5 8 4
+o top
+f 8 7 3 4
+o bottom
+f 1 2 6 5

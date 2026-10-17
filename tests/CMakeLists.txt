@@ -1,0 +1,30 @@
+# A real Engine consumer: only its public headers and link interface are available.
+add_executable(EngineApiChecks engine_api.cpp)
+target_link_libraries(EngineApiChecks PRIVATE Engine)
+set_target_properties(EngineApiChecks PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>"
+    CXX_EXTENSIONS OFF)
+add_dependencies(EngineApiChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET EngineApiChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:EngineApiChecks>
+        VERBATIM)
+endif()
+add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/assets/models/blackrat.glb")
+
+add_executable(SceneChecks scene.cpp)
+target_link_libraries(SceneChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+add_test(NAME Scene.Cpu COMMAND SceneChecks "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/scene-output")
+
+add_executable(SceneRuntimeChecks scene_runtime.cpp)
+target_link_libraries(SceneRuntimeChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+set_target_properties(SceneRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(SceneRuntimeChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET SceneRuntimeChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:SceneRuntimeChecks>
+        VERBATIM)
+endif()
+add_test(NAME Scene.Runtime COMMAND SceneRuntimeChecks "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/scene-runtime")
+set_tests_properties(Engine.PublicApi Scene.Runtime PROPERTIES RUN_SERIAL TRUE)

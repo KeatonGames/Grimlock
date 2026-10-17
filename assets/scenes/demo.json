@@ -1,0 +1,168 @@
+{
+  "active_camera": "main",
+  "cameras": [
+    {
+      "id": "main",
+      "position": [3.5,2.2,7.5],
+      "target": [0,-0.4,0]
+    }
+  ],
+  "lighting": {
+    "directional": {
+      "color": [1,1,1],
+      "direction": [-0.4,-0.8,-0.5],
+      "intensity": 3
+    },
+    "points": [
+      {
+        "color": [1,0.8,0.65],
+        "intensity": 28,
+        "position": [-2,2,2],
+        "range": 8
+      },
+      {
+        "color": [0.6,0.75,1],
+        "intensity": 16,
+        "position": [2,1.5,1],
+        "range": 7
+      }
+    ]
+  },
+  "name": "Grimlock demonstration",
+  "objects": [
+    {
+      "id": "1",
+      "model": "models/base.glb",
+      "name": "Character",
+      "transform": {
+        "position": [-2.413761615753174,-1.7821567058563232,0.46230044960975647],
+        "rotation": [0,0.1741081327199936,0,0.9847265481948853],
+        "scale": [1.054032802581787,1.0961940288543701,1.054032802581787]
+      }
+    },
+    {
+      "id": "2",
+      "model": "models/dogcat.glb",
+      "name": "Cat",
+      "transform": {
+        "position": [-1.2999999523162842,-0.41943594813346863,-0.7728592753410339],
+        "rotation": [0,0,0,1],
+        "scale": [1.5837392807006836,1.5837392807006836,1.5837392807006836]
+      }
+    },
+    {
+      "id": "3",
+      "model": "models/bunny2.glb",
+      "name": "Bunny",
+      "transform": {
+        "position": [1.2008931636810303,-0.49713581800460815,-0.7034978866577148],
+        "rotation": [0,-0.1246747300028801,0,0.9921976923942566],
+        "scale": [0.1884646713733673,0.1884646713733673,0.1884646713733673]
+      }
+    },
+    {
+      "id": "4",
+      "name": "Rat placement group",
+      "transform": {
+        "position": [0,0.20000000298023224,1.2000000476837158],
+        "rotation": [0,0.14943814277648926,0,0.9887710809707642],
+        "scale": [0.699999988079071,0.699999988079071,0.699999988079071]
+      }
+    },
+    {
+      "animation": {
+        "clip": 0
+      },
+      "id": "5",
+      "model": "models/blackrat.glb",
+      "name": "Rat static pose",
+      "parent": "4",
+      "transform": {
+        "position": [6.838467214720367e-8,-0.2294156551361084,0.39579394459724426],
+        "rotation": [0,0,0,1],
+        "scale": [4.589217662811279,4.589217662811279,4.589217662811279]
+      }
+    },
+    {
+      "animation": {
+        "clip": 1,
+        "speed": 0.75
+      },
+      "id": "6",
+      "model": "models/blackrat.glb",
+      "name": "Rat idle",
+      "transform": {
+        "position": [2.2181243896484375,0.03940904140472412,1.4646815061569214],
+        "rotation": [0,-0.14943814277648926,0,0.9887710809707642],
+        "scale": [3.2124524116516113,3.2124524116516113,3.2124524116516113]
+      }
+    },
+    {
+      "id": "7",
+      "material_override": 0,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 0",
+      "transform": {
+        "position": [-1.100000023841858,-1.100000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    },
+    {
+      "id": "8",
+      "material_override": 1,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 1",
+      "transform": {
+        "position": [0,-1.100000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    },
+    {
+      "id": "9",
+      "material_override": 2,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 2",
+      "transform": {
+        "position": [1.100000023841858,-1.100000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    },
+    {
+      "id": "10",
+      "material_override": 3,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 3",
+      "transform": {
+        "position": [-1.100000023841858,-1.850000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    },
+    {
+      "id": "11",
+      "material_override": 4,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 4",
+      "transform": {
+        "position": [0,-1.850000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    },
+    {
+      "id": "12",
+      "material_override": 5,
+      "model": "models/pbr-comparison.glb",
+      "name": "PBR sphere 5",
+      "transform": {
+        "position": [1.100000023841858,-1.850000023841858,0.4000000059604645],
+        "rotation": [0,0,0,1],
+        "scale": [0.30000001192092896,0.30000001192092896,0.30000001192092896]
+      }
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,113 @@
+#pragma once
+
+#include "renderer/buffer.hpp"
+#include "grimlock/camera.hpp"
+#include "renderer/depth_target.hpp"
+#include "renderer/gpu_mesh.hpp"
+#include "renderer/gpu_materials.hpp"
+#include "renderer/mesh_pipeline.hpp"
+#include "renderer/vulkan_context.hpp"
+#include "renderer/lighting.hpp"
+#include "renderer/tone_map_pipeline.hpp"
+#include "assets/environment.hpp"
+#include "grimlock/assets/animation.hpp"
+#include "renderer/deformation.hpp"
+
+#include <cstddef>
+#include <optional>
+#include <memory>
+#include <span>
+#include <vector>
+
+struct SDL_Window;
+
+namespace grimlock::renderer {
+
+struct ModelDraw {
+    std::size_t model = 0;
+    glm::mat4 transform{1.0F};
+    glm::vec4 baseColor{1.0F}; // Optional linear-space instance tint, neutral by default.
+    std::optional<std::size_t> materialOverride; // Share geometry in the PBR comparison scene.
+    const assets::ModelPose* pose = nullptr; // Instance-owned; immutable for the duration of drawFrame.
+};
+
+class VulkanRenderer final {
+public:
+    explicit VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube* environment = nullptr);
+    ~VulkanRenderer();
+    VulkanRenderer(const VulkanRenderer&) = delete;
+    VulkanRenderer& operator=(const VulkanRenderer&) = delete;
+
+    // Internal IDs remain valid until releaseModels; freed slots may be reused.
+    [[nodiscard]] std::size_t uploadModel(const assets::ModelData& model);
+    void releaseModels(std::span<const std::size_t> models) noexcept;
+    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws, const Lighting& lighting = {});
+    void requestSwapchainRecreation() noexcept;
+
+private:
+    void createCommandPool();
+    void createCameraResources(const assets::EnvironmentCube* environment);
+    void createMaterialResources();
+    void createSynchronization();
+    [[nodiscard]] bool createSwapchainResources();
+    [[nodiscard]] bool createSwapchain();
+    void createImageViews();
+    void allocateCommandBuffers();
+    void recordFrame(std::uint32_t imageIndex, const Camera& camera, std::span<const ModelDraw> draws, float exposure);
+    [[nodiscard]] bool recreateSwapchain();
+    [[nodiscard]] VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
+    [[nodiscard]] VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+    [[nodiscard]] bool hasDrawableExtent() const;
+    void destroySwapchainResources() noexcept;
+    void destroy() noexcept;
+
+    SDL_Window* window_ = nullptr;
+    VulkanContext context_;
+    VkCommandPool commandPool_ = VK_NULL_HANDLE;
+    struct NodeDraw {
+        std::vector<std::size_t> meshes;
+        std::size_t node = 0;
+    };
+    struct GpuModel {
+        std::vector<GpuMesh> meshes;
+        std::vector<NodeDraw> nodes; // Static selected-scene draw cache, not baked geometry.
+        std::vector<std::size_t> meshMaterials;
+        std::vector<glm::vec3> meshCenters;
+        std::unique_ptr<GpuMaterials> materials;
+        std::vector<VkDescriptorSet> deformationSets;
+        assets::ModelPose restPose;
+    };
+    std::vector<std::unique_ptr<GpuModel>> models_;
+    std::optional<Deformation> deformation_;
+
+    VkDescriptorSetLayout cameraLayout_ = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet cameraSet_ = VK_NULL_HANDLE;
+    std::optional<Buffer> cameraBuffer_;
+    std::optional<Buffer> lightBuffer_;
+    std::optional<Texture> irradiance_, specularEnvironment_, brdfLut_;
+    VkSampler environmentSampler_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout toneMapLayout_ = VK_NULL_HANDLE;
+    VkDescriptorSet toneMapSet_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout materialLayout_ = VK_NULL_HANDLE;
+    std::optional<Texture> whiteTexture_;
+    std::optional<MeshPipeline> pipeline_;
+    std::optional<ToneMapPipeline> toneMapPipeline_;
+    std::optional<Texture> hdrColor_;
+
+    VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+    VkFormat swapchainFormat_ = VK_FORMAT_UNDEFINED;
+    VkExtent2D swapchainExtent_{};
+    std::vector<VkImage> swapchainImages_;
+    std::vector<VkImageView> swapchainImageViews_;
+    VkFormat depthFormat_ = VK_FORMAT_UNDEFINED;
+    // One depth target and camera buffer suffice while there is one frame in flight.
+    std::optional<DepthTarget> depth_;
+    std::vector<VkCommandBuffer> commandBuffers_;
+    VkSemaphore imageAvailable_ = VK_NULL_HANDLE;
+    std::vector<VkSemaphore> renderFinished_;
+    VkFence inFlight_ = VK_NULL_HANDLE;
+    bool framebufferResized_ = false;
+};
+
+} // namespace grimlock::renderer

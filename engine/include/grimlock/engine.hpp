@@ -1,0 +1,86 @@
+#pragma once
+#include "grimlock/camera.hpp"
+#include "grimlock/lighting.hpp"
+#include "grimlock/transform.hpp"
+#include <glm/gtc/quaternion.hpp>
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace grimlock {
+class Scene;
+namespace assets { struct ModelData; class ModelInstance; }
+
+struct EngineConfig {
+    std::string windowTitle = "Grimlock";
+    int width = 1280, height = 720;
+    std::filesystem::path environmentFolder;
+    std::filesystem::path assetRoot = "assets";
+};
+
+class ModelId final {
+public:
+    ModelId() = default;
+    bool operator==(const ModelId&) const = default;
+private:
+    friend class Engine;
+    explicit ModelId(std::size_t index) : index_(index) {}
+    std::size_t index_ = static_cast<std::size_t>(-1);
+};
+class InstanceId final {
+public:
+    InstanceId() = default;
+    bool operator==(const InstanceId&) const = default;
+private:
+    friend class Engine;
+    explicit InstanceId(std::size_t index) : index_(index) {}
+    std::size_t index_ = static_cast<std::size_t>(-1);
+};
+struct ModelInfo {
+    glm::vec3 minimum{}, maximum{};
+    std::size_t primitives = 0, materials = 0;
+    std::vector<std::string> animationNames;
+};
+
+// Owns one window/device and its resources. Game policy (assets, placement,
+// normalization and default animation selection) stays outside this class.
+class Engine final {
+public:
+    explicit Engine(const EngineConfig& config = {});
+    ~Engine();
+    Engine(const Engine&) = delete;
+    Engine& operator=(const Engine&) = delete;
+
+    // Relative paths resolve beside the executable; canonical paths reuse one resource.
+    [[nodiscard]] ModelId loadModel(const std::filesystem::path& path);
+    [[nodiscard]] ModelId addModel(assets::ModelData model);
+    [[nodiscard]] ModelInfo modelInfo(ModelId model) const;
+    [[nodiscard]] InstanceId createInstance(ModelId model);
+    void setTransform(InstanceId instance, const glm::mat4& transform);
+    void setTransform(InstanceId instance, const Transform& transform);
+    [[nodiscard]] glm::mat4 transform(InstanceId instance) const;
+    void setTint(InstanceId instance, const glm::vec4& color);
+    void setMaterialOverride(InstanceId instance, std::optional<std::size_t> material);
+    // Playback controls are CPU-only; update() advances every instance automatically.
+    [[nodiscard]] assets::ModelInstance& animation(InstanceId instance);
+    [[nodiscard]] Camera& camera() noexcept;
+    [[nodiscard]] Lighting& lighting() noexcept;
+    // File paths are executable-relative. Scene model paths are asset-root-relative.
+    [[nodiscard]] std::unique_ptr<Scene> loadScene(const std::filesystem::path& path) const;
+    void saveScene(const std::filesystem::path& path) const;
+    // Validates/loads the candidate before replacing the active scene.
+    void setScene(std::unique_ptr<Scene> scene);
+    [[nodiscard]] Scene* scene() noexcept;
+    [[nodiscard]] const Scene* scene() const noexcept;
+    void unloadScene();
+    // Polls events, advances animations/lights and renders. False only when closing;
+    // a minimized window still updates, but rendering is deferred.
+    [[nodiscard]] bool update();
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+} // namespace grimlock
