@@ -11,11 +11,11 @@ if(WIN32)
             $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:EngineApiChecks>
         VERBATIM)
 endif()
-add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/assets/models/blackrat.glb")
+add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/game/assets/models/blackrat.glb")
 
 add_executable(SceneChecks scene.cpp)
 target_link_libraries(SceneChecks PRIVATE Engine nlohmann_json::nlohmann_json)
-add_test(NAME Scene.Cpu COMMAND SceneChecks "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/scene-output")
+add_test(NAME Scene.Cpu COMMAND SceneChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/scene-output")
 
 add_executable(SceneRuntimeChecks scene_runtime.cpp)
 target_link_libraries(SceneRuntimeChecks PRIVATE Engine nlohmann_json::nlohmann_json)
@@ -26,7 +26,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:SceneRuntimeChecks>
         VERBATIM)
 endif()
-add_test(NAME Scene.Runtime COMMAND SceneRuntimeChecks "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/scene-runtime")
+add_test(NAME Scene.Runtime COMMAND SceneRuntimeChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/scene-runtime")
 set_tests_properties(Engine.PublicApi Scene.Runtime PROPERTIES RUN_SERIAL TRUE)
 
 add_executable(CameraNavigationChecks camera_navigation.cpp)

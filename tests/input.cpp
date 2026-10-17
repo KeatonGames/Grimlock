@@ -1,4 +1,4 @@
-#include "platform/input.hpp"
+#include "input/input.hpp"
 #include <iostream>
 #include <stdexcept>
 

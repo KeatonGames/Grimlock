@@ -2,13 +2,20 @@
 /out/
 /build/
 /cmake-build-*/
-/CMakeCache.txt
-/CMakeFiles/
-/cmake_install.cmake
-/compile_commands.json
-/Testing/
-/install_manifest.txt
 /CMakeUserPresets.json
+
+# Generated files from accidental in-source or nested CMake/Ninja builds
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Testing/
+install_manifest.txt
+build.ninja
+rules.ninja
+.ninja_deps
+.ninja_log
+_deps/
 
 # Visual Studio
 /.vs/
@@ -25,3 +32,16 @@
 *.exp
 *.pdb
 *.ilk
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.spv
+
+# Do not ignore *.obj globally: game/assets/models contains Wavefront sources.
+/*.obj
+
+# Desktop metadata
+.DS_Store
+Thumbs.db

@@ -8,7 +8,7 @@ ToneMapPipeline::ToneMapPipeline(const VkDevice device, const VkFormat colorForm
     : device_(device), colorFormat_(colorFormat) {
     try {
     diagnostics::StartupSpan profile{"pipeline.tonemap"};
-        const ShaderModule shader{device_, "shaders/tonemap.spv"};
+        const ShaderModule shader{device_, "shaders/tone_map.spv"};
         const VkPushConstantRange push{VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float)};
         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         layoutInfo.setLayoutCount = 1; layoutInfo.pSetLayouts = &layout;

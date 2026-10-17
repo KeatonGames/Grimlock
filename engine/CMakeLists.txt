@@ -2,21 +2,22 @@ add_library(Engine STATIC
     src/core/engine.cpp
     src/core/startup_profile.cpp
     src/core/transform.cpp
-    src/core/orbit_camera.cpp
+    src/camera/camera.cpp
+    src/camera/orbit_camera.cpp
+    src/input/input.cpp
+    src/animation/animation.cpp
     src/scene/scene.cpp
     src/scene/scene_serializer.cpp
     src/platform/window.cpp
-    src/platform/input.cpp
     src/platform/runtime_paths.cpp
     src/assets/model_loader.cpp
     src/assets/gltf_loader.cpp
     src/assets/gltf_materials.cpp
-    src/assets/mesh_data.cpp
+    src/assets/model_data.cpp
     src/assets/image_loader.cpp
     src/assets/stb_image.cpp
     src/assets/tangents.cpp
     src/assets/environment.cpp
-    src/assets/animation.cpp
     src/assets/gltf_animation.cpp
     src/renderer/vulkan_renderer.cpp
     src/renderer/vulkan_context.cpp
@@ -24,7 +25,6 @@ add_library(Engine STATIC
     src/renderer/buffer.cpp
     src/renderer/gpu_mesh.cpp
     src/renderer/depth_target.cpp
-    src/renderer/camera.cpp
     src/renderer/texture.cpp
     src/renderer/gpu_materials.cpp
     src/renderer/lighting.cpp
@@ -33,6 +33,10 @@ add_library(Engine STATIC
 )
 target_compile_features(Engine PUBLIC cxx_std_20)
 set_target_properties(Engine PROPERTIES CXX_EXTENSIONS OFF)
+
+# Shader sources belong to Engine; consumers retain the shared runtime layout.
+include("${PROJECT_SOURCE_DIR}/cmake/Shaders.cmake")
+add_dependencies(Engine GrimlockShaders)
 target_include_directories(Engine PUBLIC include PRIVATE src)
 target_include_directories(Engine SYSTEM PRIVATE "${simdjson_SOURCE_DIR}/include")
 target_link_libraries(Engine PUBLIC glm::glm PRIVATE

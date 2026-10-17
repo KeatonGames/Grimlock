@@ -4,7 +4,7 @@
 #include "assets/environment.hpp"
 #include "core/startup_profile.hpp"
 #include "platform/window.hpp"
-#include "platform/input.hpp"
+#include "input/input.hpp"
 #include "platform/runtime_paths.hpp"
 #include "renderer/vulkan_renderer.hpp"
 #include <SDL3/SDL.h>

@@ -5,7 +5,7 @@ find_program(SLANGC_EXECUTABLE NAMES slangc
     REQUIRED
 )
 
-set(mesh_shader "${PROJECT_SOURCE_DIR}/shaders/mesh.slang")
+set(mesh_shader "${CMAKE_CURRENT_SOURCE_DIR}/shaders/mesh.slang")
 set(mesh_spirv "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/mesh.spv")
 
 add_custom_command(
@@ -21,17 +21,17 @@ add_custom_command(
     VERBATIM
 )
 
-set(tonemap_shader "${PROJECT_SOURCE_DIR}/shaders/tonemap.slang")
-set(tonemap_spirv "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/tonemap.spv")
+set(tone_map_shader "${CMAKE_CURRENT_SOURCE_DIR}/shaders/tone_map.slang")
+set(tone_map_spirv "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/tone_map.spv")
 add_custom_command(
-    OUTPUT "${tonemap_spirv}"
+    OUTPUT "${tone_map_spirv}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders"
-    COMMAND "${SLANGC_EXECUTABLE}" "${tonemap_shader}"
+    COMMAND "${SLANGC_EXECUTABLE}" "${tone_map_shader}"
         -target spirv -profile spirv_1_5 -emit-spirv-directly
         -fvk-use-entrypoint-name -entry vertMain -entry fragMain
-        -matrix-layout-column-major -o "${tonemap_spirv}"
-    DEPENDS "${tonemap_shader}" "${SLANGC_EXECUTABLE}"
+        -matrix-layout-column-major -o "${tone_map_spirv}"
+    DEPENDS "${tone_map_shader}" "${SLANGC_EXECUTABLE}"
     COMMENT "Compiling HDR tone-mapping shaders"
     VERBATIM
 )
-add_custom_target(GrimlockShaders DEPENDS "${mesh_spirv}" "${tonemap_spirv}")
+add_custom_target(GrimlockShaders DEPENDS "${mesh_spirv}" "${tone_map_spirv}")
