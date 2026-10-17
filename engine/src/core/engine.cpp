@@ -4,6 +4,7 @@
 #include "assets/environment.hpp"
 #include "core/startup_profile.hpp"
 #include "platform/window.hpp"
+#include "platform/input.hpp"
 #include "platform/runtime_paths.hpp"
 #include "renderer/vulkan_renderer.hpp"
 #include <SDL3/SDL.h>
@@ -24,6 +25,7 @@ struct Engine::Impl {
     };
     explicit Impl(const EngineConfig& config)
         : window(config.windowTitle.c_str(),config.width,config.height)
+        , input(window.native())
         , environment(config.environmentFolder.empty()?std::nullopt
             :std::optional{assets::loadEnvironmentCube(platform::runtimePath(config.environmentFolder))})
         , renderer(window.native(),environment?&*environment:nullptr)
@@ -119,9 +121,33 @@ struct Engine::Impl {
             sceneDraws.push_back(draw);
         }
     }
+    Camera currentCamera() const { return activeScene?activeScene->resolvedCamera():camera; }
+    void storeCamera(Camera& view) {
+        if (activeScene) { activeScene->setResolvedCamera(view); view=activeScene->resolvedCamera(); }
+        else { camera=view; }
+        lastNavigationCamera=view;
+    }
+    void resetNavigation() {
+        input.cancelNavigation(); navigation.cancelDrag(); navigationSynchronized=false;
+    }
+    void navigate(Camera& view) {
+        if (!navigationEnabled) { return; }
+        const auto id=activeScene?activeScene->activeCamera():std::string{};
+        const bool synchronize=!navigationSynchronized||id!=navigationCameraId||view.position!=lastNavigationCamera.position
+            ||view.target!=lastNavigationCamera.target||view.up!=lastNavigationCamera.up;
+        if (synchronize) {
+            resetNavigation(); navigation.synchronize(view); navigationCameraId=id; navigationSynchronized=true;
+        }
+        int width=0,height=0; SDL_GetWindowSize(window.native(),&width,&height);
+        const bool changed=navigation.update(view,input.state(),static_cast<float>(height));
+        if (synchronize||changed) { storeCamera(view); }
+        else { lastNavigationCamera=view; }
+    }
     bool update() {
+        input.beginFrame();
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            input.handleEvent(event);
             switch (event.type) {
             case SDL_EVENT_QUIT:
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED: running=false; break;
@@ -131,6 +157,7 @@ struct Engine::Impl {
             default: break;
             }
         }
+        input.finishFrame(navigationEnabled&&running);
         if (!running) { return false; }
         const auto now=std::chrono::steady_clock::now();
         const double delta=previousFrame?std::chrono::duration<double>(now-*previousFrame).count():0;
@@ -150,7 +177,7 @@ struct Engine::Impl {
                 for (std::size_t i=0;i<instances.size();++i) { renderer::addModelLights(frameLighting,instances[i]->model(),instances[i]->pose(),draws[i].transform,directionalUsed); }
             }
         }
-        collectUnused();
+        navigate(frameCamera); collectUnused();
         if (renderer.drawFrame(frameCamera,frameDraws,frameLighting)) { startup.firstPresent(); }
         else { SDL_Delay(16); }
         return true;
@@ -158,11 +185,16 @@ struct Engine::Impl {
     // Reverse destruction: scene/instances/CPU assets -> renderer/device -> SDL.
     diagnostics::StartupProfile startup;
     platform::Window window;
+    platform::Input input;
     std::optional<assets::EnvironmentCube> environment;
     renderer::VulkanRenderer renderer;
     std::filesystem::path assetRoot;
     Camera camera;
     Lighting lighting;
+    OrbitCameraController navigation;
+    Camera lastNavigationCamera;
+    std::string navigationCameraId;
+    bool navigationEnabled=false,navigationSynchronized=false;
     std::vector<std::unique_ptr<Resource>> resources;
     std::map<std::filesystem::path,std::size_t> modelPaths;
     std::vector<std::unique_ptr<assets::ModelInstance>> instances;
@@ -203,14 +235,41 @@ void Engine::saveScene(const std::filesystem::path& path) const {
 }
 void Engine::setScene(std::unique_ptr<Scene> scene) {
     if (!scene) { unloadScene(); return; }
-    try { impl_->prepare(*scene); }
+    try {
+        impl_->prepare(*scene);
+        if (impl_->navigationEnabled) {
+            auto controller=impl_->navigation; auto view=scene->resolvedCamera(); controller.synchronize(view); scene->setResolvedCamera(view);
+        }
+    }
     catch (...) { scene.reset(); impl_->collectUnused(); throw; }
-    impl_->sceneDraws.clear(); impl_->activeScene=std::move(scene); impl_->previousFrame.reset(); impl_->collectUnused();
+    impl_->sceneDraws.clear(); impl_->activeScene=std::move(scene); impl_->previousFrame.reset(); impl_->resetNavigation(); impl_->collectUnused();
 }
 Scene* Engine::scene() noexcept { return impl_->activeScene.get(); }
 const Scene* Engine::scene() const noexcept { return impl_->activeScene.get(); }
 void Engine::unloadScene() {
-    impl_->sceneDraws.clear(); impl_->activeScene.reset(); impl_->previousFrame.reset(); impl_->collectUnused();
+    impl_->sceneDraws.clear(); impl_->activeScene.reset(); impl_->previousFrame.reset(); impl_->resetNavigation(); impl_->collectUnused();
+}
+const InputState& Engine::input() const noexcept { return impl_->input.state(); }
+void Engine::setCameraNavigationEnabled(bool enabled) {
+    if (impl_->navigationEnabled==enabled) { return; }
+    if (enabled) {
+        auto controller=impl_->navigation; auto view=impl_->currentCamera(); controller.synchronize(view);
+        impl_->storeCamera(view); impl_->navigation=controller;
+    }
+    impl_->resetNavigation(); impl_->navigationEnabled=enabled;
+    if (enabled) {
+        impl_->navigationCameraId=impl_->activeScene?impl_->activeScene->activeCamera():std::string{};
+        impl_->navigationSynchronized=true;
+    }
+}
+bool Engine::cameraNavigationEnabled() const noexcept { return impl_->navigationEnabled; }
+const OrbitCameraConfig& Engine::cameraNavigationConfig() const noexcept { return impl_->navigation.config(); }
+void Engine::configureCameraNavigation(const OrbitCameraConfig& config) {
+    auto controller=impl_->navigation; controller.configure(config);
+    auto view=impl_->currentCamera(); controller.apply(view); impl_->storeCamera(view);
+    impl_->navigation=controller; impl_->resetNavigation();
+    impl_->navigationCameraId=impl_->activeScene?impl_->activeScene->activeCamera():std::string{};
+    impl_->navigationSynchronized=true;
 }
 bool Engine::update() { return impl_->update(); }
 }

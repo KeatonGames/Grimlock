@@ -8,7 +8,7 @@ add_subdirectory(engine)
 add_subdirectory(game)
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Game)
 
-option(GRIMLOCK_BUILD_TESTS "Build focused scene/API checks (graphical tests require a Vulkan display)" OFF)
+option(GRIMLOCK_BUILD_TESTS "Build focused scene, camera and input checks (some require a Vulkan display)" OFF)
 if(GRIMLOCK_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

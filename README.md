@@ -28,6 +28,62 @@ cmake --build --preset release --target Game --parallel 4
 
 The CMake executable target is named `Game`, with output name `Grimlock` to preserve existing launch paths. Select `Game` in VS Code's CMake Tools target selector. The presets select x64. Visual Studio build presets select the configuration; `CMAKE_BUILD_TYPE` is not used. Initial dependency population needs network access. No package manager or privileged installation is required. The selected GLM release emits harmless upstream CMake deprecation warnings.
 
+Model assets use Git LFS. After a fresh clone, materialize tracked `.glb` files with `git lfs pull` before building/staging assets. A small text file starting with `version https://git-lfs.github.com/spec/v1` is a pointer, not a usable GLB. The demo also references user-supplied `assets/models/base.glb`, which is not currently tracked; supply that file separately. No model data is silently substituted when assets are missing.
+
+## Mouse navigation (Phase 7)
+
+Game enables mouse navigation for both JSON scenes and standalone model previews:
+
+| Input | Action |
+| --- | --- |
+| Right button + drag | Pan camera and target together, parallel to XZ |
+| Middle button + drag | Orbit around the target; yaw/pitch, constant distance |
+| Wheel up / down | Zoom in / out by changing distance, never field of view |
+| Left button, keyboard | Tracked only; no camera or gameplay actions |
+
+There are no keyboard shortcuts, speed modifiers, selection, picking, FPS controls, or new rendering features. Middle drag takes precedence if both navigation buttons are held. Drag entry/action changes discard that frame's motion so earlier pointer motion cannot cause a jump. Motion is displacement-based, not multiplied by frame time.
+
+Engine initializes the target from the active camera's existing `target`, deriving yaw/pitch/distance from `position - target`. Normal authored poses are preserved. Camera selection, scene replacement, and externally edited camera poses resynchronize the controller and cancel any ongoing drag. Navigation writes the selected scene camera (not a renderer-only override); attached cameras are converted back into object-local coordinates without losing their attachment. Existing camera JSON fields save/reload the navigated view; controller sensitivities/bounds are C++ settings, not new scene format fields.
+
+Pan uses view-relative right/up directions projected onto the horizontal plane. The shift is `(-dx * rightXZ + dy * upXZ) * scale`, moving the world with the drag. Scale is `2 * distance * tan(verticalFov/2) / logicalWindowHeight * panSensitivity`; neither camera nor target changes height, orientation, or orbit distance. Scaling uses SDL window height, not Vulkan drawable pixels. SDL relative motion uses the configured sensitivity; no OS acceleration or SDL mouse-scale settings are changed.
+
+Orbit reconstructs position as `target + distance * (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw))`, using fixed world up `(0,1,0)`. Horizontal drag subtracts yaw; downward drag raises pitch. Yaw wraps modulo 2*pi for continuous rotation, and pitch stays away from the pole. Zoom is `distance *= exp(-wheelY * zoomSensitivity)`, clamped in logarithmic space so large or fractional wheel inputs remain safe. Scrolling does not modify sensitivity or a movement-speed setting; pan still scales with current distance as specified.
+
+The horizontal ground plane is Y=0. Pitch/radius limits also keep the camera above that plane when the target itself is below it (the demo target is y=-0.4): orbit raises its minimum pitch without changing radius; zoom raises its minimum radius without changing pitch. This is a navigation bound, not model collision/terrain detection. An initial/configured pose outside limits is constrained; unreachable targets/configurations are rejected.
+
+### Configure or disable navigation
+
+```cpp
+engine.setCameraNavigationEnabled(); // Derives initial pose from the current camera.
+auto settings = engine.cameraNavigationConfig();
+settings.panSensitivity = 1.0F;
+settings.rotationSensitivity = 0.005F;
+settings.zoomSensitivity = 0.15F;
+engine.configureCameraNavigation(settings); // Applies target/distance/angles to the current camera.
+// engine.setCameraNavigationEnabled(false);
+```
+
+All math/configuration lives in Engine's Vulkan/SDL-free `OrbitCameraController`; Game only enables/configures it. Engine defaults to navigation disabled for other API consumers. `configureCameraNavigation` applies its complete pose explicitly; use a copy of the derived configuration when changing sensitivity only.
+
+| `OrbitCameraConfig` field | Default / units |
+| --- | --- |
+| `target` | (0,0,0), replaced by camera target when enabling/resynchronizing |
+| `distance` | 10 world units, derived from initial camera when enabling |
+| `yaw`, `pitch` | 0 / 35 degrees expressed in **radians**; derived on enable |
+| `panSensitivity` | 1, nonnegative multiplier |
+| `rotationSensitivity` | 0.005 radians per mouse coordinate unit |
+| `zoomSensitivity` | 0.15 exponential coefficient per wheel unit |
+| `minDistance`, `maxDistance` | 0.5 / 100 world units, positive ordered bounds |
+| `minPitch`, `maxPitch` | 5 / 85 degrees expressed in radians; minimum >=0, maximum <pi/2 |
+
+### Input snapshot and cursor lifecycle
+
+`engine.input()` returns a const `InputState` stable until the next update (explicit navigation lifecycle changes can cancel held navigation buttons). It provides pressed/held/released button/key states, accumulated relative mouse motion, fractional normalized wheel motion, window-coordinate position and focus. Mouse buttons use `MouseButton`; keyboard indices are SDL physical scancodes [0,511], not text or mapped actions. Left button and all keys remain unmapped. SDL headers stay private to Engine; only the SDL adapter tests include them explicitly.
+
+Engine polls SDL once per frame, clears transient edges/deltas before polling, and passes the completed snapshot to the controller. Events for other windows are ignored by the input adapter. Focus loss/minimization releases held keys/buttons and discards pending motion/wheel. Resize cancels drags; focus regain requires a fresh button press. Scene/camera changes and controller disable also cancel navigation. No stale motion is reused.
+
+During right/middle drag, SDL's per-window relative mode hides/constrains the cursor and supports motion at window edges; ending a drag restores the cursor to its starting window position. Focus loss releases relative mode without warping the cursor into an unfocused window. Disable/shutdown restore mouse mode via RAII; SDL failures are logged and cancel the gesture. See the [SDL3 relative-mode API](https://wiki.libsdl.org/SDL3/SDL_SetWindowRelativeMouseMode) and [wheel direction semantics](https://wiki.libsdl.org/SDL3/SDL_MouseWheelEvent). No permanent cursor capture, global event loop, or input mapping framework is introduced.
+
 ## Load an OBJ, GLB, or glTF
 
 1. Put the model in `assets/models/`, for example `assets/models/statue.glb`. For `.gltf`, keep external buffers beside the file in their referenced relative locations.
@@ -451,11 +507,19 @@ The committed checks use no testing framework. `Scene.Cpu` needs no window/devic
 
 ```powershell
 cmake --preset debug -DGRIMLOCK_BUILD_TESTS=ON
-cmake --build --preset debug --target Game EngineApiChecks SceneChecks SceneRuntimeChecks --parallel 4
+cmake --build --preset debug --target Game EngineApiChecks SceneChecks SceneRuntimeChecks CameraNavigationChecks InputChecks NavigationRuntimeChecks --parallel 4
 ctest --test-dir out/build/debug -C Debug --output-on-failure
 ```
 
-Verified on 17 October 2026:
+### Phase 7 validation / current checkout limitation
+
+Debug and Release builds succeed. `Camera.Navigation`, `Input.State`, `Camera.Runtime`, and `Scene.Cpu` pass in both configurations. Camera tests cover initial pose preservation, XZ pan, 10,000 orbit updates without radius drift, pitch/zoom/ground bounds, fractional/flipped wheel input, unmapped keys/left button, drag edges, focus/resize/disable cancellation, cursor-mode teardown, active-camera switching, and attached-camera local/world save/reload. SDL events are injected into the Engine's own window for the integration checks; no keyboard camera actions or selection code is added.
+
+The unfiltered suite currently has two asset-setup failures (`Engine.PublicApi`, `Scene.Runtime`), because source `blackrat.glb` is an LFS pointer rather than model bytes. Both checks also pass when run directly against an ignored local fixture root containing a cached blackrat copy whose SHA-256 matches the pointer: `7b1012b36cb510a3f96f8647242eecb25dc7c1e8234176084d01f0e6e53b6996`. Source assets/pointers are left untouched. Full default-scene verification needs the LFS models and the separately supplied `base.glb`; do not mistake this checkout condition for a camera/parser regression. Local test logs are `out/verification/phase7-*.log`.
+
+An ignored diagnostic scene using available cached base/blackrat assets passes Debug and Release animated rendering, wide/tall/repeated resize, minimize/restore, runtime-path and cleanup checks. The supplied `witch.obj` preview passes stationary rendering with navigation enabled. Stationary capture comparison excludes the window's rounded DWM corners; no rendered interior pixels changed. Core and synchronization validation report no errors/warnings in these checks. The default JSON/model binaries are not replaced or edited to bypass the LFS setup requirement.
+
+Earlier rendering/scene checks, recorded on 17 October 2026 before the current missing-LFS-assets checkout condition:
 
 - Debug and Release configure, compile, and link successfully; generated SPIR-V validates for Vulkan 1.3.
 - `Engine.PublicApi` passes canonical-path resource reuse, metadata, independent transformations/playback, paused versus advancing instances, automatic updates, invalid IDs, and RAII shutdown. Its graphical smoke mode also passes resize/minimize/restore. Game's generated compile command exposes neither private engine nor SDL/Vulkan headers.
@@ -523,6 +587,24 @@ Applied only small measured optimizations:
 - Canonical-path model reuse prevents repeat CPU decoding/GPU uploads. The two blackrats share one resource, while retaining independent animation/placement; the API check deliberately loads the same path twice and verifies reuse.
 
 The remaining dominant Debug cost is decoding 22 images, including full-resolution 4K material maps. Large CPU geometry conversion and initial bounds also remain visible in per-asset/self rows. Pipeline creation is only ~3.6 ms total for all nine fixed variants, so a persistent Vulkan pipeline cache is **not justified by these measurements** and was not added. Upload-fence waits are ~0.10 s; introducing asynchronous/batched-upload machinery would add complexity without addressing the main measured cost. Existing upload fences and real resize/shutdown device-idle waits remain for safety. No new dependencies, asset streaming, threads, disk caches, renderer features, or gameplay systems were added.
+
+## Phase 7 file inventory
+
+Added:
+
+- `engine/include/grimlock/input.hpp`: read-only frame snapshot interface (buttons, keys, motion, wheel, focus).
+- `engine/include/grimlock/orbit_camera.hpp`, `engine/src/core/orbit_camera.cpp`: configuration and pure camera-control math, operating on the existing Camera.
+- `engine/src/platform/input.hpp/.cpp`: SDL event-to-state adapter and drag-scoped relative-mode RAII.
+- `tests/camera_navigation.cpp`, `tests/input.cpp`, `tests/navigation_runtime.cpp`: math, SDL state and Engine integration checks.
+
+Modified:
+
+- `engine/include/grimlock/engine.hpp`, `engine/src/core/engine.cpp`: input snapshot/access, one event pass, optional controller, active-camera synchronization and lifecycle cleanup.
+- `engine/include/grimlock/scene.hpp`, `engine/src/scene/scene.cpp`: world-space camera writeback that retains object-local attachments and existing serialization.
+- `game/src/game.cpp`: enable navigation after loading the scene/model preview; no input handling or camera math in Game.
+- `CMakeLists.txt`, `engine/CMakeLists.txt`, `tests/CMakeLists.txt`: sources and optional focused tests; this README documents controls/settings/verification.
+
+Removed: no files. No dependency versions, shader/rendering code, model data, JSON format, or original Camera view/projection math changed. No input mapping framework, keyboard camera controls, picking, gameplay, camera animation, or other next-phase functionality was introduced.
 
 ## Phase 6 file inventory
 

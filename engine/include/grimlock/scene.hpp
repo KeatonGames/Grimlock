@@ -79,6 +79,8 @@ public:
     [[nodiscard]] const std::map<std::string,SceneCamera>& cameras() const noexcept { return cameras_; }
     [[nodiscard]] const std::string& activeCamera() const noexcept { return activeCamera_; }
     [[nodiscard]] Camera resolvedCamera() const;
+    // Writes a world-space view into the selected camera, retaining its attachment.
+    void setResolvedCamera(const Camera& camera);
     void setLighting(const SceneLighting& lighting);
     [[nodiscard]] const SceneLighting& lighting() const noexcept { return lighting_; }
     [[nodiscard]] Lighting resolvedLighting() const;

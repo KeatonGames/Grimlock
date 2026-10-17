@@ -2,6 +2,7 @@
 #include "grimlock/camera.hpp"
 #include "grimlock/lighting.hpp"
 #include "grimlock/transform.hpp"
+#include "grimlock/orbit_camera.hpp"
 #include <glm/gtc/quaternion.hpp>
 #include <cstddef>
 #include <filesystem>
@@ -76,6 +77,11 @@ public:
     [[nodiscard]] Scene* scene() noexcept;
     [[nodiscard]] const Scene* scene() const noexcept;
     void unloadScene();
+    [[nodiscard]] const InputState& input() const noexcept;
+    void setCameraNavigationEnabled(bool enabled = true);
+    [[nodiscard]] bool cameraNavigationEnabled() const noexcept;
+    [[nodiscard]] const OrbitCameraConfig& cameraNavigationConfig() const noexcept;
+    void configureCameraNavigation(const OrbitCameraConfig& config);
     // Polls events, advances animations/lights and renders. False only when closing;
     // a minimized window still updates, but rendering is deferred.
     [[nodiscard]] bool update();

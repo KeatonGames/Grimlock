@@ -2,9 +2,11 @@ add_library(Engine STATIC
     src/core/engine.cpp
     src/core/startup_profile.cpp
     src/core/transform.cpp
+    src/core/orbit_camera.cpp
     src/scene/scene.cpp
     src/scene/scene_serializer.cpp
     src/platform/window.cpp
+    src/platform/input.cpp
     src/platform/runtime_paths.cpp
     src/assets/model_loader.cpp
     src/assets/gltf_loader.cpp

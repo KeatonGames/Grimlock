@@ -171,6 +171,17 @@ Camera Scene::resolvedCamera() const {
     }
     (void)value.camera.view(); (void)value.camera.projection(1); return value.camera;
 }
+void Scene::setResolvedCamera(const Camera& camera) {
+    (void)camera.view(); (void)camera.projection(1);
+    auto value=cameras_.at(activeCamera_); value.camera=camera;
+    if (value.object) {
+        const auto inverse=glm::inverse(worldTransform(*value.object));
+        value.camera.position=glm::vec3{inverse*glm::vec4{camera.position,1}};
+        value.camera.target=glm::vec3{inverse*glm::vec4{camera.target,1}};
+        value.camera.up=glm::vec3{inverse*glm::vec4{camera.up,0}};
+    }
+    setCamera(activeCamera_,value);
+}
 void Scene::setLighting(const SceneLighting& value) {
     validateLighting(value.values);
     if (value.directionalObject) { (void)object(*value.directionalObject); }

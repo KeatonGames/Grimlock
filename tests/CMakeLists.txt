@@ -28,3 +28,30 @@ if(WIN32)
 endif()
 add_test(NAME Scene.Runtime COMMAND SceneRuntimeChecks "${PROJECT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/scene-runtime")
 set_tests_properties(Engine.PublicApi Scene.Runtime PROPERTIES RUN_SERIAL TRUE)
+
+add_executable(CameraNavigationChecks camera_navigation.cpp)
+target_link_libraries(CameraNavigationChecks PRIVATE Engine)
+add_test(NAME Camera.Navigation COMMAND CameraNavigationChecks)
+
+add_executable(InputChecks input.cpp)
+target_include_directories(InputChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(InputChecks PRIVATE Engine SDL3::SDL3)
+if(WIN32)
+    add_custom_command(TARGET InputChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:InputChecks>
+        VERBATIM)
+endif()
+add_test(NAME Input.State COMMAND InputChecks)
+set_tests_properties(Input.State PROPERTIES RUN_SERIAL TRUE)
+
+add_executable(NavigationRuntimeChecks navigation_runtime.cpp)
+target_link_libraries(NavigationRuntimeChecks PRIVATE Engine SDL3::SDL3)
+set_target_properties(NavigationRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(NavigationRuntimeChecks GrimlockShaders)
+if(WIN32)
+    add_custom_command(TARGET NavigationRuntimeChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:NavigationRuntimeChecks>
+        VERBATIM)
+endif()
+add_test(NAME Camera.Runtime COMMAND NavigationRuntimeChecks "${CMAKE_CURRENT_BINARY_DIR}/navigation-camera.json")
+set_tests_properties(Camera.Runtime PROPERTIES RUN_SERIAL TRUE)

@@ -11,6 +11,7 @@ Game::Game(const std::filesystem::path& path,const std::filesystem::path& enviro
     : engine_(EngineConfig{.environmentFolder=environmentFolder}) {
     if (path.empty()||path.extension()==".json") {
         engine_.setScene(engine_.loadScene(path.empty()?"assets/scenes/demo.json":path));
+        engine_.setCameraNavigationEnabled();
         return;
     }
     // Preserve the existing standalone model-preview CLI, separate from authored scenes.
@@ -18,6 +19,7 @@ Game::Game(const std::filesystem::path& path,const std::filesystem::path& enviro
     lighting.points[0]={{-2,2,2},28,{1,0.8F,0.65F},8};
     lighting.points[1]={{2,1.5F,1},16,{0.6F,0.75F,1},7}; lighting.pointCount=2;
     (void)loadExample(path);
+    engine_.setCameraNavigationEnabled();
 }
 InstanceId Game::loadExample(const std::filesystem::path& path) {
     const auto model=engine_.loadModel(path); const auto info=engine_.modelInfo(model);
