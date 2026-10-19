@@ -3,7 +3,7 @@ struct CameraData { float4x4 view; float4x4 projection; float4 position; };
 struct DrawData {
     float4x4 model;
     float4 normalColumn0; // W = sign of model determinant.
-    float4 normalColumn1;
+    float4 normalColumn1; // W = selection highlight; XYZ still stores the normal matrix.
     float4 normalColumn2;
     float4 baseColor;
 };
@@ -138,12 +138,22 @@ float3 environmentDirection(float3 direction) {
     float s, c; sincos(lights.environment.y, s, c);
     return float3(c * direction.x + s * direction.z, direction.y, -s * direction.x + c * direction.z);
 }
+float3 selectionHighlight(float3 color, VertexOutput input) {
+    if (draw.normalColumn1.w < 0.5) return color;
+    // Inner silhouette rim, not an expanded hull: existing depth/alpha tests retain occlusion.
+    float3 normal = safeNormalize(input.worldNormal, float3(0,1,0));
+    float3 view = safeNormalize(camera.position.xyz - input.worldPosition, normal);
+    float rim = pow(1 - saturate(abs(dot(normal,view))), 3);
+    float strength = 0.10 + 0.50 * smoothstep(0.12, 0.8, rim);
+    // A bounded cyan overlay both lifts dark surfaces and contrasts with bright ones.
+    return lerp(color, float3(0.08, 1.8, 2.6), strength);
+}
 [shader("fragment")]
 float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Target0 {
     float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
     if (material.state.x > 0.5 && material.state.x < 1.5 && base.a < material.factors.w) discard;
     if (material.state.x < 1.5) base.a = 1;
-    if (material.state.z > 0.5) return float4(base.rgb, base.a);
+    if (material.state.z > 0.5) return float4(selectionHighlight(base.rgb,input), base.a);
     float2 packed = metallicRoughnessMap.Sample(coordinates(input, 1)).gb;
     float roughness = clamp(material.emissiveRoughness.w * packed.x, 0.045, 1);
     float metallic = saturate(material.factors.x * packed.y);
@@ -226,5 +236,5 @@ float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Targ
         * (coatBrdf.x + coatBrdf.y) * coatFresnel;
     color += ((diffuseIbl + specularIbl) * (1 - coatFresnel) + coatIbl) * lights.environment.x * ao;
     color += emissiveMap.Sample(coordinates(input, 4)).rgb * material.emissiveRoughness.rgb * material.extensions.w * (1 - coatFresnel);
-    return float4(clamp(color, 0, 65504), base.a); // Finite RGBA16F; tone mapping happens after blending.
+    return float4(clamp(selectionHighlight(color,input), 0, 65504), base.a); // Finite RGBA16F; tone mapping happens after blending.
 }

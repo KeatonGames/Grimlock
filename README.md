@@ -2,7 +2,7 @@
 
 C++20, SDL3, and Vulkan 1.3+ renderer with glTF PBR, node/skeletal/morph animation, and punctual lights. The default scene preserves the character/cat/bunny placement, adds two independently posed blackrat instances sharing one GPU model, and retains six PBR spheres. Directional/point/spot lights and split-sum IBL illuminate the scene; HDR blending precedes tone mapping.
 
-`Engine` is an internal static library; `Game` is the demo executable and links only its public API. Game loads `assets/scenes/demo.json`; the scene supplies assets, placement, hierarchy, cameras, lights, and clip settings. Engine owns platform initialization, loading, shared CPU/GPU resources, scene updates, rendering, and shutdown. No ECS, gameplay, editor, hot reload, or new rendering/animation techniques are introduced.
+`Engine` is an internal static library; `Game` is the demo executable and links only its public API. Game loads `assets/scenes/demo.json`; the scene supplies assets, placement, hierarchy, cameras, lights, and clip settings. Engine owns platform initialization, loading, shared CPU/GPU resources, scene updates, rendering, and shutdown. The optional scene editor is isolated in `Editor`. No ECS, gameplay, hot reload, or new rendering/animation techniques are introduced.
 
 ## Build and run on Windows
 
@@ -15,7 +15,7 @@ From PowerShell in the repository root:
 ```powershell
 cmake --preset debug
 cmake --build --preset debug --target Game --parallel 4
-.\out\build\debug\Debug\Grimlock.exe assets/models/cube.obj
+.\out\build\debug\Debug\Grimlock.exe
 ```
 
 For Release:
@@ -23,12 +23,12 @@ For Release:
 ```powershell
 cmake --preset release
 cmake --build --preset release --target Game --parallel 4
-.\out\build\release\Release\Grimlock.exe assets/models/cube.obj
+.\out\build\release\Release\Grimlock.exe
 ```
 
 The CMake executable target is named `Game`, with output name `Grimlock` to preserve existing launch paths. Select `Game` in VS Code's CMake Tools target selector. The presets select x64. Visual Studio build presets select the configuration; `CMAKE_BUILD_TYPE` is not used. Initial dependency population needs network access. No package manager or privileged installation is required. The selected GLM release emits harmless upstream CMake deprecation warnings.
 
-Model assets use Git LFS. After a fresh clone, materialize tracked `.glb` files with `git lfs pull` before building/staging assets. A small text file starting with `version https://git-lfs.github.com/spec/v1` is a pointer, not a usable GLB. The demo also references user-supplied `game/assets/models/base.glb`, which is not currently tracked; supply that file separately. No model data is silently substituted when assets are missing.
+Model assets use Git LFS. After a fresh clone, materialize tracked `.glb` files with `git lfs pull` before building/staging assets. A small text file starting with `version https://git-lfs.github.com/spec/v1` is a pointer, not a usable GLB. The demo references the existing user-supplied `game/assets/models/assassin.glb`; its model data is preserved. No model data is silently substituted when assets are missing.
 
 ## Other CMake toolchains
 
@@ -38,10 +38,101 @@ The presets above select Visual Studio on Windows. On another platform, use an o
 cmake -S . -B out/build/native -DCMAKE_BUILD_TYPE=Debug -DGRIMLOCK_BUILD_TESTS=ON
 cmake --build out/build/native --parallel 4
 ctest --test-dir out/build/native --output-on-failure
-./out/build/native/Debug/Grimlock assets/models/cube.obj
+./out/build/native/Debug/Grimlock
 ```
 
 The `Debug/` executable/runtime subdirectory is intentional, including with single-configuration generators. These commands are not a claim of Linux/macOS validation; a compatible Vulkan implementation and display are required.
+
+## Minimal scene editor (Phase 9)
+
+The optional `Editor` library uses the official [Dear ImGui v1.93.0](https://github.com/ocornut/imgui/releases/tag/v1.93.0) `v1.93.0-docking` tag and unmodified SDL3/Vulkan backends. `GRIMLOCK_BUILD_EDITOR` defaults to `ON`; the normal launch still runs Game without an ImGui context, panels or editor input handling. No extra application executable is introduced.
+
+```powershell
+cmake --preset debug -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON
+cmake --build --preset debug --parallel 4
+.\out\build\debug\Debug\Grimlock.exe --editor
+# Or: Grimlock.exe --editor assets/scenes/my_scene.json
+```
+
+In editor mode:
+
+1. **File > New Scene** starts an empty scene; **Open Scene** offers the runtime scene list and an editable JSON path. Invalid/missing files report an error without replacing the active scene.
+2. **Scene Hierarchy** displays the actual Scene tree. Click a name or a model in the viewport to share the same stable-ID selection. Empty and hidden objects can remain selected for inspection; normal Game picking still ignores inactive/non-selectable objects. Selection reveals collapsed ancestors. Visibility checkboxes edit local enabled state; disabled ancestors still hide their children.
+3. **Add Model** opens a compact asset picker; **Add to Scene** places the chosen model. The list scans the configured asset root's `models/` directory; **Refresh List** refreshes names only, not already loaded model contents. New model instances are fitted to roughly two world units, grounded and centered at the camera target. Source geometry/materials are not modified. New objects are selected automatically.
+4. **Create Group** creates an empty Scene object at the root. Right-click an object for **Group Selected Object**, which wraps it in a new group under its existing parent without moving it. Drag model/group names onto groups to reparent them; drop onto **Scene Root** or the empty hierarchy area to unparent. Moves preserve world transforms and descendants, reject cycles/model targets, and retain selection. Double-click a name, or use **Rename** in its context menu, to edit it inline (Enter commits, Escape cancels). The Inspector can also rename groups. Groups and models have distinct row markers; arrows expand/collapse real children.
+5. **Inspector** separates General and Transform properties, with aligned X/Y/Z-accented numerical controls for local position/XYZ rotation in degrees/scale. Drag values or Ctrl+click to enter numbers; viewport updates are immediate. Rotation uses a consistent GLM Euler/quaternion convention with a per-selection display cache; non-finite values are rejected and near-zero scales constrained. Negative scales remain supported. Groups show their direct-child count; models show a read-only asset path. Animated models also show the **Animation** controls described below.
+6. **Duplicate** copies the selected object's local state, model/material reference, parent and authored animation configuration into an independent instance. Preview time/pause/stop are not copied; the new instance starts according to its Autoplay setting. It does not recursively clone children. **Delete Object/Group** asks for confirmation and explicitly reports how many descendants will also be deleted. Move children to Scene Root first to keep them. Shared CPU/GPU resources remain alive while other instances use them.
+7. **Save Scene** writes the current JSON path; **Save Scene As** chooses a new `.json` filename. Group names, parent relationships and local transforms use the existing JSON schema. An asterisk marks edits, including camera navigation. New/Open/Exit and window-close requests ask **Save and Continue / Discard / Cancel** before losing unsaved changes. Normal animation playback and selection alone do not mark the document dirty.
+
+World-preserving reparenting cannot always be expressed as translation/rotation/scale: rotated, non-uniformly scaled parents can require shear. Such moves report a clear error and leave hierarchy/transforms unchanged. Use uniform group scales or aligned rotations before retrying; the editor never silently approximates shear or changes the Scene transform format.
+
+Paths entered in the file dialog are absolute or executable-relative, just like Engine's existing load/save APIs. Hover the scene name in the menu bar to see the current path. **Builds restage `game/assets/` beside the executable: use Save As to save persistent authored scenes to your source scene directory, or open an absolute source path before editing.** Saving a staged copy is not a source-file hot-reload mechanism. New models added to the source assets directory need normal asset staging before they appear in the running editor.
+
+The default docked layout puts Hierarchy left and Inspector right, over the existing full-window 3D scene. The transparent center remains the viewport: RMB pan, MMB orbit, wheel zoom and left picking work there. UI mouse/keyboard capture suppresses the corresponding Engine input, including during Inspector drags and text entry. Panels can be rearranged within the same native window; multi-viewport support is disabled. Layout is session-only (`imgui.ini`/log output disabled). **View > Performance** optionally shows ImGui's rolling FPS/frame time and Scene object/enabled counts; no new draw-call tracker or profiler is installed.
+
+Editor code lives only in `editor/`: its document commands call the real Engine/Scene APIs and never keep a parallel scene graph. Engine exposes a small opt-in native overlay interface for attachment, SDL event forwarding, capture, deferred close, swapchain changes and post-tone-map command recording. There are no ImGui dependencies in Engine or Scene, and Game's implementation is unchanged; only the executable launcher chooses editor mode. The backend renders inside the existing Dynamic Rendering color pass after tone mapping, under the existing frame fence. Device-idle detach/recreation preserves deterministic cleanup, and only format/image-count changes reinitialize the ImGui Vulkan backend. The slate dark theme uses muted blue accents, consistent padding/rounding and ImGui's embedded scalable font at 15 px, without OS font paths, extra assets or dependencies. The palette is linearized once for the existing sRGB attachment.
+
+To exclude the editor and its dependency completely:
+
+```powershell
+cmake --preset debug -B out/build/game-only -DGRIMLOCK_BUILD_EDITOR=OFF
+cmake --build out/build/game-only --config Debug --target Game --parallel 4
+.\out\build\game-only\Debug\Grimlock.exe
+```
+
+The pinned ImGui archive/hash is isolated in `cmake/ImGui.cmake`; initial editor-enabled dependency population needs network access. No file-dialog library, custom UI renderer, gizmos, undo history, asset database or scene hot reload is added.
+
+### Animation controls and public Engine API
+
+Select an animated model to show **Animation Clip**, **Play/Pause/Resume**, **Stop**, **Loop**, **Autoplay**, and **Playback Speed** in the existing Inspector. Clip names come directly from imported data; unnamed clips receive a display-only numbered label. Static models and groups have no animation controls. The supplied `blackrat.glb` has 13 clips; `assassin.glb` has no clips and correctly shows no controls.
+
+Changing the selected clip resets its time and updates its pose immediately: an already playing instance keeps playing, while a stopped/paused instance previews the new clip's first frame paused. Pause holds the exact current pose; Resume retains time; Play restarts a finished/stopped clip. Stop restores imported rest transforms, morph weights and skin palettes. Non-looping playback holds its endpoint and reports **Finished (holding pose)**; Stop returns to rest. Speed 1 is normal, 0 freezes advancement, and negative speed reverses; Play/restart with negative speed starts at the clip's end. Loop/speed edits affect the live instance without restarting it. Autoplay only controls the next scene initialization and does not start/stop the current preview.
+
+Only clip/Loop/Speed/Autoplay edits mark the document dirty. Play/Pause/Resume/Stop and ordinary advancement never change authored settings. Saving during a preview does not save its time, paused state or pose. Each instance keeps independent playback and poses while sharing immutable model/clip data and GPU assets; no new evaluator or Vulkan work is introduced.
+
+The public `grimlock::Scene` owned by Engine is the object-ID animation API for both Editor and Game (`auto& scene = *engine.scene();`, after scene activation/model preparation):
+
+| API | Behavior |
+| --- | --- |
+| `availableAnimations(id)` | Read-only span of imported clips/names/start/end, empty for non-animated/unbound objects; valid until the object's model is replaced/removed |
+| `playAnimation(id, clipIndexOrName, loop)` | Select/restart a runtime clip, without changing saved configuration; names must match exactly and uniquely |
+| `pauseAnimation(id)`, `resumeAnimation(id)` | Freeze/resume the current playback time and pose |
+| `stopAnimation(id)` | Stop and restore rest pose |
+| `setAnimationSpeed(id, speed)` | Finite runtime speed only; does not change saved Speed |
+| `animationSettings(id)` | Existing live snapshot: clip index, time, speed, loop, running/paused/rest flags; `playing` means running before pause filtering |
+| `animationConfiguration(id)` | Authored clip, optional unique clip name, autoplay, loop and speed, independent of preview |
+| `setAnimationConfiguration(id, config)` | Validate/save configuration; changed clip previews immediately, loop/speed update live, autoplay applies on reload |
+
+For example, using actual imported names rather than hardcoded model-specific strings:
+
+```cpp
+auto& scene = *engine.scene();
+const auto clips = scene.availableAnimations(objectId);
+if (!clips.empty()) {
+    scene.playAnimation(objectId, std::size_t{0}, true); // Or clips[0].name if unique/nonempty.
+    scene.pauseAnimation(objectId);
+    scene.resumeAnimation(objectId);
+    scene.setAnimationSpeed(objectId, 0.75F); // Runtime only.
+    scene.stopAnimation(objectId);
+
+    auto config = scene.animationConfiguration(objectId);
+    config.clip = 0;
+    config.clipName.reset(); // Choose by index; a supplied name otherwise takes precedence.
+    config.autoplay = true;
+    config.speed = 1.0F;
+    scene.setAnimationConfiguration(objectId, config);
+}
+```
+
+Editor configuration edits go through `SceneDocument` to track dirty state; preview buttons call this public Scene API. Existing `Scene::setAnimation` / `Scene::animation` and manual `Engine::animation(InstanceId)` remain available for legacy initial-state input and lower-level playback/seek use. No state machines, blending, timeline or keyframe editing are added.
+
+New scene saves write only these initial settings per animated instance:
+
+```json
+"animation": {"clip": "idle_A1", "autoplay": true, "loop": true, "speed": 0.75}
+```
+
+`clip` uses a unique nonempty imported name when possible, or a zero-based index for unnamed/duplicate-named clips. Missing/renamed/ambiguous names and out-of-range indices produce a warning at binding, retain the authored choice, and leave that instance at rest; the Inspector offers a new selection. A missing named selection resolves to `configuration.clip == availableAnimations(id).size()`. Invalid interactive API selections throw before changing state. Names survive clip reordering; index fallbacks cannot promise that. Scene format version remains 1: old numeric clip records and legacy `time`/`playing`/`paused`/`rest_pose` still load as initial playback state, but saving migrates them to configuration-only records. Explicit `autoplay` takes precedence over legacy playback flags/time. An absent `animation` starts at rest with autoplay off, loop on and speed 1; old records lacking `autoplay` preserve their previous playback defaults.
 
 ## Mouse navigation (Phase 7)
 
@@ -52,9 +143,10 @@ Game enables mouse navigation for both JSON scenes and standalone model previews
 | Right button + drag | Pan camera and target together, parallel to XZ |
 | Middle button + drag | Orbit around the target; yaw/pitch, constant distance |
 | Wheel up / down | Zoom in / out by changing distance, never field of view |
-| Left button, keyboard | Tracked only; no camera or gameplay actions |
+| Left-click | Select a scene model; empty space clears selection |
+| Keyboard | Tracked only; no camera or gameplay actions |
 
-There are no keyboard shortcuts, speed modifiers, selection, picking, FPS controls, or new rendering features. Middle drag takes precedence if both navigation buttons are held. Drag entry/action changes discard that frame's motion so earlier pointer motion cannot cause a jump. Motion is displacement-based, not multiplied by frame time.
+There are no keyboard shortcuts, speed modifiers or FPS controls. Middle drag takes precedence if both navigation buttons are held. Drag entry/action changes discard that frame's motion so earlier pointer motion cannot cause a jump. Motion is displacement-based, not multiplied by frame time. Selection ignores clicks during right/middle navigation gestures.
 
 Engine initializes the target from the active camera's existing `target`, deriving yaw/pitch/distance from `position - target`. Normal authored poses are preserved. Camera selection, scene replacement, and externally edited camera poses resynchronize the controller and cancel any ongoing drag. Navigation writes the selected scene camera (not a renderer-only override); attached cameras are converted back into object-local coordinates without losing their attachment. Existing camera JSON fields save/reload the navigated view; controller sensitivities/bounds are C++ settings, not new scene format fields.
 
@@ -91,11 +183,33 @@ All math/configuration lives in Engine's Vulkan/SDL-free `OrbitCameraController`
 
 ### Input snapshot and cursor lifecycle
 
-`engine.input()` returns a const `InputState` stable until the next update (explicit navigation lifecycle changes can cancel held navigation buttons). It provides pressed/held/released button/key states, accumulated relative mouse motion, fractional normalized wheel motion, window-coordinate position and focus. Mouse buttons use `MouseButton`; keyboard indices are SDL physical scancodes [0,511], not text or mapped actions. Left button and all keys remain unmapped. SDL headers stay private to Engine; only the SDL adapter tests include them explicitly.
+`engine.input()` returns a const `InputState` stable until the next update (explicit navigation lifecycle changes can cancel held navigation buttons). It provides pressed/held/released button/key states, accumulated relative mouse motion, fractional normalized wheel motion, window-coordinate position, first left-press coordinates and focus. Mouse buttons use `MouseButton`; keyboard indices are SDL physical scancodes [0,511], not text or mapped actions. Keyboard actions remain unmapped. SDL headers stay private to Engine; only adapter/integration tests include them explicitly.
 
 Engine polls SDL once per frame, clears transient edges/deltas before polling, and passes the completed snapshot to the controller. Events for other windows are ignored by the input adapter. Focus loss/minimization releases held keys/buttons and discards pending motion/wheel. Resize cancels drags; focus regain requires a fresh button press. Scene/camera changes and controller disable also cancel navigation. No stale motion is reused.
 
 During right/middle drag, SDL's per-window relative mode hides/constrains the cursor and supports motion at window edges; ending a drag restores the cursor to its starting window position. Focus loss releases relative mode without warping the cursor into an unfocused window. Disable/shutdown restore mouse mode via RAII; SDL failures are logged and cancel the gesture. See the [SDL3 relative-mode API](https://wiki.libsdl.org/SDL3/SDL_SetWindowRelativeMouseMode) and [wheel direction semantics](https://wiki.libsdl.org/SDL3/SDL_MouseWheelEvent). No permanent cursor capture, global event loop, or input mapping framework is introduced.
+
+## Object selection (Phase 8)
+
+Game enables picking for JSON scenes. Left-click selects the closest visible, selectable scene model; clicking empty space clears it. A held button does not repeatedly pick. RMB pan, MMB orbit, wheel zoom and navigation settings are unchanged, and selection survives navigation. The standalone legacy model-preview API has no scene object identifiers and is unchanged.
+
+```cpp
+engine.setObjectSelectionEnabled(); // Other Engine consumers default to disabled.
+if (const auto id = engine.selectedObject()) {
+    const auto& object = engine.scene()->object(*id);
+    // Read object data here; no gameplay interaction is installed by Engine.
+}
+engine.clearSelection();
+// engine.scene()->setSelectable(id, false); // Runtime policy, not a JSON field.
+```
+
+Scene stores one optional stable `ObjectId`, not an object pointer or GPU handle. Changing the selection replaces it; deletion (including ancestor deletion), disabling the selected hierarchy, removing/changing its model, making it non-selectable, unloading/replacing the scene or disabling selection safely invalidates/clears it. `Scene::selectObject`, `selectedObject` and `clearSelection` also expose the CPU-only state. Selection and selectable policy are intentionally not serialized; scene format version 1 is unchanged.
+
+On a valid left-button press, Engine unprojects the logical cursor through the active camera's inverse view-projection at Vulkan depths 0 and 1. Logical coordinates are normalized by logical window size, while drawable pixel size determines the projection aspect. Camera projection already flips Y; no second Y flip is applied. Picking is restricted to the camera near/far interval and ignores unfocused, minimized/zero-sized, outside-window and navigation-drag clicks. Press coordinates are retained even if later motion occurs in the same event batch.
+
+Each shared CPU model caches local mesh AABBs once. A world-unit ray is transformed into each instance/imported node's local space without renormalizing its direction, retaining comparable world-distance parameters under nonuniform or mirrored scale. AABB rejection precedes double-precision Moller-Trumbore triangle tests, respecting material back-face policy and overrides. Skinned/morphed positions and their exact bounds are evaluated only for clicks, using the current pose, morph-before-skin order and both sets of joint influences, including existing legacy bind-pose previews. One reusable per-resource scratch array avoids retaining duplicate meshes. Alpha-cutout hits sample the existing CPU base-color image at barycentric UV0/UV1, with texture transforms, sampler wrapping/filtering and material/instance alpha; fully transparent blended texels are also ignored. This is base-level CPU filtering, not an exact reproduction of GPU mip/derivative filtering or blended visibility. There is no GPU readback, physics system, BVH or per-frame geometry intersection work.
+
+The selected object receives a soft cyan **inner silhouette rim plus a light surface tint**, not an external pixel-width outline. This deliberately simpler technique uses the existing mesh pass and one spare push-constant component; no additional image, pass, pipeline, descriptor or GPU geometry is allocated. Every primitive uses the same object flag, including animated children. Existing depth testing, material alpha discard/blending, skin/morph deformation, PBR lighting and tone mapping remain in force. Unselected shading and material data are unchanged; deselection immediately removes the transient effect. Occluded surfaces are not drawn through opaque foreground geometry. This is not a selection mask or a post-processing framework.
 
 ## Load an OBJ, GLB, or glTF
 
@@ -207,7 +321,7 @@ IDs/references are decimal **strings**, not JSON floating-point numbers. Parent 
 | `name`, `parent`, `model`, `enabled` | Empty name, no parent, transform-only object, true |
 | `transform.position/rotation/scale` | [0,0,0] / [0,0,0,1] / [1,1,1] |
 | `tint`, `material_override` | White [1,1,1,1], imported primitive materials; override selects existing model material index |
-| `animation` | Omitted means rest pose; if present, clip 0, time 0 (clamped to clip), speed 1, loop/playing true, paused/rest_pose false |
+| `animation` | Omitted means rest pose/autoplay off, clip 0, speed 1, loop true. New records save clip name/index, autoplay, loop, speed; legacy records without autoplay retain their old startup defaults |
 | `cameras`, `active_camera` | Default `main` Camera; supplied nonempty array selects first unless active ID specified |
 | Camera properties | `id` required; position [3,2.2,4], target [0,0,0], up [0,1,0], `vertical_fov_degrees` 45, `near` 0.1, `far` 100 |
 | Light attachment `object` | Optional object ID, otherwise world-space |
@@ -217,7 +331,7 @@ IDs/references are decimal **strings**, not JSON floating-point numbers. Parent 
 | Spot extras | Direction [0,0,-1], `inner_cone` 0 / `outer_cone` pi/4 radians |
 | IBL/exposure | `environment_intensity` 1, `environment_rotation` 0 radians, `exposure` 1 |
 
-Camera/light `object` references can point to transform-only or model-bearing objects. Light colors/intensities/ranges must be nonnegative; spot angles satisfy `0 <= inner < outer <= pi/2`. Cameras use the existing non-degenerate view/perspective validation. Saving captures clip/time/speed/loop/playing/paused/rest-pose settings, not mesh/skin pose arrays. No blending/state machine is added.
+Camera/light `object` references can point to transform-only or model-bearing objects. Light colors/intensities/ranges must be nonnegative; spot angles satisfy `0 <= inner < outer <= pi/2`. Cameras use the existing non-degenerate view/perspective validation. Saving captures authored clip/autoplay/speed/loop configuration, never preview time, playing/paused/rest flags or mesh/skin pose arrays. No blending/state machine is added.
 
 Scene JSON uses private, SHA-256-pinned nlohmann/json 3.12.0 for parsing/writing; fastgltf retains simdjson. Unknown/duplicate properties, malformed types/JSON, invalid references/cycles/TRS, unsupported versions, and invalid lights/cameras fail with file/field diagnostics. Limits: 16 MiB scene files, JSON depth 128, 10,000 objects/cameras, plus existing renderer frame/resource limits. Save builds the document before opening the destination and checks write errors; disk writes are synchronous, not a crash-proof transactional filesystem/database.
 
@@ -323,15 +437,15 @@ CPU preprocessing runs once at renderer creation, not per frame or resize: cosin
 
 | Asset | Meshes/primitives | Nodes | Materials | Images/textures | Skins | Animations |
 | --- | --- | --- | --- | --- | --- | --- |
-| `base.glb` | 27/27 | 216 | 4 | 12/12 | 27 | 0 |
+| `assassin.glb` | 27/27 | 216 | 4 | 12/12 | 27 | 0 |
 | `dogcat.glb` | 1/1 | 35 | 1 | 0/0 | 1 | 0 |
 | `blackrat.glb` | 2/3 | 238 | 3 | 6/10 | 1 (235 joints) | 13 |
 | `bunny.glb` | 20/22 | 20 | 11 | 2/2 | 0 | 0 |
 | `bunny2.glb` | 22/22 | 45 | 11 | 4/4 | 0 | 0 |
 
-`base.glb` uses UV0/imported tangents, four double-sided OPAQUE materials, four embedded JPEG base-color images (three 4096², one 2048²), four JPEG metallic-roughness maps, and four PNG normal maps. All twelve images are decoded/uploaded and shaded, with repeat/linear/trilinear sampling. Metallic/roughness factors default to 1, so the packed maps control their values. `dogcat.glb` has no textures; its double-sided OPAQUE material uses linear RGBA `(0.5, 0.5, 0.5, 1)`, metallic 0, and roughness about 0.6. Neither asset contains AO/emissive textures, UV transforms, or material extensions; synthetic checks cover those channels.
+`assassin.glb` uses UV0/imported tangents, four double-sided OPAQUE materials, four embedded JPEG base-color images (three 4096², one 2048²), four JPEG metallic-roughness maps, and four PNG normal maps. All twelve images are decoded/uploaded and shaded, with repeat/linear/trilinear sampling. Metallic/roughness factors default to 1, so the packed maps control their values. `dogcat.glb` has no textures; its double-sided OPAQUE material uses linear RGBA `(0.5, 0.5, 0.5, 1)`, metallic 0, and roughness about 0.6. Neither asset contains AO/emissive textures, UV transforms, or material extensions; synthetic checks cover those channels.
 
-`base.glb` and `dogcat.glb` have identity local transforms on every referenced joint despite non-identity inverse binds, and no clips. Their declared rest skins collapse geometry. For this narrowly detected all-identity/coincident-joint case only, the importer warns and marks **undeformed bind-pose preview in joint-root space**; the GPU palette implements the preview without altering imported geometry or node transforms. Re-export complete joint transforms to reproduce an intended skeletal pose. This legacy compatibility path is never applied to animated blackrat.
+`assassin.glb` and `dogcat.glb` have identity local transforms on every referenced joint despite non-identity inverse binds, and no clips. Their declared rest skins collapse geometry. For this narrowly detected all-identity/coincident-joint case only, the importer warns and marks **undeformed bind-pose preview in joint-root space**; the GPU palette implements the preview without altering imported geometry or node transforms. Re-export complete joint transforms to reproduce an intended skeletal pose. This legacy compatibility path is never applied to animated blackrat.
 
 ### Blackrat failure and fix
 
@@ -383,7 +497,7 @@ Morph targets preserve position/normal/tangent deltas and default mesh/node weig
 
 `Deformation` owns a single fence-protected coherent SSBO arena: draw records, joint matrices, and morph weights. Immutable per-mesh set 2 descriptors additionally bind the device-local morph buffer. Direct indexed draws use Vulkan's instance index to select a record, without extra shader-draw-parameter features or push-constant growth. Matrices/weights upload only after the existing frame fence; there are no per-frame GPU allocations or descriptor updates. Current explicit limits: 4096 uploaded primitive sets, 4096 primitive draws/frame, 65536 palette entries/frame, and 65536 weights/frame. Palettes/weights are currently appended per primitive draw; these are small-scene bounds, not a streaming allocator. Device storage-buffer limits and buffer sizes are checked; all descriptors use aligned offset zero. Resizing preserves these resources.
 
-No animation blending/state machine/editor is included. Bounds remain initial framing bounds and transparent sorting still uses primitive centers rather than recomputed deformed bounds. Stop/rest does not reconstruct missing source joint transforms. The only CPU deformation is initial position-only bounds calculation, not rendering.
+No animation blending/state machine/timeline is included. The optional scene Inspector controls existing playback only. Bounds remain initial framing bounds and transparent sorting still uses primitive centers rather than recomputed deformed bounds. Stop/rest does not reconstruct missing source joint transforms. The only CPU deformation is initial position-only bounds calculation, not rendering.
 
 ### Place multiple instances (legacy manual API)
 
@@ -436,7 +550,8 @@ Minimization defers rendering but does not end the update loop. First update use
 .
 ├── CMakeLists.txt         Project composition and optional tests
 ├── CMakePresets.json      Windows Debug/Release workflows
-├── cmake/                Pinned dependency setup and shader compilation
+├── cmake/                Pinned dependencies (including optional ImGui) and shaders
+├── editor/               Optional editor library: public launcher, UI and document commands
 ├── engine/
 │   ├── CMakeLists.txt     Engine static library and shader target
 │   ├── include/grimlock/ Public API (including CPU asset types in assets/)
@@ -465,7 +580,7 @@ Minimization defers rendering but does not end the update loop. First update use
 └── .gitignore
 ```
 
-Generated builds, fetched third-party sources (`_deps/`), caches and local verification artifacts stay under ignored `out/`; they are not source modules. Dependency versions/hashes remain centralized in `cmake/Dependencies.cmake`, without a duplicate vendored tree. No empty directories are reserved for future systems. Public header paths remain stable; private implementation files use snake_case names.
+Generated builds, fetched third-party sources (`_deps/`), caches and local verification artifacts stay under ignored `out/`; they are not source modules. Core dependency versions/hashes remain centralized in `cmake/Dependencies.cmake`, with optional editor dependencies in `cmake/ImGui.cmake`, without a duplicate vendored tree. No empty directories are reserved for future systems. Public header paths remain stable; private implementation files use snake_case names.
 
 Source and runtime ownership are distinct: `game/assets/` is staged as `assets/` beside the executable, while `engine/shaders/` is compiled into runtime `shaders/`. Existing JSON model references, CLI arguments and public Engine includes are unchanged.
 
@@ -481,7 +596,7 @@ The existing one-frame-in-flight fence and per-swapchain-image presentation sema
 
 Dynamic Rendering binds HDR color and a supported depth attachment (D32 float, otherwise D16). Depth clears to 1; indexed draws use LESS testing, with writes for opaque/masked materials only. A second color-only pass samples HDR into the swapchain. Synchronization2 covers acquisition, uploads, color/depth access, HDR-write to fragment-read, and presentation. Shared depth/HDR are safe with one frame in flight. HDR/depth targets and command buffers are recreated with the swapchain; GPU meshes/materials/IBL remain resident. The HDR sampler descriptor updates only during recreation, after idle. Dynamic viewport/scissor preserve pipelines on size-only resizes; only the presentation pipeline depends on swapchain format. Minimized/zero-extent windows defer rendering.
 
-The functioning Vulkan responsibility split is retained instead of introducing another abstraction layer. The full-screen tone-map triangle remains necessary, not obsolete Hello Triangle code. No shadows, deferred lighting, SSR, ray tracing, physics, audio, UI, gameplay, or advanced transmission post-processing is introduced.
+The functioning Vulkan responsibility split is retained. The full-screen tone-map triangle remains necessary, not obsolete Hello Triangle code. Only the generic overlay callback bridge is new; editor widgets stay outside the renderer. No shadows, deferred lighting, SSR, ray tracing, physics, audio, gameplay or advanced transmission post-processing is introduced.
 
 ## Shaders and runtime files
 
@@ -506,13 +621,13 @@ assets/models/witch.obj
 assets/scenes/demo.json
 ```
 
-Keep shaders, assets, and the SDL shared library alongside the executable when moving a build. The default demo still requires the separately supplied `base.glb`, as noted above; it is not generated or copied from another model. Paths use SDL's executable base directory, with UTF-8 path handling, not hardcoded absolute paths.
+Keep shaders, assets, and the SDL shared library alongside the executable when moving a build. The default demo uses the supplied `assassin.glb`; it is not generated or copied from another model. Paths use SDL's executable base directory, with UTF-8 path handling, not hardcoded absolute paths.
 
 ## Dependencies
 
 C++20 and the standard library, Vulkan, SDL3, GLM, TinyObjLoader, fastgltf (with simdjson), stb_image, MikkTSpace, nlohmann/json, Slang, and CMake are the active stack. JSON is header-only/private to Engine serialization; no JSON types leak into the API. No graphics engine or IBL library is added.
 
-All downloaded libraries are centralized in `cmake/Dependencies.cmake` with explicit archive versions and SHA-256 validation:
+Core downloaded libraries are centralized in `cmake/Dependencies.cmake` with explicit archive versions and SHA-256 validation:
 
 | Library | Pinned tag | SHA-256 |
 | --- | --- | --- |
@@ -524,6 +639,7 @@ All downloaded libraries are centralized in `cmake/Dependencies.cmake` with expl
 | stb (stb_image 2.30) | `2c980bb59875b0d32144a71867fbdebb2f77cd20` | `9a955b1b49a4410088a2e0ee2a9c057c3c907d0c1d75454144cb980aca0ba515` |
 | MikkTSpace | `3e895b49d05ea07e4c2133156cfa94369e19e409` | `aeba65ddee85a679133d510d71d00b108f603752f90b15b9ecf7777033f6e351` |
 | nlohmann/json | v3.12.0 (`json.tar.xz`) | `42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa` |
+| Dear ImGui (optional, `cmake/ImGui.cmake`) | v1.93.0-docking | `746c265540bd3aa109570f29492ef4d8f5b421dd9fd0049c35ca35f21496f1a5` |
 
 [TinyObjLoader v1.0.7](https://github.com/tinyobjloader/tinyobjloader/tree/v1.0.7) is the latest stable tag verified upstream; v2 tags are release candidates. Its legacy CMake 2.8 configuration cannot run unchanged under CMake 4, so FetchContent retrieves the release and this project builds its documented `tiny_obj_loader.cc` library source directly. Upstream examples, install rules, and unrelated tools are excluded. SDL retains only needed subsystems, and GLM is header-only. Vulkan and Slang come from the system SDK.
 
@@ -537,11 +653,11 @@ The committed checks use no testing framework. Scene/camera CPU checks need no w
 
 ```powershell
 cmake --preset debug -DGRIMLOCK_BUILD_TESTS=ON
-cmake --build --preset debug --target Game EngineApiChecks SceneChecks SceneRuntimeChecks CameraNavigationChecks InputChecks NavigationRuntimeChecks --parallel 4
+cmake --build --preset debug --parallel 4
 ctest --test-dir out/build/debug -C Debug --output-on-failure
 ```
 
-The asset-dependent checks require materialized Git LFS models. The default demo additionally needs the separately supplied `game/assets/models/base.glb`; standalone previews such as `assets/models/cube.obj` do not. This cleanup does not substitute or rename user models to satisfy a missing scene reference.
+The asset-dependent checks require materialized Git LFS models. The default demo uses `game/assets/models/assassin.glb`. No user models are substituted or recreated.
 
 Earlier phase-specific results and startup measurements are preserved in [Development history](docs/history.md).
 
@@ -550,3 +666,64 @@ Earlier phase-specific results and startup measurements are preserved in [Develo
 Windows Debug and Release configure/build successfully, and all six CTest checks pass in each configuration with Vulkan core and synchronization validation enabled. Both mesh and tone-map SPIR-V outputs validate for Vulkan 1.3. An isolated Debug runtime containing only current shaders/source assets passes a stationary model preview and an animated scene derived from the existing demo's rat objects, including wide/tall/repeated resize, minimize/restore, unrelated working directory and clean shutdown, with no validation errors/warnings. Blackrat's default clip 0 is intentionally static; the animated check uses its existing idle clip 1.
 
 The Release Game also passes the existing `witch.obj` preview with resize/minimize and validation-clean shutdown. Every moved model, scene and asset note was checked against its pre-move SHA-256. Camera, animation, model-data and shader moves preserve implementation content; only the SDL adapter's private include path changes. Public headers, Game logic, dependency versions and scene JSON are unchanged. Other operating systems were not tested.
+
+### Phase 8 verification and file inventory
+
+Debug and Release configure/build successfully; all eight CTest checks pass with Vulkan core/synchronization validation enabled. Mesh SPIR-V validates for Vulkan 1.3. CPU picking checks load and intersect every supplied GLB/OBJ, including `assassin.glb`, and cover Vulkan/DPI unprojection, resize/aspect, clipping, exact triangle rejection, mirrored/nonuniform scales, imported hierarchy, independent shared instances, current animation, morph-before-skinning, the second influence set and stable selection invalidation. Runtime SDL events exercise first-press/held/empty clicks, nearest overlapping models, runtime selectable/enabled flags, navigation conflicts, pan/orbit/zoom, resizing, serialization without new fields, deletion/unload, and actual clicks on the multi-mesh assassin and both shared rat instances. Existing animation and camera tests remain unchanged and pass.
+
+Fixed-pose GPU captures verify that selecting the assassin or one rat changes only that object's rendered pixels, not its shared twin or the other models. Highlight rendering survives wide/tall/repeated resize and minimize/restore with no core/synchronization validation errors/warnings. Captures and the small local comparison harness stay under ignored `out/verification/`; no Windows-only capture code enters Engine/Game. DPI math is unit-tested at multiple logical/drawable ratios; a physical mixed-DPI display migration and other operating systems were not tested.
+
+Additional checks cover transparent cutouts, UV1/texture-transform alpha, material overrides and instance alpha. The CPU import/picking smoke check enumerates all supported model files in `game/assets/models/`, including user additions, rather than maintaining a duplicate asset list. Pixel comparisons measured 7,776 changed pixels exclusively on the assassin and 1,264 exclusively on the selected rat. Bright bunny selection also remains visible. The Release Game passes the default animated demo with repeated resize/minimize/restore, and separate `witch.obj`, `hierarchy.glb` and `bunny.glb` previews; no validation warnings/errors were reported. Existing asset-specific missing-rest-joint warnings remain importer diagnostics, not Vulkan validation errors.
+
+Added:
+
+- `engine/src/scene/picking.hpp/.cpp`: private ray generation, shared static bounds, click-time posed geometry and nearest triangle intersection.
+- `tests/picking.cpp`, `tests/selection_runtime.cpp`: CPU and Engine/SDL picking regressions.
+
+Modified:
+
+- `engine/include/grimlock/scene.hpp`, `engine/src/scene/scene.cpp`: CPU-only single selection and runtime selectable policy.
+- `engine/include/grimlock/engine.hpp`, `engine/src/core/engine.cpp`: minimal selection API, per-resource bounds cache, input-to-scene picking and draw flags.
+- `engine/include/grimlock/input.hpp`, `engine/src/input/input.cpp`, `tests/input.cpp`: first-press coordinates and cancellation/hold coverage.
+- `engine/src/renderer/vulkan_renderer.hpp/.cpp`, `mesh_pipeline.hpp`, `engine/shaders/mesh.slang`: transient whole-object flag and depth-tested soft rim/tint in the existing pass.
+- `game/src/game.cpp`: enable scene selection; no picking math or Vulkan resources in Game.
+- `CMakeLists.txt`, `engine/CMakeLists.txt`, `tests/CMakeLists.txt`: source/test registration; no new dependencies.
+- This README, `docs/history.md`, `game/assets/models/README.md`: selection documentation and current assassin asset name. The demo JSON already referenced `models/assassin.glb`; no model file was renamed/recreated, and no scene schema or material/animation data changed.
+
+### Phase 9 verification and file inventory
+
+The official pinned ImGui docking release configures through CMake and compiles with its SDL3/Vulkan backends unmodified. Debug and Release editor-enabled builds pass all nine CTest checks with core and synchronization validation enabled. `Editor.Runtime` exercises empty/hidden selection, hierarchy/local-TRS roundtrips, quaternion/Euler consistency, invalid-value/world-transform rollback, adding/duplicating/deleting shared model instances, failed-model/open rollback, file saving, actual Inspector text entry and keyboard capture, blocked UI mouse gestures, viewport pan, camera dirty tracking, unsaved-close cancellation and context teardown/reattachment. Group-management checks also cover nested JSON roundtrips, world-preserving moves with mirrored and aligned non-uniform scales, descendant transforms, cycle/invalid-target/shear rejection, real hierarchy drag/drop to groups and root, inline renaming, and delete-confirmation cancellation/acceptance. Existing eight Engine/scene/camera/picking tests also pass. No model binaries, materials, shader code or JSON schema were changed by the editor work.
+
+Debug and Release editor-mode graphical smoke checks show the existing animated demo beneath docked panels, then resize wide/tall repeatedly, minimize/restore and close normally with no Vulkan validation errors/warnings. An independent `GRIMLOCK_BUILD_EDITOR=OFF` build compiles/runs the normal animated Game scene without an Editor/ImGui target and rejects `--editor` explicitly. Local captures, logs, downloaded archives and test outputs remain under ignored `out/`. Other operating systems and physical mixed-DPI monitor migration were not tested.
+
+Added:
+
+- `cmake/ImGui.cmake`: optional dependency pin/hash and official backend build.
+- `editor/CMakeLists.txt`, `editor/include/grimlock/editor.hpp`: optional static library and launcher.
+- `editor/src/editor.hpp/.cpp`: ImGui context/backends, docking, panels, input capture and file/unsaved/error dialogs.
+- `editor/src/scene_document.hpp/.cpp`: commands over the real Scene, paths, dirty tracking and model enumeration; no parallel object graph.
+- `engine/include/grimlock/render_overlay.hpp`: opt-in native overlay lifecycle/target/input contract, without an ImGui dependency.
+- `tests/editor_runtime.cpp`: document, native-backend interaction and lifecycle regressions.
+
+Modified for this phase:
+
+- `CMakeLists.txt`, `game/CMakeLists.txt`, `game/src/main.cpp`: optional library/CLI mode; no second application executable.
+- `engine/include/grimlock/engine.hpp`, `engine/src/core/engine.cpp`: overlay attachment, capture/close routing, asset-root access and explicit scene validation.
+- `engine/include/grimlock/scene.hpp`, `engine/src/scene/scene.cpp`: read-only child enumeration and opt-in inactive/empty selection; default Game picking policy unchanged.
+- `engine/src/input/input.hpp/.cpp`: suppress captured mouse/keyboard snapshots and release viewport mouse mode safely.
+- `engine/src/renderer/vulkan_context.hpp`, `vulkan_renderer.hpp/.cpp`: native context accessor, generic post-tone-map callback and device-idle overlay lifecycle/target notifications; no editor widgets or ImGui code.
+- `tests/CMakeLists.txt`: conditional editor regression registration; this README documents usage, structure and verification.
+
+### Animation-controls changes and verification
+
+Debug and Release builds pass all nine CTest checks with Vulkan core/synchronization validation enabled and no validation warnings/errors. Editor smoke runs in both configurations preserve animated rendering through wide/tall/repeated resizing, minimization/restoration and clean shutdown. The selected animated Inspector was visually checked at the unchanged 1280x720 layout. An Editor-disabled Game build also succeeds. Tests/captures/logs stay under ignored `out/`; other operating systems were not exercised. No new external setup is required.
+
+Modified files for the animation-controls task (no new dependencies, targets, source files, shaders or model assets):
+
+- `engine/include/grimlock/assets/animation.hpp`: change loop mode without restarting playback.
+- `engine/include/grimlock/scene.hpp`, `engine/src/scene/scene.cpp`: public per-object playback/configuration API, immutable clip queries, name resolution and missing-clip rest fallback.
+- `engine/src/scene/scene_serializer.cpp`: configuration-only saves and backwards-compatible legacy/name-based loading.
+- `editor/src/editor.hpp/.cpp`: Animation Inspector controls over the public Scene API.
+- `editor/src/scene_document.hpp/.cpp`: dirty tracking for authored animation edits and duplication of configuration rather than preview state.
+- `tests/scene.cpp`, `tests/scene_runtime.cpp`, `tests/editor_runtime.cpp`: legacy/new JSON, name/index controls, missing clips, actual UI selection/playback/checkboxes, pause/rest poses, loop/speed, autoplay and shared-instance independence.
+- `README.md`: API, configuration, behavior and compatibility documentation.

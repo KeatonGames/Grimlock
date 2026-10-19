@@ -12,6 +12,7 @@ Game::Game(const std::filesystem::path& path,const std::filesystem::path& enviro
     if (path.empty()||path.extension()==".json") {
         engine_.setScene(engine_.loadScene(path.empty()?"assets/scenes/demo.json":path));
         engine_.setCameraNavigationEnabled();
+        engine_.setObjectSelectionEnabled();
         return;
     }
     // Preserve the existing standalone model-preview CLI, separate from authored scenes.

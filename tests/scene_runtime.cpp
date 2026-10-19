@@ -6,6 +6,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 using namespace grimlock;
@@ -62,13 +63,48 @@ int main(int argc,char** argv) {
         auto bad=single("cube.obj"); const auto missing=bad->createObject();bad->setModel(missing,"missing.glb");
         rejects([&]{engine.setScene(std::move(bad));}); require(engine.scene()==active,"failed load replaced active scene");
         auto invalidClip=single("blackrat.glb"); invalidClip->setAnimation(1,AnimationSettings{.clip=999});
-        rejects([&]{engine.setScene(std::move(invalidClip));}); require(engine.scene()==active,"bad animation replaced active scene");
+        engine.prepareScene(*invalidClip);require(invalidClip->animation(1).restPose(),"missing numeric clip did not fall back to rest pose");invalidClip.reset();
+        auto invalidName=single("blackrat.glb");AnimationSettings missingName;missingName.clipName="renamed-or-missing";invalidName->setAnimation(1,missingName);
+        engine.prepareScene(*invalidName);require(invalidName->animation(1).restPose()&&invalidName->animationConfiguration(1).clipName==missingName.clipName,"missing named clip fallback lost configuration");invalidName.reset();
         auto invalidMaterial=single("cube.obj"); invalidMaterial->setMaterialOverride(1,999);
         rejects([&]{engine.setScene(std::move(invalidMaterial));});
-        active->animation(b).pause(); const auto time=active->animation(b).time(); engine.saveScene(output/"live.json");
+        const auto clips=active->availableAnimations(a);
+        require(clips.size()==13&&clips.data()==active->availableAnimations(b).data(),"clip metadata was duplicated or missing");
+        const auto samples=clips[1].samplers[0].values;
+        active->playAnimation(a,clips[1].name,false);active->playAnimation(b,std::size_t{4},true);
+        require(active->animationSettings(a).clip==1&&active->animationSettings(b).clip==4,"name/index play API failed");
+        active->pauseAnimation(a);const auto pausedTime=active->animationSettings(a).time;const auto pausedPose=active->animation(a).pose().world;
+        for(int i=0;i<3;++i) { require(engine.update(),"animation preview closed unexpectedly"); }
+        require(active->animationSettings(a).time==pausedTime&&active->animation(a).pose().world==pausedPose,"pause did not preserve pose/time");
+        active->resumeAnimation(a);active->animation(a).update(0.125);require(active->animationSettings(a).time>pausedTime,"resume failed");
+        const auto duration=clips[1].end-clips[1].start;
+        active->animation(a).update(duration+1);require(!active->animationSettings(a).playing&&!active->animationSettings(a).restPose,"non-looping animation did not hold endpoint");
+        active->stopAnimation(a);
+        { assets::ModelInstance rest{active->animation(a).asset()};
+          require(active->animationSettings(a).restPose&&active->animation(a).pose().world==rest.pose().world,"stop did not restore rest transforms"); }
+        active->playAnimation(a,std::size_t{1},true);active->animation(a).update(duration*3+0.125);
+        require(std::abs(active->animationSettings(a).time-clips[1].start-0.125F)<1e-4F,"loop did not wrap");
+        active->setAnimationSpeed(a,0);const auto frozen=active->animationSettings(a).time;active->animation(a).update(1);require(active->animationSettings(a).time==frozen,"zero speed advanced time");
+        active->setAnimationSpeed(a,-1);active->playAnimation(a,std::size_t{1},false);
+        require(active->animationSettings(a).time==clips[1].end,"reverse playback did not start at endpoint");
+        active->animation(a).update(0.125);require(active->animationSettings(a).time<clips[1].end,"negative speed did not reverse time");
+        rejects([&]{active->setAnimationSpeed(a,std::numeric_limits<float>::infinity());});
+        rejects([&]{active->playAnimation(a,"missing");});rejects([&]{active->playAnimation(a,std::size_t{999});});
+        require(clips[1].samplers[0].values==samples&&active->animationSettings(b).clip==4,"preview modified shared clip data or another instance");
+        auto configuration=active->animationConfiguration(a);configuration.clip=4;configuration.clipName.reset();configuration.autoplay=true;configuration.loop=false;configuration.speed=1.25F;
+        active->setAnimationConfiguration(a,configuration);
+        configuration=active->animationConfiguration(b);configuration.clip=1;configuration.clipName.reset();configuration.autoplay=false;configuration.loop=true;configuration.speed=0.5F;
+        active->setAnimationConfiguration(b,configuration);
+        engine.saveScene(output/"configuration.json");
+        active->playAnimation(a,std::size_t{2},true);active->pauseAnimation(a);active->setAnimationSpeed(a,2);active->stopAnimation(b);
+        engine.saveScene(output/"live.json");
+        const auto read=[](const auto& path) { std::ifstream stream(path);nlohmann::json result;stream>>result;return result; };
+        require(read(output/"configuration.json")==read(output/"live.json"),"preview commands changed serialized configuration");
+        require(read(output/"live.json")["objects"][1]["animation"]["clip"].is_string(),"unique imported clip name was not saved");
         engine.setScene(engine.loadScene(output/"live.json")); active=engine.scene();
         require(!resource.expired(),"replacement discarded shared resource");
-        require(std::abs(active->animation(b).time()-time)<1e-5F&&active->animation(b).paused(),"live animation roundtrip failed");
+        require(active->animationSettings(a).clip==4&&active->animationSettings(a).playing&&active->animationSettings(a).speed==1.25F&&!active->animationSettings(a).loop,"autoplay configuration was not restored");
+        require(active->animationSettings(b).clip==1&&active->animationSettings(b).restPose&&!active->animationSettings(b).playing,"disabled autoplay did not restore rest pose");
         active->setEnabled(group,false); require(engine.update(),"empty enabled set failed to render");
         require(!active->enabledInHierarchy(a)&&!active->enabledInHierarchy(b),"disabled hierarchy remained visible");
         active->setEnabled(group,true); active->removeObject(a); require(engine.update(),"object deletion failed");

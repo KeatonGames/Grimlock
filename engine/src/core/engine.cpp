@@ -7,6 +7,8 @@
 #include "input/input.hpp"
 #include "platform/runtime_paths.hpp"
 #include "renderer/vulkan_renderer.hpp"
+#include "scene/picking.hpp"
+#include "grimlock/render_overlay.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <chrono>
@@ -22,6 +24,7 @@ struct Engine::Impl {
         std::size_t gpuModel = 0;
         ModelInfo info;
         bool pinned = false; // Legacy ModelId API retains its documented Engine lifetime.
+        picking::Geometry picking;
     };
     explicit Impl(const EngineConfig& config)
         : window(config.windowTitle.c_str(),config.width,config.height)
@@ -33,6 +36,7 @@ struct Engine::Impl {
 
     std::size_t store(std::shared_ptr<const assets::ModelData> asset,const std::string& name,bool pin) {
         auto resource=std::make_unique<Resource>(); resource->asset=std::move(asset); resource->pinned=pin;
+        resource->picking=picking::Geometry{*resource->asset};
         auto& info=resource->info;
         info={resource->asset->minimum,resource->asset->maximum,resource->asset->meshes.size(),resource->asset->materials.size(),{}};
         for (const auto& clip:resource->asset->animations) { info.animationNames.push_back(clip.name); }
@@ -122,6 +126,36 @@ struct Engine::Impl {
         }
     }
     Camera currentCamera() const { return activeScene?activeScene->resolvedCamera():camera; }
+    void updateSelection(const Camera& view) {
+        if (!activeScene) { return; }
+        const auto& state=input.state();
+        const auto navigationButton=[&](MouseButton button) {
+            const auto& value=state.button(button); return value.held||value.pressed||value.released;
+        };
+        if (selectionEnabled&&state.focused&&state.button(MouseButton::left).pressed&&state.leftPressPosition
+            &&!navigationButton(MouseButton::right)&&!navigationButton(MouseButton::middle)) {
+            glm::ivec2 windowSize{},drawableSize{};
+            SDL_GetWindowSize(window.native(),&windowSize.x,&windowSize.y);
+            SDL_GetWindowSizeInPixels(window.native(),&drawableSize.x,&drawableSize.y);
+            if (const auto ray=picking::mouseRay(view,*state.leftPressPosition,windowSize,drawableSize)) {
+                std::optional<ObjectId> selected;
+                double nearest=ray->maximum;
+                for (const auto& [id,object]:activeScene->objects_) {
+                    if (!object.instance_||!object.visible_||!object.selectable) { continue; }
+                    auto& resource=resourceFor(*object.instance_);
+                    if (const auto hit=resource.picking.intersect(*ray,*object.instance_,object.world_,object.materialOverride,nearest,object.tint.a)) {
+                        nearest=*hit; selected=id;
+                    }
+                }
+                activeScene->selectObject(selected);
+            }
+        }
+        const auto selected=activeScene->selectedObject();
+        std::size_t draw=0;
+        for (const auto& [id,object]:activeScene->objects_) {
+            if (object.instance_&&object.visible_) { sceneDraws.at(draw++).selected=selected==id; }
+        }
+    }
     void storeCamera(Camera& view) {
         if (activeScene) { activeScene->setResolvedCamera(view); view=activeScene->resolvedCamera(); }
         else { camera=view; }
@@ -147,18 +181,25 @@ struct Engine::Impl {
         input.beginFrame();
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
+            if (overlay) { overlay->processEvent(event); }
             input.handleEvent(event);
             switch (event.type) {
             case SDL_EVENT_QUIT:
-            case SDL_EVENT_WINDOW_CLOSE_REQUESTED: running=false; break;
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                if (!overlay||overlay->requestClose()) { running=false; }
+                break;
             case SDL_EVENT_WINDOW_RESIZED:
             case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
             case SDL_EVENT_WINDOW_RESTORED: renderer.requestSwapchainRecreation(); break;
             default: break;
             }
         }
-        input.finishFrame(navigationEnabled&&running);
         if (!running) { return false; }
+        const auto capture=overlay?overlay->frame():OverlayInput{};
+        if (capture.close) { running=false; return false; }
+        input.capture(capture.mouse,capture.keyboard);
+        if (capture.mouse) { navigation.cancelDrag(); }
+        input.finishFrame(navigationEnabled&&!capture.mouse&&running);
         const auto now=std::chrono::steady_clock::now();
         const double delta=previousFrame?std::chrono::duration<double>(now-*previousFrame).count():0;
         previousFrame=now;
@@ -177,7 +218,7 @@ struct Engine::Impl {
                 for (std::size_t i=0;i<instances.size();++i) { renderer::addModelLights(frameLighting,instances[i]->model(),instances[i]->pose(),draws[i].transform,directionalUsed); }
             }
         }
-        navigate(frameCamera); collectUnused();
+        navigate(frameCamera); updateSelection(frameCamera); collectUnused();
         if (renderer.drawFrame(frameCamera,frameDraws,frameLighting)) { startup.firstPresent(); }
         else { SDL_Delay(16); }
         return true;
@@ -195,6 +236,7 @@ struct Engine::Impl {
     Camera lastNavigationCamera;
     std::string navigationCameraId;
     bool navigationEnabled=false,navigationSynchronized=false;
+    bool selectionEnabled=false;
     std::vector<std::unique_ptr<Resource>> resources;
     std::map<std::filesystem::path,std::size_t> modelPaths;
     std::vector<std::unique_ptr<assets::ModelInstance>> instances;
@@ -202,6 +244,7 @@ struct Engine::Impl {
     std::unique_ptr<Scene> activeScene;
     std::optional<std::chrono::steady_clock::time_point> previousFrame;
     bool running=true;
+    RenderOverlay* overlay=nullptr;
 };
 Engine::Engine(const EngineConfig& config) : impl_(std::make_unique<Impl>(config)) {}
 Engine::~Engine()=default;
@@ -246,10 +289,26 @@ void Engine::setScene(std::unique_ptr<Scene> scene) {
 }
 Scene* Engine::scene() noexcept { return impl_->activeScene.get(); }
 const Scene* Engine::scene() const noexcept { return impl_->activeScene.get(); }
+const std::filesystem::path& Engine::assetRoot() const noexcept { return impl_->assetRoot; }
+void Engine::prepareScene(Scene& scene) { impl_->prepare(scene); }
+void Engine::attachOverlay(RenderOverlay& overlay) {
+    if (impl_->overlay) { throw std::logic_error("A render overlay is already attached."); }
+    impl_->renderer.attachOverlay(overlay); impl_->overlay=&overlay; impl_->resetNavigation();
+}
+void Engine::detachOverlay() noexcept {
+    impl_->renderer.detachOverlay(); impl_->overlay=nullptr; impl_->resetNavigation();
+}
 void Engine::unloadScene() {
     impl_->sceneDraws.clear(); impl_->activeScene.reset(); impl_->previousFrame.reset(); impl_->resetNavigation(); impl_->collectUnused();
 }
 const InputState& Engine::input() const noexcept { return impl_->input.state(); }
+void Engine::setObjectSelectionEnabled(bool enabled) {
+    impl_->selectionEnabled=enabled;
+    if (!enabled) { clearSelection(); }
+}
+bool Engine::objectSelectionEnabled() const noexcept { return impl_->selectionEnabled; }
+std::optional<ObjectId> Engine::selectedObject() const { return impl_->activeScene?impl_->activeScene->selectedObject():std::nullopt; }
+void Engine::clearSelection() noexcept { if (impl_->activeScene) { impl_->activeScene->clearSelection(); } }
 void Engine::setCameraNavigationEnabled(bool enabled) {
     if (impl_->navigationEnabled==enabled) { return; }
     if (enabled) {

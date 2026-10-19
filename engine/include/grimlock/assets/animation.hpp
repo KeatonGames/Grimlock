@@ -19,6 +19,7 @@ public:
     void pause() noexcept { paused_ = true; }
     void resume() noexcept { paused_ = false; }
     void setSpeed(float speed);
+    void setLoop(bool loop) noexcept { loop_ = loop; }
     void seek(float seconds);
     void update(double deltaSeconds);
     [[nodiscard]] bool playing() const noexcept { return playing_ && !paused_; }

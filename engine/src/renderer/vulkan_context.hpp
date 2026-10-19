@@ -25,6 +25,7 @@ public:
     VulkanContext& operator=(const VulkanContext&) = delete;
 
     [[nodiscard]] VkPhysicalDevice physicalDevice() const noexcept { return physicalDevice_; }
+    [[nodiscard]] VkInstance instance() const noexcept { return instance_; }
     [[nodiscard]] VkDevice device() const noexcept { return device_; }
     [[nodiscard]] VkSurfaceKHR surface() const noexcept { return surface_; }
     [[nodiscard]] VkQueue graphicsQueue() const noexcept { return graphicsQueue_; }

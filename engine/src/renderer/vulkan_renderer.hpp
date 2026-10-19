@@ -12,6 +12,7 @@
 #include "assets/environment.hpp"
 #include "grimlock/assets/animation.hpp"
 #include "renderer/deformation.hpp"
+#include "grimlock/render_overlay.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -29,6 +30,7 @@ struct ModelDraw {
     glm::vec4 baseColor{1.0F}; // Optional linear-space instance tint, neutral by default.
     std::optional<std::size_t> materialOverride; // Share geometry in the PBR comparison scene.
     const assets::ModelPose* pose = nullptr; // Instance-owned; immutable for the duration of drawFrame.
+    bool selected = false;
 };
 
 class VulkanRenderer final {
@@ -43,6 +45,8 @@ public:
     void releaseModels(std::span<const std::size_t> models) noexcept;
     [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws, const Lighting& lighting = {});
     void requestSwapchainRecreation() noexcept;
+    void attachOverlay(RenderOverlay& overlay);
+    void detachOverlay() noexcept;
 
 private:
     void createCommandPool();
@@ -108,6 +112,8 @@ private:
     std::vector<VkSemaphore> renderFinished_;
     VkFence inFlight_ = VK_NULL_HANDLE;
     bool framebufferResized_ = false;
+    RenderOverlay* overlay_ = nullptr;
+    std::uint32_t minimumImages_ = 2;
 };
 
 } // namespace grimlock::renderer

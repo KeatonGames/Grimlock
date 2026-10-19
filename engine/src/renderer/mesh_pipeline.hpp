@@ -17,7 +17,7 @@ struct alignas(16) CameraUniforms {
 struct alignas(16) DrawConstants {
     glm::mat4 model{1.0F};
     glm::vec4 normalColumn0{};
-    glm::vec4 normalColumn1{};
+    glm::vec4 normalColumn1{}; // W is a transient per-object selection flag.
     glm::vec4 normalColumn2{};
     glm::vec4 baseColor{1.0F};
 };

@@ -28,6 +28,21 @@ VulkanRenderer::VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube
 
 VulkanRenderer::~VulkanRenderer() { destroy(); }
 
+void VulkanRenderer::attachOverlay(RenderOverlay& overlay) {
+    if (overlay_) { throw std::logic_error("A render overlay is already attached."); }
+    if (!swapchain_&&!recreateSwapchain()) { throw std::runtime_error("Cannot attach an overlay to a zero-size surface."); }
+    checkVk(vkDeviceWaitIdle(context_.device()),"vkDeviceWaitIdle(overlay attach)");
+    try {
+        overlay.initialize({window_,context_.instance(),context_.physicalDevice(),context_.device(),context_.graphicsQueue(),
+            context_.graphicsFamily(),{swapchainFormat_,minimumImages_,static_cast<std::uint32_t>(swapchainImages_.size())}});
+        overlay_=&overlay;
+    } catch (...) { overlay.shutdown(); throw; }
+}
+void VulkanRenderer::detachOverlay() noexcept {
+    if (!overlay_) { return; }
+    (void)vkDeviceWaitIdle(context_.device()); overlay_->shutdown(); overlay_=nullptr;
+}
+
 std::size_t VulkanRenderer::uploadModel(const assets::ModelData& model) {
     diagnostics::StartupSpan profile{"GPU.model.upload"};
     if (model.meshes.empty()) { throw std::invalid_argument("Cannot upload a model without meshes."); }
@@ -245,6 +260,7 @@ bool VulkanRenderer::createSwapchainResources() {
     for (auto& semaphore : renderFinished_) {
         checkVk(vkCreateSemaphore(context_.device(), &info, nullptr, &semaphore), "vkCreateSemaphore");
     }
+    if (overlay_) { overlay_->targetChanged({swapchainFormat_,minimumImages_,static_cast<std::uint32_t>(swapchainImages_.size())}); }
     return true;
 }
 
@@ -260,6 +276,7 @@ bool VulkanRenderer::createSwapchain() {
     // Native surface changes can precede SDL's queued window events.
     if (extent.width == 0 || extent.height == 0) { return false; }
     std::uint32_t count = support.capabilities.minImageCount + 1;
+    minimumImages_=std::max(2U,support.capabilities.minImageCount);
     if (support.capabilities.maxImageCount > 0) { count = std::min(count, support.capabilities.maxImageCount); }
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = context_.surface();
@@ -421,7 +438,7 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex, const Camera& c
                 throw std::invalid_argument("Model/node transform must have a finite, invertible linear part.");
             }
             const glm::mat3 normal = glm::transpose(glm::inverse(linear));
-            const DrawConstants constants{transform, glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F}, glm::vec4{normal[1], 0.0F},
+            const DrawConstants constants{transform, glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F}, glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
                 glm::vec4{normal[2], 0.0F}, draw.baseColor};
             for (const auto mesh : node.meshes) {
                 const auto& material = model.materials->at(draw.materialOverride.value_or(model.meshMaterials[mesh]));
@@ -486,6 +503,7 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex, const Camera& c
     vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, toneMapPipeline_->layout(), 0, 1, &toneMapSet_, 0, nullptr);
     vkCmdPushConstants(command, toneMapPipeline_->layout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(exposure), &exposure);
     vkCmdDraw(command, 3, 1, 0, 0);
+    if (overlay_) { overlay_->render(command); }
     vkCmdEndRendering(command);
     VkImageMemoryBarrier2 present = acquired;
     present.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -570,6 +588,7 @@ void VulkanRenderer::destroySwapchainResources() noexcept {
 void VulkanRenderer::destroy() noexcept {
     const auto device = context_.device();
     vkDeviceWaitIdle(device);
+    detachOverlay();
     destroySwapchainResources();
     pipeline_.reset();
     toneMapPipeline_.reset();

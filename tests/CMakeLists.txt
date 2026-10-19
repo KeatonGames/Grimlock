@@ -55,3 +55,33 @@ if(WIN32)
 endif()
 add_test(NAME Camera.Runtime COMMAND NavigationRuntimeChecks "${CMAKE_CURRENT_BINARY_DIR}/navigation-camera.json")
 set_tests_properties(Camera.Runtime PROPERTIES RUN_SERIAL TRUE)
+
+add_executable(PickingChecks picking.cpp)
+target_include_directories(PickingChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(PickingChecks PRIVATE Engine)
+add_test(NAME Picking.Cpu COMMAND PickingChecks "${PROJECT_SOURCE_DIR}/game/assets/models")
+
+add_executable(SelectionRuntimeChecks selection_runtime.cpp)
+target_link_libraries(SelectionRuntimeChecks PRIVATE Engine SDL3::SDL3)
+set_target_properties(SelectionRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+if(WIN32)
+    add_custom_command(TARGET SelectionRuntimeChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:SelectionRuntimeChecks>
+        VERBATIM)
+endif()
+add_test(NAME Picking.Runtime COMMAND SelectionRuntimeChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/selection.json")
+set_tests_properties(Picking.Runtime PROPERTIES RUN_SERIAL TRUE)
+
+if(GRIMLOCK_BUILD_EDITOR)
+    add_executable(EditorRuntimeChecks editor_runtime.cpp)
+    target_include_directories(EditorRuntimeChecks PRIVATE "${PROJECT_SOURCE_DIR}/editor/src")
+    target_link_libraries(EditorRuntimeChecks PRIVATE Editor DearImGui SDL3::SDL3 Vulkan::Vulkan)
+    set_target_properties(EditorRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+    if(WIN32)
+        add_custom_command(TARGET EditorRuntimeChecks POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:EditorRuntimeChecks>
+            VERBATIM)
+    endif()
+    add_test(NAME Editor.Runtime COMMAND EditorRuntimeChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/editor-output")
+    set_tests_properties(Editor.Runtime PROPERTIES RUN_SERIAL TRUE)
+endif()

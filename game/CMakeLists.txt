@@ -1,5 +1,9 @@
 add_executable(Game src/main.cpp src/game.cpp)
 target_link_libraries(Game PRIVATE Engine)
+if(GRIMLOCK_BUILD_EDITOR)
+    target_link_libraries(Game PRIVATE Editor)
+    target_compile_definitions(Game PRIVATE GRIMLOCK_WITH_EDITOR=1)
+endif()
 # Preserve the established executable/VS Code paths while exposing the Game target.
 set_target_properties(Game PROPERTIES
     OUTPUT_NAME Grimlock

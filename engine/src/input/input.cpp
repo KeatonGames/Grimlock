@@ -18,11 +18,13 @@ Input::Input(SDL_Window* window) : window_(window),id_(SDL_GetWindowID(window)) 
 }
 Input::~Input() { relativeMode(false); }
 void Input::beginFrame() {
+    state_.leftPressPosition.reset();
     for (auto& b:state_.mouseButtons) { b.pressed=b.released=false; }
     for (auto& b:state_.keys) { b.pressed=b.released=false; }
     state_.mouseMotion=state_.mouseWheel={0,0};
 }
 void Input::clearButtons(bool keyboard) {
+    state_.leftPressPosition.reset();
     for (auto& b:state_.mouseButtons) { release(b); }
     if (keyboard) { for (auto& b:state_.keys) { release(b); } }
     state_.mouseMotion=state_.mouseWheel={0,0}; relativeMode(false);
@@ -43,6 +45,10 @@ void Input::handleEvent(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
         if (event.button.windowID==id_&&state_.focused&&event.button.button>=1&&event.button.button<=state_.mouseButtons.size()) {
+            if (event.type==SDL_EVENT_MOUSE_BUTTON_DOWN&&event.button.button==SDL_BUTTON_LEFT
+                &&!state_.button(MouseButton::left).held&&!state_.leftPressPosition&&finite(event.button.x,event.button.y)) {
+                state_.leftPressPosition=glm::vec2{event.button.x,event.button.y};
+            }
             transition(state_.mouseButtons[event.button.button-1],event.type==SDL_EVENT_MOUSE_BUTTON_DOWN);
             if (finite(event.button.x,event.button.y)) { state_.mousePosition={event.button.x,event.button.y}; }
         }
@@ -89,5 +95,9 @@ void Input::finishFrame(bool navigationEnabled) {
 }
 void Input::cancelNavigation() {
     release(state_.mouseButtons[1]); release(state_.mouseButtons[2]); state_.mouseMotion={0,0}; relativeMode(false);
+}
+void Input::capture(bool mouse,bool keyboard) {
+    if (mouse) { clearButtons(false); }
+    if (keyboard) { for (auto& button:state_.keys) { button={}; } }
 }
 }

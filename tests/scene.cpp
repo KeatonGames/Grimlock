@@ -55,7 +55,10 @@ int main(int argc,char** argv) {
         require(loaded->name()==scene.name()&&loaded->object(child).parent==parent,"identity/name/parent roundtrip failed");
         require(near(loaded->worldTransform(leaf),scene.worldTransform(leaf)),"TRS roundtrip failed");
         require(loaded->object(child).model==scene.object(child).model&&loaded->object(child).materialOverride==1,"asset/material roundtrip failed");
-        require(loaded->animationSettings(child).clip==1&&loaded->animationSettings(child).paused,"animation settings roundtrip failed");
+        require(loaded->animationConfiguration(child).clip==1&&!loaded->animationConfiguration(child).autoplay
+            &&loaded->animationConfiguration(child).speed==-0.75F,"animation configuration roundtrip failed");
+        const auto savedAnimation=read(output/"roundtrip.json")["objects"][1]["animation"];
+        require(savedAnimation.size()==4&&!savedAnimation.contains("time")&&!savedAnimation.contains("paused"),"saved transient animation preview state");
         loaded->save(output/"roundtrip-again.json"); require(read(output/"roundtrip.json")==read(output/"roundtrip-again.json"),"semantic JSON roundtrip changed data");
         scene.removeObject(parent); require(!scene.contains(child)&&!scene.contains(leaf),"cascade deletion failed");
         rejects([&]{(void)scene.object(child);});
@@ -82,6 +85,8 @@ int main(int argc,char** argv) {
         j=baseline; j["objects"][0]["enabled"]="yes"; invalid(j,".enabled");
         j=baseline; j["objects"][0]["model"]="../outside.glb"; invalid(j,".model");
         j=baseline; j["objects"][0]["animation"]={{"clip",-1}}; invalid(j,".clip");
+        j=baseline; j["objects"][0]["animation"]={{"clip",true}}; invalid(j,".clip");
+        j=baseline; j["objects"][0]["animation"]={{"autoplay","yes"}}; invalid(j,".autoplay");
         j=baseline; j["objects"][0]["typo"]=true; invalid(j,".typo");
         j=baseline; j["active_camera"]="missing"; invalid(j,"active_camera");
         j=baseline; j["cameras"][0]["near"]=-1; invalid(j,"cameras");
@@ -93,6 +98,15 @@ int main(int argc,char** argv) {
         {std::ofstream f(output/"syntax.json");f<<"{";} rejects([&]{(void)Scene::load(output/"syntax.json");});
         write(output/"defaults.json",{{"version",1},{"objects",Json::array({{{"id","1"}}})}});
         auto defaults=Scene::load(output/"defaults.json"); require(defaults->object(1).enabled&&near(defaults->worldTransform(1),glm::mat4{1}),"optional defaults failed");
+        require(!defaults->animationConfiguration(1).autoplay&&defaults->animationConfiguration(1).speed==1,"animation defaults failed");
+        write(output/"legacy-animation.json",{{"version",1},{"objects",Json::array({{{"id","1"},{"model","models/blackrat.glb"},
+            {"animation",{{"clip",1},{"time",0.25},{"paused",true},{"speed",0.5}}}}})}});
+        auto legacy=Scene::load(output/"legacy-animation.json");
+        require(legacy->animationSettings(1).paused&&legacy->animationSettings(1).time==0.25F&&!legacy->animationConfiguration(1).autoplay,"legacy animation input compatibility failed");
+        write(output/"named-animation.json",{{"version",1},{"objects",Json::array({{{"id","1"},{"model","models/blackrat.glb"},
+            {"animation",{{"clip","renamed-or-missing"},{"autoplay",true},{"loop",false},{"speed",1.5}}}}})}});
+        auto named=Scene::load(output/"named-animation.json");named->save(output/"named-animation-again.json");
+        require(read(output/"named-animation-again.json")["objects"][0]["animation"]["clip"]=="renamed-or-missing","unresolved named clip was lost during save");
         std::cout<<"PASS Scene: hierarchy/cache, reparent/cycles, stable IDs/deletion, attached lights/camera, JSON roundtrips/defaults/negative cases.\n"; return 0;
     } catch(const std::exception& e) { std::cerr<<"FAIL Scene: "<<e.what()<<'\n';return 1; }
 }

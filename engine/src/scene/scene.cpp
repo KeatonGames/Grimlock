@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iostream>
 #include <stdexcept>
 
 namespace grimlock {
@@ -21,6 +22,17 @@ Transform checked(Transform value) {
 }
 void checkAnimation(const AnimationSettings& value) {
     if (!std::isfinite(value.time)||!std::isfinite(value.speed)) { throw std::invalid_argument("Animation time/speed must be finite."); }
+}
+std::optional<std::size_t> namedClip(std::span<const assets::AnimationData> clips,std::string_view name) {
+    std::optional<std::size_t> result;
+    for(std::size_t i=0;i<clips.size();++i) {
+        if(clips[i].name==name) { if(result) { return {}; }result=i; }
+    }
+    return result; // Missing and ambiguous names both require an explicit new choice.
+}
+std::optional<std::size_t> resolveClip(const AnimationSettings& settings,std::span<const assets::AnimationData> clips) {
+    if(settings.clipName) { return namedClip(clips,*settings.clipName); }
+    return settings.clip<clips.size()?std::optional{settings.clip}:std::nullopt;
 }
 void checkPath(const std::filesystem::path& value) {
     const auto utf8=value.generic_u8string();
@@ -75,12 +87,31 @@ void Scene::setParent(ObjectId id,std::optional<ObjectId> parent) {
 }
 void Scene::setEnabled(ObjectId id,bool enabled) {
     auto& value=objects_.at(id); if (value.enabled==enabled) { return; }
-    value.enabled=enabled; invalidate(id,false);
+    value.enabled=enabled; invalidate(id,false); (void)selectedObject();
+}
+void Scene::setSelectable(ObjectId id,bool selectable) {
+    objects_.at(id).selectable=selectable; (void)selectedObject();
+}
+std::optional<ObjectId> Scene::selectedObject() const {
+    if (selected_) {
+        const auto found=objects_.find(*selected_);
+        if (found==objects_.end()||(!selectionIncludesInactive_&&(!found->second.selectable||!found->second.model||!enabledInHierarchy(*selected_)))) { selected_.reset(); }
+    }
+    return selected_;
+}
+void Scene::selectObject(std::optional<ObjectId> id,bool includeInactive) {
+    if (id) {
+        const auto& value=object(*id);
+        if (!includeInactive&&(!value.selectable||!value.model||!enabledInHierarchy(*id))) { throw std::invalid_argument("Object is not selectable."); }
+    }
+    selected_=id;
+    selectionIncludesInactive_=includeInactive;
 }
 void Scene::setModel(ObjectId id,std::optional<std::filesystem::path> model) {
     auto& value=objects_.at(id);
     if (model) { checkPath(*model); *model=model->lexically_normal(); }
     if (value.model==model) { return; }
+    if (selected_==id) { clearSelection(); }
     value.model=std::move(model); value.instance_.reset();
     if (!value.model) { value.initialAnimation.reset(); value.materialOverride.reset(); }
 }
@@ -99,7 +130,15 @@ void Scene::applyAnimation(SceneObject& value) {
     auto& instance=*value.instance_;
     if (!value.initialAnimation) { instance.stop(); return; }
     const auto& settings=*value.initialAnimation;
-    instance.play(settings.clip,settings.loop); instance.seek(settings.time); instance.setSpeed(settings.speed);
+    const auto clip=resolveClip(settings,instance.model().animations);
+    if(!clip) {
+        instance.stop();
+        std::clog<<"Scene animation warning: object '"<<value.name<<"' has a missing/ambiguous clip '"
+            <<(settings.clipName?*settings.clipName:std::to_string(settings.clip))<<"'; keeping the rest pose.\n";
+        return;
+    }
+    instance.play(*clip,settings.loop);instance.setSpeed(settings.speed);
+    instance.seek(settings.time==0&&settings.speed<0?instance.model().animations[*clip].end:settings.time);
     if (settings.restPose) { instance.stop(); }
     else if (!settings.playing) { instance.stop(false); }
     if (settings.paused) { instance.pause(); }
@@ -109,7 +148,7 @@ void Scene::setAnimation(ObjectId id,std::optional<AnimationSettings> settings) 
     if (settings&&!value.model) { throw std::invalid_argument("Animation requires a model."); }
     if (settings) {
         checkAnimation(*settings);
-        if (value.instance_&&settings->clip>=value.instance_->model().animations.size()) { throw std::out_of_range("Animation clip exceeds model clip count."); }
+        if (value.instance_&&!resolveClip(*settings,value.instance_->model().animations)) { throw std::out_of_range("Animation clip is missing or ambiguous."); }
     }
     value.initialAnimation=settings; applyAnimation(value);
 }
@@ -124,11 +163,61 @@ AnimationSettings Scene::animationSettings(ObjectId id) const {
     const auto& a=*value.instance_;
     return {a.clip(),a.time(),a.speed(),a.looping(),a.running(),a.paused(),a.restPose()};
 }
+std::span<const assets::AnimationData> Scene::availableAnimations(ObjectId id) const {
+    const auto& value=object(id);
+    return value.instance_?std::span<const assets::AnimationData>{value.instance_->model().animations}:std::span<const assets::AnimationData>{};
+}
+AnimationConfiguration Scene::animationConfiguration(ObjectId id) const {
+    const auto& value=object(id);AnimationConfiguration result;
+    if(value.initialAnimation) {
+        const auto& settings=*value.initialAnimation;
+        result={settings.clip,settings.playing&&!settings.paused&&!settings.restPose,settings.loop,settings.speed,settings.clipName};
+    }
+    const auto clips=availableAnimations(id);
+    if(result.clipName) { result.clip=namedClip(clips,*result.clipName).value_or(clips.size()); }
+    else if(result.clip<clips.size()&&!clips[result.clip].name.empty()&&namedClip(clips,clips[result.clip].name)) { result.clipName=clips[result.clip].name; }
+    return result;
+}
+void Scene::setAnimationConfiguration(ObjectId id,AnimationConfiguration configuration) {
+    auto& value=objects_.at(id);
+    if(!value.model) { throw std::invalid_argument("Animation requires a model."); }
+    if(!std::isfinite(configuration.speed)) { throw std::invalid_argument("Animation speed must be finite."); }
+    const auto clips=availableAnimations(id);
+    if(configuration.clipName) {
+        const auto clip=namedClip(clips,*configuration.clipName);
+        if(!clip) { throw std::invalid_argument("Animation clip name is missing or ambiguous."); }configuration.clip=*clip;
+    }
+    if(configuration.clip>=clips.size()) { throw std::out_of_range("Choose an available animation clip."); }
+    const auto previous=animationConfiguration(id);
+    AnimationSettings settings;settings.clip=configuration.clip;settings.speed=configuration.speed;settings.loop=configuration.loop;
+    settings.playing=configuration.autoplay;settings.restPose=!configuration.autoplay;
+    const auto& name=clips[configuration.clip].name;
+    if(!name.empty()&&namedClip(clips,name)) { settings.clipName=name; }
+    auto& instance=*value.instance_;
+    if(previous.clip!=configuration.clip) {
+        const bool playing=instance.playing();instance.play(configuration.clip,configuration.loop);
+        if(configuration.speed<0) { instance.seek(clips[configuration.clip].end); }
+        if(!playing) { instance.pause(); } // Changing a stopped/paused selection previews its first frame.
+    }
+    instance.setSpeed(configuration.speed);instance.setLoop(configuration.loop);
+    value.initialAnimation=std::move(settings);
+}
+void Scene::playAnimation(ObjectId id,std::size_t clip,bool loop) {
+    auto& instance=animation(id);instance.play(clip,loop);
+    if(instance.speed()<0) { instance.seek(instance.model().animations[clip].end); }
+}
+void Scene::playAnimation(ObjectId id,std::string_view clipName,bool loop) {
+    const auto clip=namedClip(availableAnimations(id),clipName);
+    if(!clip) { throw std::invalid_argument("Animation clip name is missing or ambiguous."); }playAnimation(id,*clip,loop);
+}
+void Scene::pauseAnimation(ObjectId id) { animation(id).pause(); }
+void Scene::resumeAnimation(ObjectId id) { animation(id).resume(); }
+void Scene::stopAnimation(ObjectId id) { animation(id).stop(); }
+void Scene::setAnimationSpeed(ObjectId id,float speed) { animation(id).setSpeed(speed); }
 void Scene::bindModel(ObjectId id,std::shared_ptr<const assets::ModelData> asset) {
     auto& value=objects_.at(id);
     if (value.instance_&&value.instance_->asset()==asset) { return; }
     if (value.materialOverride&&*value.materialOverride>=asset->materials.size()) { throw std::out_of_range("Material override exceeds model material count."); }
-    if (value.initialAnimation&&value.initialAnimation->clip>=asset->animations.size()) { throw std::out_of_range("Animation clip exceeds model clip count."); }
     value.instance_=std::make_unique<assets::ModelInstance>(std::move(asset)); applyAnimation(value);
 }
 glm::mat4 Scene::worldTransform(ObjectId id) const {
@@ -254,5 +343,6 @@ void Scene::removeObject(ObjectId rootId) {
     }
     if (object(rootId).parent) { std::erase(objects_.at(*object(rootId).parent).children_,rootId); }
     for (const auto removedId:removed) { objects_.erase(removedId); }
+    (void)selectedObject();
 }
 }

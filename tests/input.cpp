@@ -14,7 +14,11 @@ int main() {
             event.type=SDL_EVENT_WINDOW_FOCUS_GAINED;event.window.windowID=id;input.handleEvent(event);input.beginFrame();
             event={};event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;event.button.windowID=id;event.button.button=SDL_BUTTON_LEFT;event.button.x=50;event.button.y=60;
             input.handleEvent(event);require(input.state().button(MouseButton::left).pressed&&input.state().button(MouseButton::left).held,"mouse pressed/held missing");
+            require(input.state().leftPressPosition==glm::vec2{50,60},"press coordinates missing");
+            SDL_Event moved{};moved.type=SDL_EVENT_MOUSE_MOTION;moved.motion.windowID=id;moved.motion.x=500;moved.motion.y=400;
+            input.handleEvent(moved);require(input.state().leftPressPosition==glm::vec2{50,60},"later motion changed press coordinates");
             input.beginFrame();input.handleEvent(event);require(!input.state().button(MouseButton::left).pressed,"duplicate press edge");
+            require(!input.state().leftPressPosition,"held mouse repeated picking coordinates");
             event.type=SDL_EVENT_MOUSE_BUTTON_UP;input.handleEvent(event);require(input.state().button(MouseButton::left).released&&!input.state().button(MouseButton::left).held,"release missing");
             event={};event.type=SDL_EVENT_KEY_DOWN;event.key.windowID=id;event.key.scancode=SDL_SCANCODE_W;input.handleEvent(event);
             require(input.state().key(SDL_SCANCODE_W).pressed,"key pressed missing");input.beginFrame();event.key.repeat=true;input.handleEvent(event);

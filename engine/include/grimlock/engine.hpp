@@ -3,6 +3,7 @@
 #include "grimlock/lighting.hpp"
 #include "grimlock/transform.hpp"
 #include "grimlock/orbit_camera.hpp"
+#include "grimlock/scene.hpp"
 #include <glm/gtc/quaternion.hpp>
 #include <cstddef>
 #include <filesystem>
@@ -13,6 +14,7 @@
 
 namespace grimlock {
 class Scene;
+class RenderOverlay;
 namespace assets { struct ModelData; class ModelInstance; }
 
 struct EngineConfig {
@@ -77,7 +79,17 @@ public:
     [[nodiscard]] Scene* scene() noexcept;
     [[nodiscard]] const Scene* scene() const noexcept;
     void unloadScene();
+    [[nodiscard]] const std::filesystem::path& assetRoot() const noexcept;
+    // Load/validate pending model changes before the next update; errors reach the caller.
+    void prepareScene(Scene& scene);
+    void attachOverlay(RenderOverlay& overlay);
+    void detachOverlay() noexcept;
     [[nodiscard]] const InputState& input() const noexcept;
+    // Scene-only left-press picking. Disabling clears selection; navigation is independent.
+    void setObjectSelectionEnabled(bool enabled = true);
+    [[nodiscard]] bool objectSelectionEnabled() const noexcept;
+    [[nodiscard]] std::optional<ObjectId> selectedObject() const;
+    void clearSelection() noexcept;
     void setCameraNavigationEnabled(bool enabled = true);
     [[nodiscard]] bool cameraNavigationEnabled() const noexcept;
     [[nodiscard]] const OrbitCameraConfig& cameraNavigationConfig() const noexcept;

@@ -14,6 +14,7 @@ public:
     void handleEvent(const SDL_Event& event);
     void finishFrame(bool navigationEnabled);
     void cancelNavigation();
+    void capture(bool mouse, bool keyboard);
     [[nodiscard]] const InputState& state() const noexcept { return state_; }
 private:
     void clearButtons(bool keyboard);

@@ -73,14 +73,20 @@ void readTransform(Scene& scene,ObjectId object,const Json& j,const std::string&
     context(field,[&]{scene.setTransform(object,value);});
 }
 AnimationSettings readAnimation(const Json& j,const std::string& field) {
-    fields(j,field,{"clip","time","speed","loop","playing","paused","rest_pose"}); AnimationSettings value;
-    if (j.contains("clip")) { value.clip=index(j.at("clip"),field+".clip"); }
+    fields(j,field,{"clip","autoplay","time","speed","loop","playing","paused","rest_pose"}); AnimationSettings value;
+    if (j.contains("clip")) {
+        if(j.at("clip").is_string()) { value.clipName=string(j.at("clip"),field+".clip"); }
+        else { value.clip=index(j.at("clip"),field+".clip"); }
+    }
     if (j.contains("time")) { value.time=number(j.at("time"),field+".time"); }
     if (j.contains("speed")) { value.speed=number(j.at("speed"),field+".speed"); }
     if (j.contains("loop")) { value.loop=boolean(j.at("loop"),field+".loop"); }
     if (j.contains("playing")) { value.playing=boolean(j.at("playing"),field+".playing"); }
     if (j.contains("paused")) { value.paused=boolean(j.at("paused"),field+".paused"); }
     if (j.contains("rest_pose")) { value.restPose=boolean(j.at("rest_pose"),field+".rest_pose"); }
+    if(j.contains("autoplay")) {
+        value.playing=boolean(j.at("autoplay"),field+".autoplay");value.paused=false;value.restPose=!value.playing;value.time=0;
+    }
     return value;
 }
 SceneCamera readCamera(const Json& j,const std::string& field) {
@@ -138,7 +144,10 @@ SceneLighting readLighting(const Json& j,const std::string& field) {
     }
     return value;
 }
-Json json(const AnimationSettings& a) { return {{"clip",a.clip},{"time",a.time},{"speed",a.speed},{"loop",a.loop},{"playing",a.playing},{"paused",a.paused},{"rest_pose",a.restPose}}; }
+Json json(const AnimationConfiguration& a) {
+    Json result={{"autoplay",a.autoplay},{"speed",a.speed},{"loop",a.loop}};
+    if(a.clipName) { result["clip"]=*a.clipName; }else { result["clip"]=a.clip; }return result;
+}
 void attach(Json& j,std::optional<ObjectId> object) { if (object) { j["object"]=std::to_string(*object); } }
 }
 
@@ -221,7 +230,7 @@ void Scene::save(const std::filesystem::path& path) const {
             if (value.parent) { j["parent"]=std::to_string(*value.parent); }
             if (value.model) { const auto text=value.model->generic_u8string(); j["model"]=std::string{text.begin(),text.end()}; }
             if (value.materialOverride) { j["material_override"]=*value.materialOverride; }
-            if (value.initialAnimation||(value.instance_&&!value.instance_->model().animations.empty())) { j["animation"]=json(animationSettings(id)); }
+            if (value.initialAnimation||(value.instance_&&!value.instance_->model().animations.empty())) { j["animation"]=json(animationConfiguration(id)); }
             root["objects"].push_back(std::move(j));
         }
         for (const auto& [id,value]:cameras_) {

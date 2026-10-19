@@ -7,6 +7,7 @@ add_library(Engine STATIC
     src/input/input.cpp
     src/animation/animation.cpp
     src/scene/scene.cpp
+    src/scene/picking.cpp
     src/scene/scene_serializer.cpp
     src/platform/window.cpp
     src/platform/runtime_paths.cpp

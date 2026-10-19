@@ -19,7 +19,7 @@ six dielectric/metallic roughness materials. Six objects in `assets/scenes/demo.
 share its single primitive and select different material overrides; no procedural
 generation code remains in Game.
 
-`base.glb`, `dogcat.glb`, `witch.obj`, `blackrat.glb`, `bunny.glb`, and `bunny2.glb`
+`assassin.glb`, `dogcat.glb`, `witch.obj`, `blackrat.glb`, `bunny.glb`, and `bunny2.glb`
 are user-supplied assets, unchanged by this
 implementation. Their licenses are not established here; the CC0 dedication above
 does not apply to them. Do not redistribute them without checking their source terms.

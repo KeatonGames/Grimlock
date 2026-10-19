@@ -1,4 +1,7 @@
 #include "game.hpp"
+#ifdef GRIMLOCK_WITH_EDITOR
+#include "grimlock/editor.hpp"
+#endif
 #include <cstdlib>
 #include <exception>
 #include <iostream>
@@ -8,21 +11,32 @@
 int main(const int argc, char** argv) {
     try {
         std::filesystem::path path, environment;
+        bool editor = false;
         for (int i = 1; i < argc; ++i) {
             const std::string_view argument{argv[i]};
             if (argument == "--help") {
-                std::cout << "Usage: Grimlock [scene.json|model.obj|.glb|.gltf] [--environment folder]\nNo argument: assets/scenes/demo.json. A supplied model starts its first clip, if any.\n"
+                std::cout << "Usage: Grimlock [--editor] [scene.json|model.obj|.glb|.gltf] [--environment folder]\nNo argument: assets/scenes/demo.json. A supplied model starts its first clip, if any.\n"
                              "Environment faces: px/nx/py/ny/pz/nz (.hdr, .png, .jpg). Paths are executable-relative.\n";
                 return EXIT_SUCCESS;
             }
-            if (argument == "--environment") {
+            if (argument == "--editor") {
+                editor = true;
+            } else if (argument == "--environment") {
                 if (++i >= argc || !environment.empty()) { throw std::invalid_argument("--environment requires one cubemap folder."); }
                 const std::string_view folder{argv[i]};
                 environment = std::filesystem::path{std::u8string{folder.begin(),folder.end()}};
             } else {
-                if (!path.empty() || argument.starts_with("--")) { throw std::invalid_argument("Usage: Grimlock [scene.json|model] [--environment folder]"); }
+                if (!path.empty() || argument.starts_with("--")) { throw std::invalid_argument("Usage: Grimlock [--editor] [scene.json|model] [--environment folder]"); }
                 path = std::filesystem::path{std::u8string{argument.begin(),argument.end()}};
             }
+        }
+        if (editor) {
+#ifdef GRIMLOCK_WITH_EDITOR
+            if (!path.empty()&&path.extension()!=".json") { throw std::invalid_argument("Editor mode opens JSON scenes; add models from the Hierarchy panel."); }
+            grimlock::editor::run(path,environment); return EXIT_SUCCESS;
+#else
+            throw std::runtime_error("Editor support is disabled; configure with -DGRIMLOCK_BUILD_EDITOR=ON.");
+#endif
         }
         grimlock::game::Game game{path, environment};
         game.run();

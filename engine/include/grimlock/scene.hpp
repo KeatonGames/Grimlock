@@ -10,14 +10,25 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <span>
 #include <vector>
 
 namespace grimlock {
 using ObjectId = std::uint64_t; // Nonzero, never reused within a Scene; serialized as decimal strings.
+// Live playback snapshot / legacy initial-state input. Scene saves authored configuration instead.
 struct AnimationSettings {
     std::size_t clip = 0;
     float time = 0, speed = 1;
     bool loop = true, playing = true, paused = false, restPose = false;
+    std::optional<std::string> clipName; // Legacy initial-state records may still address clips by index.
+};
+// Authored configuration, separate from the advancing per-instance playback state.
+struct AnimationConfiguration {
+    std::size_t clip = 0;
+    bool autoplay = false, loop = true;
+    float speed = 1;
+    std::optional<std::string> clipName; // When supplied, a unique imported name takes precedence over clip.
 };
 struct SceneObject {
     ObjectId id = 0;
@@ -26,6 +37,7 @@ struct SceneObject {
     std::optional<ObjectId> parent;
     std::optional<std::filesystem::path> model;
     bool enabled = true;
+    bool selectable = true; // Runtime policy only; intentionally not serialized.
     glm::vec4 tint{1};
     std::optional<std::size_t> materialOverride;
     std::optional<AnimationSettings> initialAnimation;
@@ -61,16 +73,35 @@ public:
     [[nodiscard]] bool contains(ObjectId id) const noexcept { return objects_.contains(id); }
     [[nodiscard]] const SceneObject& object(ObjectId id) const;
     [[nodiscard]] const std::map<ObjectId,SceneObject>& objects() const noexcept { return objects_; }
+    [[nodiscard]] std::span<const ObjectId> children(ObjectId id) const { return object(id).children_; }
     void setName(ObjectId id, std::string name);
     void setTransform(ObjectId id, const Transform& local);
     void setParent(ObjectId id, std::optional<ObjectId> parent);
     void setEnabled(ObjectId id, bool enabled);
+    void setSelectable(ObjectId id, bool selectable);
+    // Including inactive/empty objects is useful for tools; mouse picking keeps the default policy.
+    void selectObject(std::optional<ObjectId> id, bool includeInactive = false);
+    [[nodiscard]] std::optional<ObjectId> selectedObject() const;
+    void clearSelection() noexcept { selected_.reset(); selectionIncludesInactive_ = false; }
     void setModel(ObjectId id, std::optional<std::filesystem::path> model);
     void setTint(ObjectId id, const glm::vec4& tint);
     void setMaterialOverride(ObjectId id, std::optional<std::size_t> material);
+    // Legacy initial-state input, also usable before model binding; retained for existing scenes/code.
     void setAnimation(ObjectId id, std::optional<AnimationSettings> settings);
     [[nodiscard]] assets::ModelInstance& animation(ObjectId id);
-    [[nodiscard]] AnimationSettings animationSettings(ObjectId id) const;
+    [[nodiscard]] AnimationSettings animationSettings(ObjectId id) const; // Current playback, not saved configuration.
+    // Read-only shared clips. The span remains valid while this object's model is bound.
+    [[nodiscard]] std::span<const assets::AnimationData> availableAnimations(ObjectId id) const;
+    // A missing named clip resolves to clip == availableAnimations(id).size(); it stays at rest.
+    [[nodiscard]] AnimationConfiguration animationConfiguration(ObjectId id) const;
+    void setAnimationConfiguration(ObjectId id, AnimationConfiguration configuration);
+    // Runtime/preview controls never change authored configuration. play restarts; resume retains time.
+    void playAnimation(ObjectId id, std::size_t clip, bool loop = true);
+    void playAnimation(ObjectId id, std::string_view clipName, bool loop = true);
+    void pauseAnimation(ObjectId id);
+    void resumeAnimation(ObjectId id);
+    void stopAnimation(ObjectId id);
+    void setAnimationSpeed(ObjectId id, float speed);
     [[nodiscard]] glm::mat4 worldTransform(ObjectId id) const;
     [[nodiscard]] bool enabledInHierarchy(ObjectId id) const;
     void updateTransforms() const;
@@ -100,6 +131,8 @@ private:
     std::map<std::string,SceneCamera> cameras_;
     SceneLighting lighting_;
     ObjectId nextId_ = 1;
+    mutable std::optional<ObjectId> selected_;
+    bool selectionIncludesInactive_ = false;
     mutable std::vector<ObjectId> scratch_;
 };
 }
