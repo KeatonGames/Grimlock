@@ -211,7 +211,15 @@ int main(int argc,char** argv) {
             require(engine.scene()->animation(a).asset()==engine.scene()->animation(b).asset(),"editor animation instances did not share resources");
             engine.scene()->selectObject(a,true);document.save(output/"animation-ui.json");tick(engine);
             int count=0;auto windows=SDL_GetWindows(&count);require(windows&&count==1,"expected animation editor window");
-            const auto id=SDL_GetWindowID(windows[0]);SDL_free(windows);
+            auto* window=windows[0];const auto id=SDL_GetWindowID(window);SDL_free(windows);
+            require(SDL_SetWindowSize(window,1280,480),SDL_GetError());tick(engine,8);
+            (void)inspectorControl(engine,id,a,"##Playback Speed",80);
+            // Auto-reveal is one-shot; users can still scroll back to General/Transform.
+            auto* inspector=ImGui::FindWindowByName("Inspector");require(inspector->Scroll.y>0,"compact animated Inspector was not revealed");
+            ImGui::SetScrollY(inspector,0);tick(engine,3);require(inspector->Scroll.y==0,"Inspector fought manual scrolling");
+            engine.scene()->selectObject(b,true);tick(engine,4);
+            (void)inspectorControl(engine,id,b,"##Animation Clip",80);
+            engine.scene()->selectObject(a,true);tick(engine,4);
             click(engine,id,inspectorControl(engine,id,a,"##Animation Clip",80));
             const auto& popups=ImGui::GetCurrentContext()->OpenPopupStack;require(!popups.empty()&&popups.back().Window,"animation clip dropdown missing");
             const auto* popup=popups.back().Window;
@@ -230,7 +238,13 @@ int main(int argc,char** argv) {
             require(!engine.scene()->animationConfiguration(a).loop&&document.dirty(),"Loop checkbox did not persist");
             click(engine,id,inspectorControl(engine,id,a,"Autoplay",100));
             require(engine.scene()->animationConfiguration(a).autoplay&&engine.scene()->animationSettings(a).restPose,"Autoplay checkbox started preview or failed to persist");
-            auto configuration=engine.scene()->animationConfiguration(a);configuration.speed=1.25F;document.setAnimationConfiguration(a,configuration);
+            const auto speedInput=inspectorControl(engine,id,a,"##Playback Speed",80);
+            ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl,true);tick(engine);click(engine,id,speedInput);
+            ImGui::GetIO().AddKeyEvent(ImGuiMod_Ctrl,false);tick(engine);
+            ImGui::GetIO().AddInputCharactersUTF8("1.25");tick(engine);
+            ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter,true);tick(engine);ImGui::GetIO().AddKeyEvent(ImGuiKey_Enter,false);tick(engine);
+            require(engine.scene()->animationConfiguration(a).speed==1.25F&&document.dirty(),"Playback Speed input did not update saved configuration");
+            auto configuration=engine.scene()->animationConfiguration(a);
             rejects([&]{configuration.speed=std::numeric_limits<float>::quiet_NaN();document.setAnimationConfiguration(a,configuration);});
             const auto duplicate=document.duplicate(a);
             require(engine.scene()->animationConfiguration(duplicate).autoplay&&engine.scene()->animation(duplicate).playing(),"duplicate did not copy authored animation configuration");
@@ -239,6 +253,12 @@ int main(int argc,char** argv) {
             document.open(output/"animation-ui.json");
             require(engine.scene()->animation(a).playing()&&engine.scene()->animationSettings(a).clip==1&&engine.scene()->animationSettings(a).speed==1.25F&&!engine.scene()->animationSettings(a).loop,"saved autoplay configuration was not restored");
             require(engine.scene()->animationSettings(b).restPose,"independent disabled autoplay was not preserved");
+            require(SDL_SetWindowSize(window,1280,720),SDL_GetError());tick(engine,6);
+            const auto staticModel=document.addModel("models/cube.obj");tick(engine,4);
+            require(engine.scene()->availableAnimations(staticModel).empty(),"static model unexpectedly has animations");
+            const auto beforeSelection=document.dirty();engine.scene()->selectObject(a,true);tick(engine,4);
+            inspector=ImGui::FindWindowByName("Inspector");require(inspector->Scroll.y==0,"tall Inspector retained stale selection scroll");
+            require(document.dirty()==beforeSelection,"Inspector reveal dirtied the scene");
         }
         require(ImGui::GetCurrentContext()==nullptr,"animation editor context leaked");
         {

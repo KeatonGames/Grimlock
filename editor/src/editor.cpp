@@ -133,7 +133,7 @@ void Editor::executePending() {
         else if(operation==Operation::open) { document_.open(filename); }
         else if(operation==Operation::close) { close_=true; }
         if(operation==Operation::newScene||operation==Operation::open) {
-            renameObject_.reset();deleteObject_.reset();hierarchySelection_.reset();rotationObject_.reset();
+            renameObject_.reset();deleteObject_.reset();hierarchySelection_.reset();rotationObject_.reset();inspectorSelection_.reset();
         }
     });
 }
@@ -279,7 +279,11 @@ void Editor::hierarchy() {
     if(hierarchyAction_) { auto action=std::move(hierarchyAction_);hierarchyAction_=nullptr;attempt(action); }
 }
 void Editor::inspector() {
-    ImGui::Begin("Inspector");auto& scene=*engine_.scene();const auto selected=scene.selectedObject();
+    auto& scene=*engine_.scene();const auto selected=scene.selectedObject();
+    const bool selectionChanged=inspectorSelection_!=selected;inspectorSelection_=selected;
+    if(selectionChanged) { ImGui::SetNextWindowScroll({0,0}); }
+    ImGui::Begin("Inspector");
+    const float height=ImGui::GetWindowHeight();const bool revealAnimation=selectionChanged||height<inspectorHeight_;inspectorHeight_=height;
     if(!selected) { ImGui::TextWrapped("Select an object in the scene or hierarchy.");ImGui::End();rotationObject_.reset();return; }
     const auto id=*selected;const auto& object=scene.object(id);const auto key=std::to_string(id);ImGui::PushID(key.c_str());
     ImGui::SeparatorText("General");
@@ -301,16 +305,17 @@ void Editor::inspector() {
     }
     changed=vectorControl("Scale",transform.scale,0.01F)||changed;
     if(changed) { attempt([&]{document_.setTransform(id,transform);});lastRotation_=scene.object(id).local.rotation; }
-    if(object.model) { animationControls(id); }
+    if(object.model) { animationControls(id,revealAnimation); }
     ImGui::Separator();if(ImGui::Button("Duplicate")) { attempt([&]{(void)document_.duplicate(id);}); }
     ImGui::SetItemTooltip("Copy this object's properties only, not its children");
     ImGui::SameLine();if(ImGui::Button(object.model?"Delete Object...":"Delete Group...")) { requestDelete(id); }
     ImGui::PopID();ImGui::End();
 }
-void Editor::animationControls(ObjectId id) {
+void Editor::animationControls(ObjectId id,bool reveal) {
     auto& scene=*engine_.scene();const auto clips=scene.availableAnimations(id);
-    if(clips.empty()) { return; }
-    ImGui::SeparatorText("Animation");auto configuration=scene.animationConfiguration(id);
+    const auto sectionStart=ImGui::GetCursorScreenPos();ImGui::SeparatorText("Animation");
+    if(clips.empty()) { ImGui::TextWrapped("No animation clips in this model.");return; }
+    auto configuration=scene.animationConfiguration(id);
     const auto label=[&](std::size_t clip) { return clips[clip].name.empty()?"Clip "+std::to_string(clip+1):clips[clip].name; };
     const auto preview=configuration.clip<clips.size()?label(configuration.clip):"Missing: "+configuration.clipName.value_or(std::to_string(configuration.clip));
     ImGui::TextUnformatted("Animation Clip");ImGui::SetNextItemWidth(-1);
@@ -347,6 +352,12 @@ void Editor::animationControls(ObjectId id) {
     }
     ImGui::SetItemTooltip("1 = normal, 0 = freeze, negative = reverse. Non-looping clips hold their endpoint.");
     ImGui::EndDisabled();
+    // General/Transform can put these controls below the fold in short windows.
+    // Reveal only on selection/shrink, never fight the user's subsequent scrolling.
+    const auto window=ImGui::GetWindowPos();const auto padding=ImGui::GetStyle().WindowPadding.y;
+    if(reveal&&(sectionStart.y<window.y+padding||ImGui::GetCursorScreenPos().y>window.y+ImGui::GetWindowHeight()-padding)) {
+        ImGui::SetScrollFromPosY(sectionStart.y-window.y-padding,0);
+    }
 }
 void Editor::performance() {
     if(!showPerformance_) { return; }ImGui::SetNextWindowSize({240,140},ImGuiCond_FirstUseEver);

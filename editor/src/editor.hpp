@@ -32,7 +32,7 @@ private:
     void beginRename(ObjectId id);
     void requestDelete(ObjectId id);
     void inspector();
-    void animationControls(ObjectId id);
+    void animationControls(ObjectId id, bool reveal);
     void performance();
     void dialogs();
     void attempt(const std::function<void()>& operation);
@@ -54,6 +54,8 @@ private:
     std::size_t modelIndex_=0;
     std::optional<ObjectId> rotationObject_;
     std::optional<ObjectId> hierarchySelection_;
+    std::optional<ObjectId> inspectorSelection_;
+    float inspectorHeight_=0;
     std::vector<ObjectId> revealParents_;
     // Tree edits run after traversal, never while iterating a child span.
     std::function<void()> hierarchyAction_;
