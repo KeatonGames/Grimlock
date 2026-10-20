@@ -16,6 +16,9 @@ add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/ga
 add_executable(SceneChecks scene.cpp)
 target_link_libraries(SceneChecks PRIVATE Engine nlohmann_json::nlohmann_json)
 add_test(NAME Scene.Cpu COMMAND SceneChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/scene-output")
+add_executable(GridChecks grid.cpp)
+target_link_libraries(GridChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+add_test(NAME Grid.Cpu COMMAND GridChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/grid-output")
 
 add_executable(SceneRuntimeChecks scene_runtime.cpp)
 target_link_libraries(SceneRuntimeChecks PRIVATE Engine nlohmann_json::nlohmann_json)

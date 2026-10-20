@@ -12,7 +12,9 @@ public:
     DepthTarget& operator=(const DepthTarget&) = delete;
 
     [[nodiscard]] static VkFormat chooseFormat(VkPhysicalDevice device);
+
     [[nodiscard]] VkImage image() const noexcept { return image_; }
+
     [[nodiscard]] VkImageView view() const noexcept { return view_; }
 
 private:

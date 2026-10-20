@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grimlock/assets/image_data.hpp"
+
 #include <array>
 #include <filesystem>
 
@@ -8,6 +9,7 @@ namespace grimlock::assets {
 
 // Vulkan cube order: +X, -X, +Y, -Y, +Z, -Z; each face is top-left origin.
 using EnvironmentCube = std::array<FloatImageData, 6>;
+
 struct EnvironmentMaps {
     std::array<FloatImageData, 6> irradiance;
     std::vector<FloatImageData> specular; // mip-major, then six faces per mip

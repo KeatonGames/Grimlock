@@ -2,12 +2,11 @@
 
 #include "grimlock/assets/image_data.hpp"
 
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-
-#include <cstdint>
-#include <optional>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -24,9 +23,10 @@ struct Vertex {
     std::uint32_t morphIndex = 0; // Original accessor index; retained across normal/tangent seams.
 
     bool operator==(const Vertex& other) const noexcept {
-        return position == other.position && normal == other.normal && uv == other.uv && uv1 == other.uv1 && tangent == other.tangent
-            && joints0 == other.joints0 && joints1 == other.joints1 && weights0 == other.weights0 && weights1 == other.weights1
-            && morphIndex == other.morphIndex;
+        return position == other.position && normal == other.normal && uv == other.uv &&
+               uv1 == other.uv1 && tangent == other.tangent && joints0 == other.joints0 &&
+               joints1 == other.joints1 && weights0 == other.weights0 &&
+               weights1 == other.weights1 && morphIndex == other.morphIndex;
     }
 };
 
@@ -36,8 +36,12 @@ struct MeshData {
     std::vector<Vertex> vertices;
     std::vector<std::uint32_t> indices;
     std::size_t material = 0;
-    struct MorphDelta { glm::vec4 position{}, normal{}, tangent{}; };
-    static_assert(sizeof(MorphDelta)==48);
+
+    struct MorphDelta {
+        glm::vec4 position{}, normal{}, tangent{};
+    };
+
+    static_assert(sizeof(MorphDelta) == 48);
     std::vector<MorphDelta> morphDeltas; // Target-major; original accessor vertex order.
     std::uint32_t morphVertexCount = 0, morphTargetCount = 0;
 };
@@ -76,7 +80,8 @@ struct MaterialData {
     // glTF metallic-roughness factors are linear; packed texture G=roughness, B=metallic.
     float metallic = 1.0F, roughness = 1.0F;
     glm::vec3 emissive{0.0F};
-    std::optional<TextureReference> metallicRoughnessTexture, normalTexture, occlusionTexture, emissiveTexture;
+    std::optional<TextureReference> metallicRoughnessTexture, normalTexture, occlusionTexture,
+        emissiveTexture;
     float normalScale = 1.0F, occlusionStrength = 1.0F;
     bool unlit = false;
     float emissiveStrength = 1.0F, ior = 1.5F, specular = 1.0F;
@@ -84,11 +89,14 @@ struct MaterialData {
     float clearcoat = 0, clearcoatRoughness = 0, clearcoatNormalScale = 1;
     std::optional<TextureReference> specularTexture, specularColorTexture, clearcoatTexture,
         clearcoatRoughnessTexture, clearcoatNormalTexture;
-    // Preserved optional advanced layers. Rendering requires a future transmission/volume/sheen path.
-    float transmission = 0, thickness = 0, attenuationDistance = std::numeric_limits<float>::infinity();
+    // Preserved optional advanced layers. Rendering requires a future transmission/volume/sheen
+    // path.
+    float transmission = 0, thickness = 0,
+          attenuationDistance = std::numeric_limits<float>::infinity();
     glm::vec3 attenuationColor{1}, sheenColor{0};
     float sheenRoughness = 0;
-    std::optional<TextureReference> transmissionTexture, thicknessTexture, sheenColorTexture, sheenRoughnessTexture;
+    std::optional<TextureReference> transmissionTexture, thicknessTexture, sheenColorTexture,
+        sheenRoughnessTexture;
 };
 
 struct ModelNode {
@@ -103,7 +111,8 @@ struct ModelNode {
     bool matrixTransform = true;
     std::optional<std::size_t> skin, light;
     std::vector<float> weights;
-    bool bindPosePreview = false; // Diagnosed legacy assets with missing rest-joint transforms only.
+    bool bindPosePreview =
+        false; // Diagnosed legacy assets with missing rest-joint transforms only.
 };
 
 struct SkinData {
@@ -114,12 +123,18 @@ struct SkinData {
 };
 enum class AnimationPath { translation, rotation, scale, weights };
 enum class Interpolation { step, linear, cubicSpline };
+
 struct AnimationSampler {
     std::vector<float> times, values; // glTF ordering; cubic = in/value/out per key.
     std::uint32_t components = 0;
     Interpolation interpolation = Interpolation::linear;
 };
-struct AnimationChannel { std::size_t sampler = 0, node = 0; AnimationPath path{}; };
+
+struct AnimationChannel {
+    std::size_t sampler = 0, node = 0;
+    AnimationPath path{};
+};
+
 struct AnimationData {
     std::string name;
     std::vector<AnimationSampler> samplers;
@@ -127,6 +142,7 @@ struct AnimationData {
     float start = 0, end = 0;
 };
 enum class LightType { directional, point, spot };
+
 struct LightData {
     std::string name;
     LightType type = LightType::point;

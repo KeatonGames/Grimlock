@@ -1,9 +1,9 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
-#include <glm/glm.hpp>
-#include <cstddef>
 #include <array>
+#include <cstddef>
+#include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
 namespace grimlock::renderer {
 
@@ -21,6 +21,7 @@ struct alignas(16) DrawConstants {
     glm::vec4 normalColumn2{};
     glm::vec4 baseColor{1.0F};
 };
+
 static_assert(sizeof(CameraUniforms) == 144);
 static_assert(sizeof(DrawConstants) == 128);
 static_assert(offsetof(CameraUniforms, projection) == 64);
@@ -29,14 +30,16 @@ static_assert(offsetof(DrawConstants, baseColor) == 112);
 
 class MeshPipeline final {
 public:
-    MeshPipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat, VkDescriptorSetLayout cameraLayout,
-        VkDescriptorSetLayout materialLayout, VkDescriptorSetLayout deformationLayout);
+    MeshPipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat,
+                 VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout,
+                 VkDescriptorSetLayout deformationLayout);
     ~MeshPipeline();
 
     MeshPipeline(const MeshPipeline&) = delete;
     MeshPipeline& operator=(const MeshPipeline&) = delete;
 
     [[nodiscard]] VkPipeline handle(bool blend, bool doubleSided, bool mirrored) const noexcept;
+
     [[nodiscard]] VkPipelineLayout layout() const noexcept { return layout_; }
 
 private:

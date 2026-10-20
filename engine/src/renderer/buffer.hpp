@@ -6,7 +6,8 @@ namespace grimlock::renderer {
 
 class Buffer final {
 public:
-    Buffer(const VulkanContext& context, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+    Buffer(const VulkanContext& context, VkDeviceSize size, VkBufferUsageFlags usage,
+           VkMemoryPropertyFlags properties);
     ~Buffer();
     Buffer(Buffer&& other) noexcept;
     Buffer& operator=(Buffer&& other) noexcept;
@@ -14,7 +15,9 @@ public:
     Buffer& operator=(const Buffer&) = delete;
 
     [[nodiscard]] VkBuffer handle() const noexcept { return buffer_; }
+
     [[nodiscard]] VkDeviceSize size() const noexcept { return size_; }
+
     void write(const void* data, VkDeviceSize bytes);
 
 private:

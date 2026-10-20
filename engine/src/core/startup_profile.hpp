@@ -16,10 +16,16 @@ public:
     StartupProfile(const StartupProfile&) = delete;
     StartupProfile& operator=(const StartupProfile&) = delete;
     void firstPresent();
+
 private:
     friend class StartupSpan;
     using Clock = std::chrono::steady_clock;
-    struct Measurement { std::size_t calls = 0; double inclusive = 0, self = 0; };
+
+    struct Measurement {
+        std::size_t calls = 0;
+        double inclusive = 0, self = 0;
+    };
+
     void report(std::string_view result) noexcept;
     static thread_local StartupProfile* active_;
     StartupProfile* previous_ = nullptr;
@@ -35,6 +41,7 @@ public:
     ~StartupSpan();
     StartupSpan(const StartupSpan&) = delete;
     StartupSpan& operator=(const StartupSpan&) = delete;
+
 private:
     friend class StartupProfile;
     StartupProfile* profile_ = nullptr;
@@ -43,4 +50,4 @@ private:
     std::chrono::steady_clock::time_point start_;
     double children_ = 0;
 };
-}
+} // namespace grimlock::diagnostics

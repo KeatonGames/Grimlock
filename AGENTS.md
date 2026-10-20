@@ -1,18 +1,26 @@
-# Project Working Contract
+# Project Guidelines
 
-- Follow the requested scope exactly. Implement only what the current task explicitly requests.
-- Never treat future plans, ideas, or background context as permission to add features.
-- Do not add unrequested mechanics, systems, libraries, tools, dependencies, or files.
-- Never refactor unrelated code or rewrite working code without a clear need.
-- Prefer the smallest complete, maintainable solution; avoid premature abstraction and overengineering.
-- Do not create placeholders that falsely imply a feature is complete.
-- Do not make architectural decisions that introduce unnecessary complexity.
-- Do not change the approved technology stack without explicit authorization.
-- Before each task, inspect the relevant code and existing project conventions.
-- Make focused changes, preserve existing work, and explain necessary deviations.
-- Build and verify changes using the documented CMake workflow whenever possible.
-- Fix errors introduced by your changes before reporting completion.
-- Never claim code was built, tested, or executed unless it actually succeeded.
-- If permissions, environment limitations, or missing information block work, explain the specific blocker rather than guessing.
-- Do not modify this file to weaken these rules unless explicitly requested.
-- When a task is complete, summarize the changes, verification performed, results, and any remaining external setup requirements.
+- `engine/include/grimlock/` exposes reusable Engine APIs; `engine/src/` implements
+  loading, scenes, animation, input and rendering. Keep gameplay and demo assets
+  in `game/`, editor tools in `editor/`, and checks in `tests/`.
+- Use C++20. Name types in `PascalCase`, functions, variables and constants in
+  `camelCase`, private data members with a trailing `_`, and files in `snake_case`.
+  Preserve names required by external APIs.
+- Run clang-format with the root `.clang-format` on every changed `.cpp` and
+  `.hpp` file. It defines LLVM-based formatting, four-space indentation, attached
+  braces and a 100-column limit. Use braces for control flow.
+- Prefer clear names, focused functions and straightforward logic. Include what
+  each file uses; remove unused code and explain intent rather than obvious steps.
+- Use RAII and value semantics. Express ownership with smart pointers when needed;
+  keep borrowing explicit and use `const` for data that should not change.
+- Validate inputs at boundaries, report actionable errors, and preserve cleanup
+  on failure. Follow the surrounding exception and error-handling conventions.
+- Inspect existing code first and preserve Engine/Game separation and behavior.
+  Keep changes focused; avoid unrequested features, dependencies and abstractions.
+- Build and verify affected functionality. With editor and tests enabled, use
+  `cmake --preset debug -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON`,
+  `cmake --build --preset debug --parallel 4`, then
+  `ctest --test-dir out/build/debug -C Debug --output-on-failure`.
+  See `README.md` for requirements and Release commands; report actual results
+  and any environment blockers.
+- Update documentation when a change affects usage, setup or public behavior.

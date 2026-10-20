@@ -9,4 +9,4 @@ struct Transform {
     glm::vec3 scale{1};
     [[nodiscard]] glm::mat4 matrix() const;
 };
-}
+} // namespace grimlock

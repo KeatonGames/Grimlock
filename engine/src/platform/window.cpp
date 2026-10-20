@@ -1,5 +1,6 @@
-#include "core/startup_profile.hpp"
 #include "platform/window.hpp"
+
+#include "core/startup_profile.hpp"
 
 #include <stdexcept>
 #include <string>

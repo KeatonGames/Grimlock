@@ -1,5 +1,5 @@
 include("${PROJECT_SOURCE_DIR}/cmake/ImGui.cmake")
-add_library(Editor STATIC src/editor.cpp src/scene_document.cpp)
+add_library(Editor STATIC src/editor.cpp src/scene_document.cpp src/grid_tools.cpp)
 target_include_directories(Editor PUBLIC include PRIVATE src)
 target_link_libraries(Editor PUBLIC Engine PRIVATE DearImGui SDL3::SDL3 Vulkan::Vulkan)
 target_compile_features(Editor PUBLIC cxx_std_20)

@@ -20,14 +20,23 @@ public:
     void setEnabled(ObjectId object, bool enabled);
     void setTransform(ObjectId object, Transform transform);
     void setAnimationConfiguration(ObjectId object, AnimationConfiguration configuration);
+    void configureGrid(std::optional<GridConfiguration> configuration);
+    bool setGridWalkable(GridCell cell, bool walkable);
     void observeCamera();
     void refreshModels();
+
     [[nodiscard]] bool dirty() const noexcept { return dirty_; }
+
     [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
-    [[nodiscard]] const std::vector<std::filesystem::path>& models() const noexcept { return models_; }
+
+    [[nodiscard]] const std::vector<std::filesystem::path>& models() const noexcept {
+        return models_;
+    }
+
     // GLM's XYZ Euler constructor and eulerAngles use the same convention.
     [[nodiscard]] static glm::vec3 rotationDegrees(const glm::quat& rotation);
     [[nodiscard]] static glm::quat rotationQuaternion(glm::vec3 degrees);
+
 private:
     void rememberCamera();
     Engine& engine_;
@@ -36,4 +45,4 @@ private:
     std::optional<Camera> camera_;
     bool dirty_ = false;
 };
-}
+} // namespace grimlock::editor

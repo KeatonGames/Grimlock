@@ -1,22 +1,22 @@
 #pragma once
 
-#include "renderer/buffer.hpp"
-#include "grimlock/camera.hpp"
-#include "renderer/depth_target.hpp"
-#include "renderer/gpu_mesh.hpp"
-#include "renderer/gpu_materials.hpp"
-#include "renderer/mesh_pipeline.hpp"
-#include "renderer/vulkan_context.hpp"
-#include "renderer/lighting.hpp"
-#include "renderer/tone_map_pipeline.hpp"
 #include "assets/environment.hpp"
 #include "grimlock/assets/animation.hpp"
-#include "renderer/deformation.hpp"
+#include "grimlock/camera.hpp"
 #include "grimlock/render_overlay.hpp"
+#include "renderer/buffer.hpp"
+#include "renderer/deformation.hpp"
+#include "renderer/depth_target.hpp"
+#include "renderer/gpu_materials.hpp"
+#include "renderer/gpu_mesh.hpp"
+#include "renderer/lighting.hpp"
+#include "renderer/mesh_pipeline.hpp"
+#include "renderer/tone_map_pipeline.hpp"
+#include "renderer/vulkan_context.hpp"
 
 #include <cstddef>
-#include <optional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -29,13 +29,15 @@ struct ModelDraw {
     glm::mat4 transform{1.0F};
     glm::vec4 baseColor{1.0F}; // Optional linear-space instance tint, neutral by default.
     std::optional<std::size_t> materialOverride; // Share geometry in the PBR comparison scene.
-    const assets::ModelPose* pose = nullptr; // Instance-owned; immutable for the duration of drawFrame.
+    const assets::ModelPose* pose =
+        nullptr; // Instance-owned; immutable for the duration of drawFrame.
     bool selected = false;
 };
 
 class VulkanRenderer final {
 public:
-    explicit VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube* environment = nullptr);
+    explicit VulkanRenderer(SDL_Window* window,
+                            const assets::EnvironmentCube* environment = nullptr);
     ~VulkanRenderer();
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
@@ -43,7 +45,8 @@ public:
     // Internal IDs remain valid until releaseModels; freed slots may be reused.
     [[nodiscard]] std::size_t uploadModel(const assets::ModelData& model);
     void releaseModels(std::span<const std::size_t> models) noexcept;
-    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws, const Lighting& lighting = {});
+    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws,
+                                 const Lighting& lighting = {});
     void requestSwapchainRecreation() noexcept;
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
@@ -57,10 +60,13 @@ private:
     [[nodiscard]] bool createSwapchain();
     void createImageViews();
     void allocateCommandBuffers();
-    void recordFrame(std::uint32_t imageIndex, const Camera& camera, std::span<const ModelDraw> draws, float exposure);
+    void recordFrame(std::uint32_t imageIndex, const Camera& camera,
+                     std::span<const ModelDraw> draws, float exposure);
     [[nodiscard]] bool recreateSwapchain();
-    [[nodiscard]] VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
-    [[nodiscard]] VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+    [[nodiscard]] VkSurfaceFormatKHR
+    chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
+    [[nodiscard]] VkExtent2D
+    chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
     [[nodiscard]] bool hasDrawableExtent() const;
     void destroySwapchainResources() noexcept;
     void destroy() noexcept;
@@ -68,10 +74,12 @@ private:
     SDL_Window* window_ = nullptr;
     VulkanContext context_;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
+
     struct NodeDraw {
         std::vector<std::size_t> meshes;
         std::size_t node = 0;
     };
+
     struct GpuModel {
         std::vector<GpuMesh> meshes;
         std::vector<NodeDraw> nodes; // Static selected-scene draw cache, not baked geometry.
@@ -81,6 +89,7 @@ private:
         std::vector<VkDescriptorSet> deformationSets;
         assets::ModelPose restPose;
     };
+
     std::vector<std::unique_ptr<GpuModel>> models_;
     std::optional<Deformation> deformation_;
 

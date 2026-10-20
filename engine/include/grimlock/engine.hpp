@@ -1,10 +1,10 @@
 #pragma once
 #include "grimlock/camera.hpp"
 #include "grimlock/lighting.hpp"
-#include "grimlock/transform.hpp"
 #include "grimlock/orbit_camera.hpp"
 #include "grimlock/scene.hpp"
-#include <glm/gtc/quaternion.hpp>
+#include "grimlock/transform.hpp"
+
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -15,7 +15,11 @@
 namespace grimlock {
 class Scene;
 class RenderOverlay;
-namespace assets { struct ModelData; class ModelInstance; }
+
+namespace assets {
+struct ModelData;
+class ModelInstance;
+} // namespace assets
 
 struct EngineConfig {
     std::string windowTitle = "Grimlock";
@@ -28,20 +32,28 @@ class ModelId final {
 public:
     ModelId() = default;
     bool operator==(const ModelId&) const = default;
+
 private:
     friend class Engine;
+
     explicit ModelId(std::size_t index) : index_(index) {}
+
     std::size_t index_ = static_cast<std::size_t>(-1);
 };
+
 class InstanceId final {
 public:
     InstanceId() = default;
     bool operator==(const InstanceId&) const = default;
+
 private:
     friend class Engine;
+
     explicit InstanceId(std::size_t index) : index_(index) {}
+
     std::size_t index_ = static_cast<std::size_t>(-1);
 };
+
 struct ModelInfo {
     glm::vec3 minimum{}, maximum{};
     std::size_t primitives = 0, materials = 0;
@@ -97,6 +109,7 @@ public:
     // Polls events, advances animations/lights and renders. False only when closing;
     // a minimized window still updates, but rendering is deferred.
     [[nodiscard]] bool update();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

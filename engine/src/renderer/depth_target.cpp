@@ -1,4 +1,5 @@
 #include "renderer/depth_target.hpp"
+
 #include "renderer/vulkan_helpers.hpp"
 
 #include <array>
@@ -11,12 +12,16 @@ VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device) {
     for (const auto format : formats) {
         VkFormatProperties properties{};
         vkGetPhysicalDeviceFormatProperties(device, format, &properties);
-        if ((properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) { return format; }
+        if ((properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) !=
+            0) {
+            return format;
+        }
     }
     throw std::runtime_error("No supported depth attachment format (D32_SFLOAT or D16_UNORM).");
 }
 
-DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, const VkFormat format)
+DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent,
+                         const VkFormat format)
     : device_(context.device()) {
     try {
         VkImageCreateInfo image{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -34,9 +39,11 @@ DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, 
         vkGetImageMemoryRequirements(device_, image_, &requirements);
         VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocation.allocationSize = requirements.size;
-        allocation.memoryTypeIndex = findMemoryType(context.physicalDevice(), requirements.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        checkVk(vkAllocateMemory(device_, &allocation, nullptr, &memory_), "vkAllocateMemory(depth)");
+        allocation.memoryTypeIndex =
+            findMemoryType(context.physicalDevice(), requirements.memoryTypeBits,
+                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        checkVk(vkAllocateMemory(device_, &allocation, nullptr, &memory_),
+                "vkAllocateMemory(depth)");
         checkVk(vkBindImageMemory(device_, image_, memory_, 0), "vkBindImageMemory(depth)");
         VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         view.image = image_;
@@ -46,10 +53,16 @@ DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, 
         view.subresourceRange.levelCount = 1;
         view.subresourceRange.layerCount = 1;
         checkVk(vkCreateImageView(device_, &view, nullptr, &view_), "vkCreateImageView(depth)");
-    } catch (...) { destroy(); throw; }
+    } catch (...) {
+        destroy();
+        throw;
+    }
 }
 
-DepthTarget::~DepthTarget() { destroy(); }
+DepthTarget::~DepthTarget() {
+    destroy();
+}
+
 void DepthTarget::destroy() noexcept {
     vkDestroyImageView(device_, view_, nullptr);
     vkDestroyImage(device_, image_, nullptr);

@@ -1,10 +1,10 @@
-#include "core/startup_profile.hpp"
 #include "renderer/vulkan_context.hpp"
+
+#include "core/startup_profile.hpp"
 #include "renderer/vulkan_helpers.hpp"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
-
 #include <algorithm>
 #include <set>
 #include <stdexcept>
@@ -21,7 +21,8 @@ VulkanContext::VulkanContext(SDL_Window* window) {
     try {
         createInstance();
         if (!SDL_Vulkan_CreateSurface(window, instance_, nullptr, &surface_)) {
-            throw std::runtime_error(std::string{"SDL_Vulkan_CreateSurface failed: "} + SDL_GetError());
+            throw std::runtime_error(std::string{"SDL_Vulkan_CreateSurface failed: "} +
+                                     SDL_GetError());
         }
         selectPhysicalDevice();
         createDevice();
@@ -31,7 +32,9 @@ VulkanContext::VulkanContext(SDL_Window* window) {
     }
 }
 
-VulkanContext::~VulkanContext() { destroy(); }
+VulkanContext::~VulkanContext() {
+    destroy();
+}
 
 void VulkanContext::createInstance() {
     const auto enumerateVersion = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
@@ -41,12 +44,14 @@ void VulkanContext::createInstance() {
         checkVk(enumerateVersion(&loaderVersion), "vkEnumerateInstanceVersion");
     }
     if (loaderVersion < VK_API_VERSION_1_3) {
-        throw std::runtime_error("Grimlock requires a Vulkan 1.3+ loader for Dynamic Rendering and Synchronization2.");
+        throw std::runtime_error(
+            "Grimlock requires a Vulkan 1.3+ loader for Dynamic Rendering and Synchronization2.");
     }
     Uint32 extensionCount = 0;
     const char* const* extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     if (extensions == nullptr) {
-        throw std::runtime_error(std::string{"SDL_Vulkan_GetInstanceExtensions failed: "} + SDL_GetError());
+        throw std::runtime_error(std::string{"SDL_Vulkan_GetInstanceExtensions failed: "} +
+                                 SDL_GetError());
     }
     VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     application.pApplicationName = "Grimlock";
@@ -73,11 +78,13 @@ VulkanContext::QueueFamilies VulkanContext::findQueueFamilies(const VkPhysicalDe
         }
         VkBool32 present = VK_FALSE;
         checkVk(vkGetPhysicalDeviceSurfaceSupportKHR(device, index, surface_, &present),
-            "vkGetPhysicalDeviceSurfaceSupportKHR");
+                "vkGetPhysicalDeviceSurfaceSupportKHR");
         if (present == VK_TRUE) {
             result.present = index;
         }
-        if (result.complete()) { break; }
+        if (result.complete()) {
+            break;
+        }
     }
     return result;
 }
@@ -85,66 +92,89 @@ VulkanContext::QueueFamilies VulkanContext::findQueueFamilies(const VkPhysicalDe
 SwapchainSupport VulkanContext::querySwapchainSupport(const VkPhysicalDevice device) const {
     SwapchainSupport support;
     checkVk(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &support.capabilities),
-        "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+            "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
     std::uint32_t count = 0;
-    checkVk(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &count, nullptr), "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    checkVk(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &count, nullptr),
+            "vkGetPhysicalDeviceSurfaceFormatsKHR");
     support.formats.resize(count);
     if (count != 0) {
-        checkVk(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &count, support.formats.data()),
+        checkVk(
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &count, support.formats.data()),
             "vkGetPhysicalDeviceSurfaceFormatsKHR");
     }
     checkVk(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &count, nullptr),
-        "vkGetPhysicalDeviceSurfacePresentModesKHR");
+            "vkGetPhysicalDeviceSurfacePresentModesKHR");
     support.presentModes.resize(count);
     if (count != 0) {
-        checkVk(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &count, support.presentModes.data()),
-            "vkGetPhysicalDeviceSurfacePresentModesKHR");
+        checkVk(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &count,
+                                                          support.presentModes.data()),
+                "vkGetPhysicalDeviceSurfacePresentModesKHR");
     }
     return support;
 }
 
-SwapchainSupport VulkanContext::swapchainSupport() const { return querySwapchainSupport(physicalDevice_); }
+SwapchainSupport VulkanContext::swapchainSupport() const {
+    return querySwapchainSupport(physicalDevice_);
+}
 
 bool VulkanContext::isDeviceSuitable(const VkPhysicalDevice device) const {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(device, &properties);
-    if (properties.apiVersion < VK_API_VERSION_1_3 || !findQueueFamilies(device).complete()) { return false; }
-    VkPhysicalDeviceVulkan13Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+    if (properties.apiVersion < VK_API_VERSION_1_3 || !findQueueFamilies(device).complete()) {
+        return false;
+    }
+    VkPhysicalDeviceVulkan13Features features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
     VkPhysicalDeviceFeatures2 features2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
     features2.pNext = &features;
     vkGetPhysicalDeviceFeatures2(device, &features2);
-    if (!features.dynamicRendering || !features.synchronization2) { return false; }
+    if (!features.dynamicRendering || !features.synchronization2) {
+        return false;
+    }
 
     std::uint32_t count = 0;
-    checkVk(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr), "vkEnumerateDeviceExtensionProperties");
+    checkVk(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr),
+            "vkEnumerateDeviceExtensionProperties");
     std::vector<VkExtensionProperties> extensions(count);
     checkVk(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()),
-        "vkEnumerateDeviceExtensionProperties");
-    if (!std::any_of(extensions.begin(), extensions.end(), [](const VkExtensionProperties& extension) {
-        return std::string_view{extension.extensionName} == VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-    })) { return false; }
+            "vkEnumerateDeviceExtensionProperties");
+    if (!std::any_of(
+            extensions.begin(), extensions.end(), [](const VkExtensionProperties& extension) {
+                return std::string_view{extension.extensionName} == VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+            })) {
+        return false;
+    }
 
     const auto support = querySwapchainSupport(device);
-    return !support.formats.empty() && !support.presentModes.empty()
-        && (support.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0;
+    return !support.formats.empty() && !support.presentModes.empty() &&
+           (support.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) != 0;
 }
 
 void VulkanContext::selectPhysicalDevice() {
     std::uint32_t count = 0;
     checkVk(vkEnumeratePhysicalDevices(instance_, &count, nullptr), "vkEnumeratePhysicalDevices");
-    if (count == 0) { throw std::runtime_error("No Vulkan-capable GPU is available."); }
+    if (count == 0) {
+        throw std::runtime_error("No Vulkan-capable GPU is available.");
+    }
     std::vector<VkPhysicalDevice> devices(count);
-    checkVk(vkEnumeratePhysicalDevices(instance_, &count, devices.data()), "vkEnumeratePhysicalDevices");
+    checkVk(vkEnumeratePhysicalDevices(instance_, &count, devices.data()),
+            "vkEnumeratePhysicalDevices");
     int bestScore = -1;
     for (const auto device : devices) {
-        if (!isDeviceSuitable(device)) { continue; }
+        if (!isDeviceSuitable(device)) {
+            continue;
+        }
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(device, &properties);
         const int score = properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ? 1 : 0;
-        if (score > bestScore) { physicalDevice_ = device; bestScore = score; }
+        if (score > bestScore) {
+            physicalDevice_ = device;
+            bestScore = score;
+        }
     }
     if (physicalDevice_ == VK_NULL_HANDLE) {
-        throw std::runtime_error("No Vulkan 1.3+ device supports Dynamic Rendering, Synchronization2, graphics, and presentation.");
+        throw std::runtime_error("No Vulkan 1.3+ device supports Dynamic Rendering, "
+                                 "Synchronization2, graphics, and presentation.");
     }
     families_ = findQueueFamilies(physicalDevice_);
 }
@@ -160,7 +190,8 @@ void VulkanContext::createDevice() {
         queue.pQueuePriorities = &priority;
         queues.push_back(queue);
     }
-    VkPhysicalDeviceVulkan13Features features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
+    VkPhysicalDeviceVulkan13Features features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES};
     features.dynamicRendering = VK_TRUE;
     features.synchronization2 = VK_TRUE;
     constexpr const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -181,8 +212,14 @@ void VulkanContext::destroy() noexcept {
         vkDestroyDevice(device_, nullptr);
         device_ = VK_NULL_HANDLE;
     }
-    if (surface_ != VK_NULL_HANDLE) { vkDestroySurfaceKHR(instance_, surface_, nullptr); surface_ = VK_NULL_HANDLE; }
-    if (instance_ != VK_NULL_HANDLE) { vkDestroyInstance(instance_, nullptr); instance_ = VK_NULL_HANDLE; }
+    if (surface_ != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(instance_, surface_, nullptr);
+        surface_ = VK_NULL_HANDLE;
+    }
+    if (instance_ != VK_NULL_HANDLE) {
+        vkDestroyInstance(instance_, nullptr);
+        instance_ = VK_NULL_HANDLE;
+    }
 }
 
 } // namespace grimlock::renderer

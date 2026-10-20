@@ -1,5 +1,6 @@
 #pragma once
 #include "grimlock/assets/image_data.hpp"
+
 #include <cstddef>
 #include <filesystem>
 #include <span>

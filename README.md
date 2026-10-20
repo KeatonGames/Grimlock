@@ -12,6 +12,7 @@ Grimlock is a C++20 Engine/Game project using SDL3 and Vulkan. Engine owns loadi
 - JSON scenes with stable object IDs, parent-child transforms, cameras, lights and initial animation settings.
 - Mouse camera navigation, model picking and selection highlighting.
 - Scene editor with model placement, grouping, duplication/deletion, transform editing, scene saving/loading and animation controls.
+- Optional XZ navigation grid with configurable dimensions/origin/cell size, walkability painting, revision tracking and scene serialization.
 
 ## Tech Stack
 
@@ -29,14 +30,14 @@ CMake downloads pinned dependencies through FetchContent. Pins live in `cmake/De
 ```text
 cmake/                      Dependency and shader build configuration
 engine/
-  include/grimlock/         Public Engine APIs
+  include/grimlock/         Public Engine APIs, including the generic CPU grid
   src/                      Core, platform, input, camera, assets, scene,
                             animation and renderer implementations
   shaders/                  Slang shader sources
 editor/                     Inspector, hierarchy and scene editing commands
 game/
   src/                      Executable launcher and Game code
-  assets/{models,scenes}/   Source models and JSON scenes
+  assets/{models,scenes}/   Source models, scenes and Game navigation configuration
 tests/                      CPU and Vulkan/editor runtime checks
 docs/                       Historical project notes
 out/                        Generated builds/runtime assets (Git-ignored)
@@ -96,6 +97,7 @@ The default scene is `game/assets/scenes/demo.json`, staged as `assets/scenes/de
 
 ```powershell
 .\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/demo.json
+.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/navigation.json
 .\out\build\debug\Debug\Grimlock.exe assets/models/blackrat.glb
 .\out\build\debug\Debug\Grimlock.exe --help
 ```
@@ -139,8 +141,22 @@ The Animation section provides the clip dropdown, Play/Pause/Resume, Stop, Loop,
 
 New saves store `clip`, `autoplay`, `loop` and `speed`, using a unique imported clip name where possible. Numeric-clip scenes still load. Missing clips retain their saved choice and fall back to rest pose. Public playback/configuration APIs are declared in `engine/include/grimlock/scene.hpp`.
 
+### Terrain and navigation grid
+
+Open `assets/scenes/navigation.json` for a flat terrain mesh, blocked areas and existing GLB props. Terrain uses the existing cube mesh; grid data is independent of model geometry and does not infer obstacles from props.
+
+- **Navigation > Show Grid** toggles the session-only overlay: green is walkable, red is blocked.
+- **Navigation > Edit Walkability** enables left-drag painting. Choose **Paint Blocked** or **Paint Walkable**; the menu bar shows the active mode. Disable editing to restore normal model picking. Camera controls remain available.
+- **Grid Settings...** changes X/Z dimensions, cell size and world origin; scenes without a grid offer **Create Grid...**. Overlapping cell coordinates retain their states when resized; shrinking discards cells outside the new bounds. The limit is 65,536 cells.
+- **File > Save/Save As** saves the grid with the scene. As with other edits, save into the source scene directory to keep changes across builds.
+
+Cell `(x,z)` spans `[origin.x + x*s, origin.x + (x+1)*s)` and the equivalent Z interval, where `s` is cell size. Its center is `origin + ((x+0.5)*s, 0, (z+0.5)*s)`. Y sets the picking/overlay plane, not terrain height. World conversion floors the X/Z offsets divided by `s`; out-of-bounds queries safely return no cell.
+
+`grid.hpp` provides allocation-free coordinate/neighbor queries and a revision counter that advances only on changes. The optional scene `navigation_grid` stores `width`, `height`, `cell_size`, `origin: [x,y,z]` and sparse `blocked: [[x,z], ...]`; omitted cells are walkable. Existing scenes without it still load. Game scene data owns configuration and authored obstacles; Engine supplies generic storage, serialization and editor infrastructure.
+
 ## Current Limitations
 
+- The navigation overlay is an editor debug view, not depth-tested terrain geometry. There is no height sampling, automatic obstacle detection, pathfinding or gameplay navigation.
 - No animation blending, state machines, timelines, keyframe editing or retargeting.
 - No multi-selection, undo/redo, transform gizmos, material editor or asset hot reload. Editor layouts are session-only.
 - Reparenting that requires shear is rejected rather than changing the model's appearance.
