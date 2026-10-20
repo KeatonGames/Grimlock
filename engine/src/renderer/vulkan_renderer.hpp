@@ -84,6 +84,22 @@ private:
         assets::ModelPose restPose;
     };
 
+    struct PrimitiveDraw {
+        const GpuModel* model;
+        std::size_t mesh;
+        DrawConstants constants;
+        const MaterialBinding* material;
+        bool mirrored;
+        float depth;
+        std::size_t order;
+        std::uint32_t deformation;
+    };
+
+    [[nodiscard]] std::vector<PrimitiveDraw> preparePrimitiveDraws(const Camera& camera,
+                                                                   std::span<const ModelDraw> draws);
+    static void sortPrimitiveDraws(std::span<PrimitiveDraw> primitives);
+    void recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives);
+
     std::vector<std::unique_ptr<GpuModel>> models_;
     std::optional<Deformation> deformation_;
 

@@ -64,6 +64,39 @@ target_include_directories(PickingChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/s
 target_link_libraries(PickingChecks PRIVATE Engine)
 add_test(NAME Picking.Cpu COMMAND PickingChecks "${PROJECT_SOURCE_DIR}/game/assets/models")
 
+add_executable(GltfPrimitiveChecks gltf_primitive.cpp)
+target_include_directories(GltfPrimitiveChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(GltfPrimitiveChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+add_test(NAME Assets.GltfPrimitive COMMAND GltfPrimitiveChecks "${CMAKE_CURRENT_BINARY_DIR}/gltf-primitive")
+
+add_executable(GltfModelChecks gltf_model.cpp)
+target_include_directories(GltfModelChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(GltfModelChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+add_test(NAME Assets.GltfModel COMMAND GltfModelChecks "${CMAKE_CURRENT_BINARY_DIR}/gltf-model")
+
+add_executable(GltfAnimationChecks gltf_animation.cpp)
+target_include_directories(GltfAnimationChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(GltfAnimationChecks PRIVATE Engine fastgltf::fastgltf)
+add_test(NAME Assets.GltfAnimation COMMAND GltfAnimationChecks)
+
+add_executable(GltfMaterialChecks gltf_materials.cpp)
+target_include_directories(GltfMaterialChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(GltfMaterialChecks PRIVATE Engine fastgltf::fastgltf)
+add_test(NAME Assets.GltfMaterials COMMAND GltfMaterialChecks)
+
+add_executable(RendererRuntimeChecks renderer_runtime.cpp)
+target_include_directories(RendererRuntimeChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(RendererRuntimeChecks PRIVATE Engine SDL3::SDL3 Vulkan::Vulkan)
+set_target_properties(RendererRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(RendererRuntimeChecks GrimlockShaders)
+if(WIN32)
+    add_custom_command(TARGET RendererRuntimeChecks POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:RendererRuntimeChecks>
+        VERBATIM)
+endif()
+add_test(NAME Renderer.Runtime COMMAND RendererRuntimeChecks)
+set_tests_properties(Renderer.Runtime PROPERTIES RUN_SERIAL TRUE)
+
 add_executable(SelectionRuntimeChecks selection_runtime.cpp)
 target_link_libraries(SelectionRuntimeChecks PRIVATE Engine SDL3::SDL3)
 set_target_properties(SelectionRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)

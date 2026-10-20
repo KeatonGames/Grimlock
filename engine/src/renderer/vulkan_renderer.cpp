@@ -13,6 +13,34 @@
 
 namespace grimlock::renderer {
 
+namespace {
+
+void validateModelDraw(const ModelDraw& draw) {
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (!std::isfinite(draw.transform[column][row])) {
+                throw std::invalid_argument("Non-finite model transform.");
+            }
+        }
+
+        if (!std::isfinite(draw.baseColor[column])) {
+            throw std::invalid_argument("Non-finite model color.");
+        }
+    }
+}
+
+void validateNodeTransform(const glm::mat4& transform) {
+    for (int column = 0; column < 4; ++column) {
+        for (int row = 0; row < 4; ++row) {
+            if (!std::isfinite(transform[column][row])) {
+                throw std::invalid_argument("Non-finite combined node transform.");
+            }
+        }
+    }
+}
+
+} // namespace
+
 VulkanRenderer::VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube* environment)
     : window_(window), context_(window) {
     try {
@@ -536,6 +564,125 @@ void VulkanRenderer::allocateCommandBuffers() {
     commandBuffers_.swap(buffers);
 }
 
+std::vector<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(
+    const Camera& camera,
+    const std::span<const ModelDraw> draws) {
+    std::vector<PrimitiveDraw> primitives;
+    deformation_->begin();
+    const auto view = camera.view();
+
+    for (const auto& draw : draws) {
+        validateModelDraw(draw);
+
+        const auto& model = *models_.at(draw.model);
+        const auto& pose = draw.pose ? *draw.pose : model.restPose;
+
+        if (pose.world.size() != model.restPose.world.size() || pose.joints.size() != pose.world.size() ||
+            pose.weights.size() != pose.world.size()) {
+            throw std::invalid_argument("Instance pose does not match the GPU model.");
+        }
+
+        for (const auto& node : model.nodes) {
+            if (pose.joints.at(node.node).size() != model.restPose.joints[node.node].size()) {
+                throw std::invalid_argument("Instance joint palette does not match model skin.");
+            }
+
+            const glm::mat4 transform = draw.transform * pose.world.at(node.node);
+
+            validateNodeTransform(transform);
+
+            const glm::mat3 linear{transform};
+            const float determinant = glm::determinant(linear);
+
+            if (!std::isfinite(determinant) || std::abs(determinant) < 1.0e-12F) {
+                throw std::invalid_argument("Model/node transform must have a finite, invertible linear part.");
+            }
+
+            const glm::mat3 normal = glm::transpose(glm::inverse(linear));
+            const DrawConstants constants{transform,
+                                          glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F},
+                                          glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
+                                          glm::vec4{normal[2], 0.0F},
+                                          draw.baseColor};
+            for (const auto mesh : node.meshes) {
+                const auto& material = model.materials->at(draw.materialOverride.value_or(model.meshMaterials[mesh]));
+                const float depth = -(view * transform * glm::vec4{model.meshCenters[mesh], 1.0F}).z;
+
+                if (!std::isfinite(depth)) {
+                    throw std::invalid_argument("Non-finite primitive sort depth.");
+                }
+
+                const auto& geometry = model.meshes[mesh];
+                const auto deformation = deformation_->append(pose.joints[node.node],
+                                                              pose.weights[node.node],
+                                                              geometry.morphVertexCount,
+                                                              geometry.morphTargetCount);
+                primitives.push_back(
+                    {&model, mesh, constants, &material, determinant < 0.0F, depth, primitives.size(), deformation});
+            }
+        }
+    }
+
+    return primitives;
+}
+
+void VulkanRenderer::sortPrimitiveDraws(std::span<PrimitiveDraw> primitives) {
+    // OPAQUE/MASK write depth first. BLEND tests depth without writing it, sorted
+    // back-to-front across every model/node/instance by view-space primitive center.
+    std::sort(primitives.begin(), primitives.end(), [](const auto& a, const auto& b) {
+        const bool aBlend = a.material->alphaMode == assets::AlphaMode::blend;
+        const bool bBlend = b.material->alphaMode == assets::AlphaMode::blend;
+
+        if (aBlend != bBlend) {
+            return !aBlend;
+        }
+
+        if (aBlend && a.depth != b.depth) {
+            return a.depth > b.depth;
+        }
+
+        return a.order < b.order;
+    });
+}
+
+void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives) {
+    VkPipeline currentPipeline = VK_NULL_HANDLE;
+    deformation_->upload();
+    VkDescriptorSet currentMaterial = VK_NULL_HANDLE;
+
+    for (const auto& primitive : primitives) {
+        const auto& material = *primitive.material;
+        const auto pipeline =
+            pipeline_->handle(material.alphaMode == assets::AlphaMode::blend, material.doubleSided, primitive.mirrored);
+        if (pipeline != currentPipeline) {
+            vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            currentPipeline = pipeline;
+        }
+
+        if (material.set != currentMaterial) {
+            vkCmdBindDescriptorSets(command,
+                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    pipeline_->layout(),
+                                    1,
+                                    1,
+                                    &material.set,
+                                    0,
+                                    nullptr);
+            currentMaterial = material.set;
+        }
+
+        vkCmdPushConstants(command,
+                           pipeline_->layout(),
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(primitive.constants),
+                           &primitive.constants);
+        const auto set = primitive.model->deformationSets[primitive.mesh];
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->layout(), 2, 1, &set, 0, nullptr);
+        primitive.model->meshes[primitive.mesh].draw(command, primitive.deformation);
+    }
+}
+
 void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
                                  const Camera& camera,
                                  const std::span<const ModelDraw> draws,
@@ -622,140 +769,9 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
                             0,
                             nullptr);
 
-    struct PrimitiveDraw {
-        const GpuModel* model;
-        std::size_t mesh;
-        DrawConstants constants;
-        const MaterialBinding* material;
-        bool mirrored;
-        float depth;
-        std::size_t order;
-        std::uint32_t deformation;
-    };
-
-    std::vector<PrimitiveDraw> primitives;
-    deformation_->begin();
-    const auto view = camera.view();
-
-    for (const auto& draw : draws) {
-        for (int column = 0; column < 4; ++column) {
-            for (int row = 0; row < 4; ++row) {
-                if (!std::isfinite(draw.transform[column][row])) {
-                    throw std::invalid_argument("Non-finite model transform.");
-                }
-            }
-
-            if (!std::isfinite(draw.baseColor[column])) {
-                throw std::invalid_argument("Non-finite model color.");
-            }
-        }
-
-        const auto& model = *models_.at(draw.model);
-        const auto& pose = draw.pose ? *draw.pose : model.restPose;
-
-        if (pose.world.size() != model.restPose.world.size() || pose.joints.size() != pose.world.size() ||
-            pose.weights.size() != pose.world.size()) {
-            throw std::invalid_argument("Instance pose does not match the GPU model.");
-        }
-
-        for (const auto& node : model.nodes) {
-            if (pose.joints.at(node.node).size() != model.restPose.joints[node.node].size()) {
-                throw std::invalid_argument("Instance joint palette does not match model skin.");
-            }
-
-            const glm::mat4 transform = draw.transform * pose.world.at(node.node);
-
-            for (int column = 0; column < 4; ++column) {
-                for (int row = 0; row < 4; ++row) {
-                    if (!std::isfinite(transform[column][row])) {
-                        throw std::invalid_argument("Non-finite combined node transform.");
-                    }
-                }
-            }
-
-            const glm::mat3 linear{transform};
-            const float determinant = glm::determinant(linear);
-
-            if (!std::isfinite(determinant) || std::abs(determinant) < 1.0e-12F) {
-                throw std::invalid_argument("Model/node transform must have a finite, invertible linear part.");
-            }
-
-            const glm::mat3 normal = glm::transpose(glm::inverse(linear));
-            const DrawConstants constants{transform,
-                                          glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F},
-                                          glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
-                                          glm::vec4{normal[2], 0.0F},
-                                          draw.baseColor};
-            for (const auto mesh : node.meshes) {
-                const auto& material = model.materials->at(draw.materialOverride.value_or(model.meshMaterials[mesh]));
-                const float depth = -(view * transform * glm::vec4{model.meshCenters[mesh], 1.0F}).z;
-
-                if (!std::isfinite(depth)) {
-                    throw std::invalid_argument("Non-finite primitive sort depth.");
-                }
-
-                const auto& geometry = model.meshes[mesh];
-                const auto deformation = deformation_->append(pose.joints[node.node],
-                                                              pose.weights[node.node],
-                                                              geometry.morphVertexCount,
-                                                              geometry.morphTargetCount);
-                primitives.push_back(
-                    {&model, mesh, constants, &material, determinant < 0.0F, depth, primitives.size(), deformation});
-            }
-        }
-    }
-
-    // OPAQUE/MASK write depth first. BLEND tests depth without writing it, sorted
-    // back-to-front across every model/node/instance by view-space primitive center.
-    std::sort(primitives.begin(), primitives.end(), [](const auto& a, const auto& b) {
-        const bool aBlend = a.material->alphaMode == assets::AlphaMode::blend;
-        const bool bBlend = b.material->alphaMode == assets::AlphaMode::blend;
-
-        if (aBlend != bBlend) {
-            return !aBlend;
-        }
-
-        if (aBlend && a.depth != b.depth) {
-            return a.depth > b.depth;
-        }
-
-        return a.order < b.order;
-    });
-    VkPipeline currentPipeline = VK_NULL_HANDLE;
-    deformation_->upload();
-    VkDescriptorSet currentMaterial = VK_NULL_HANDLE;
-
-    for (const auto& primitive : primitives) {
-        const auto& material = *primitive.material;
-        const auto pipeline =
-            pipeline_->handle(material.alphaMode == assets::AlphaMode::blend, material.doubleSided, primitive.mirrored);
-        if (pipeline != currentPipeline) {
-            vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-            currentPipeline = pipeline;
-        }
-
-        if (material.set != currentMaterial) {
-            vkCmdBindDescriptorSets(command,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipeline_->layout(),
-                                    1,
-                                    1,
-                                    &material.set,
-                                    0,
-                                    nullptr);
-            currentMaterial = material.set;
-        }
-
-        vkCmdPushConstants(command,
-                           pipeline_->layout(),
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(primitive.constants),
-                           &primitive.constants);
-        const auto set = primitive.model->deformationSets[primitive.mesh];
-        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->layout(), 2, 1, &set, 0, nullptr);
-        primitive.model->meshes[primitive.mesh].draw(command, primitive.deformation);
-    }
+    auto primitives = preparePrimitiveDraws(camera, draws);
+    sortPrimitiveDraws(primitives);
+    recordPrimitiveDraws(command, primitives);
 
     vkCmdEndRendering(command);
 
