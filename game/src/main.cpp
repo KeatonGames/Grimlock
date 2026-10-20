@@ -1,6 +1,7 @@
 #include "game.hpp"
 #ifdef GRIMLOCK_WITH_EDITOR
 #include "grimlock/editor.hpp"
+#include "navigation/navigation_debug.hpp"
 #endif
 #include <cstdlib>
 #include <exception>
@@ -49,7 +50,8 @@ int main(const int argc, char** argv) {
                 throw std::invalid_argument("Editor mode opens JSON scenes; add models from the Hierarchy panel.");
             }
 
-            grimlock::editor::run(path, environment);
+            grimlock::game::NavigationDebug navigation;
+            grimlock::editor::run(path, environment, &navigation);
 
             return EXIT_SUCCESS;
 #else

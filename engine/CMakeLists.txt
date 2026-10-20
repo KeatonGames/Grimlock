@@ -26,6 +26,7 @@ add_library(Engine STATIC
     src/renderer/mesh_pipeline.cpp
     src/renderer/buffer.cpp
     src/renderer/gpu_mesh.cpp
+    src/renderer/grid_instances.cpp
     src/renderer/depth_target.cpp
     src/renderer/texture.cpp
     src/renderer/gpu_materials.cpp

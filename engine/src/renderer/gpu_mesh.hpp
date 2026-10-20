@@ -15,7 +15,7 @@ public:
     GpuMesh(const GpuMesh&) = delete;
     GpuMesh& operator=(const GpuMesh&) = delete;
 
-    void draw(VkCommandBuffer command, std::uint32_t firstInstance = 0) const;
+    void draw(VkCommandBuffer command, std::uint32_t firstInstance = 0, std::uint32_t instanceCount = 1) const;
 
     [[nodiscard]] VkBuffer morphBuffer() const noexcept {
         return morphs_.handle();

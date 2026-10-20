@@ -35,7 +35,8 @@ public:
                  VkFormat depthFormat,
                  VkDescriptorSetLayout cameraLayout,
                  VkDescriptorSetLayout materialLayout,
-                 VkDescriptorSetLayout deformationLayout);
+                 VkDescriptorSetLayout deformationLayout,
+                 bool gridInstances = false);
     ~MeshPipeline();
 
     MeshPipeline(const MeshPipeline&) = delete;

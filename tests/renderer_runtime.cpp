@@ -1,3 +1,4 @@
+#include "assets/model_loader.hpp"
 #include "platform/window.hpp"
 #include "renderer/vulkan_renderer.hpp"
 
@@ -96,10 +97,13 @@ Camera testCamera() {
     return camera;
 }
 
-void renderFrame(VulkanRenderer& renderer, const Camera& camera, std::span<const ModelDraw> draws) {
+void renderFrame(VulkanRenderer& renderer,
+                 const Camera& camera,
+                 std::span<const ModelDraw> draws,
+                 const GridDraw* grid = nullptr) {
     for (int attempt = 0; attempt < 4; ++attempt) {
         SDL_PumpEvents();
-        if (renderer.drawFrame(camera, draws)) {
+        if (renderer.drawFrame(camera, draws, {}, grid)) {
             return;
         }
     }
@@ -141,6 +145,48 @@ void checkValidFrames(SDL_Window* window) {
     renderer.requestSwapchainRecreation();
     renderFrame(renderer, camera, draws);
     renderFrame(renderer, camera, {});
+}
+
+void checkGridFrames(SDL_Window* window, const std::filesystem::path& cubePath) {
+    VulkanRenderer renderer{window};
+    const auto cube = renderer.uploadModel(assets::loadModel(cubePath));
+    const auto model = renderer.uploadModel(makeModel(true));
+    const std::array draws{ModelDraw{.model = model, .selected = true}};
+    Camera camera;
+    camera.position = {6, 8, 10};
+    Grid grid{{8, 8, 1, {-4, 0, -4}}};
+    GridDraw gridDraw{cube, grid};
+    renderFrame(renderer, camera, draws, &gridDraw);
+    grid.setWalkable({3, 3}, false);
+    renderFrame(renderer, camera, draws, &gridDraw);
+    renderFrame(renderer, camera, draws, &gridDraw); // Unchanged instances reuse the buffer.
+    grid.setWalkable({3, 3}, true);
+    renderFrame(renderer, camera, draws, &gridDraw);
+    grid.configure({16, 16, 0.5, {-4, 1, -4}});
+    renderFrame(renderer, camera, draws, &gridDraw);
+
+    Grid replacement{{8, 8, 2, {-8, -1, -8}}};
+    const GridDraw replacementDraw{cube, replacement};
+    renderFrame(renderer, camera, {}, &replacementDraw);
+    renderFrame(renderer, camera, {});
+    renderFrame(renderer, camera, {}, &gridDraw);
+    renderer.invalidateGrid();
+    renderFrame(renderer, camera, draws, &gridDraw);
+    require(SDL_SetWindowSize(window, 480, 320), SDL_GetError());
+    renderer.requestSwapchainRecreation();
+    renderFrame(renderer, camera, draws, &gridDraw);
+
+    grid.configure({256, 256, 0.1, {-12.8, 0, -12.8}});
+    for (std::size_t index = 0; index < grid.size(); ++index) {
+        grid.setWalkable(*grid.cell(index), false);
+    }
+    renderFrame(renderer, camera, draws, &gridDraw);
+    renderFrame(renderer, camera, {});
+    const std::array released{cube};
+    renderer.releaseModels(released);
+    const auto reused = renderer.uploadModel(assets::loadModel(cubePath));
+    require(reused == cube, "grid cube resource slot was not released");
+    renderFrame(renderer, camera, {}, &gridDraw);
 }
 
 template <typename Edit> void rejects(SDL_Window* window, Edit edit, std::string_view expected) {
@@ -219,10 +265,12 @@ void checkValidation(SDL_Window* window) {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        require(argc == 2, "expected the shared cube model path");
         platform::Window window{"Renderer frame checks", 320, 240};
         checkValidFrames(window.native());
+        checkGridFrames(window.native(), argv[1]);
         checkValidation(window.native());
         std::cout
             << "PASS renderer frames: materials, mirrored instances, poses, deformation, resize and validation.\n";

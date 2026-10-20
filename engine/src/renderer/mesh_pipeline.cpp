@@ -2,6 +2,7 @@
 
 #include "core/startup_profile.hpp"
 #include "grimlock/assets/model_data.hpp"
+#include "renderer/grid_instances.hpp"
 #include "renderer/shader_module.hpp"
 #include "renderer/vulkan_helpers.hpp"
 
@@ -17,11 +18,12 @@ MeshPipeline::MeshPipeline(const VkDevice device,
                            const VkFormat depthFormat,
                            const VkDescriptorSetLayout cameraLayout,
                            const VkDescriptorSetLayout materialLayout,
-                           const VkDescriptorSetLayout deformationLayout)
+                           const VkDescriptorSetLayout deformationLayout,
+                           const bool gridInstances)
     : device_(device) {
     try {
         diagnostics::StartupSpan profile{"pipeline.mesh"};
-        const ShaderModule shader{device_, "shaders/mesh.spv"};
+        const ShaderModule shader{device_, gridInstances ? "shaders/grid.spv" : "shaders/mesh.spv"};
 
         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         const VkPushConstantRange pushRange{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -46,8 +48,11 @@ MeshPipeline::MeshPipeline(const VkDevice device,
 
         VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
         static_assert(sizeof(assets::Vertex) == 124);
-        const VkVertexInputBindingDescription binding{0, sizeof(assets::Vertex), VK_VERTEX_INPUT_RATE_VERTEX};
-        const std::array<VkVertexInputAttributeDescription, 10> attributes{{
+        const std::array<VkVertexInputBindingDescription, 2> bindings{{
+            {0, sizeof(assets::Vertex), VK_VERTEX_INPUT_RATE_VERTEX},
+            {1, sizeof(GridCubeInstance), VK_VERTEX_INPUT_RATE_INSTANCE},
+        }};
+        const std::array<VkVertexInputAttributeDescription, 12> attributes{{
             {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(assets::Vertex, position)},
             {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(assets::Vertex, normal)},
             {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(assets::Vertex, uv)},
@@ -58,10 +63,12 @@ MeshPipeline::MeshPipeline(const VkDevice device,
             {7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(assets::Vertex, weights0)},
             {8, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(assets::Vertex, weights1)},
             {9, 0, VK_FORMAT_R32_UINT, offsetof(assets::Vertex, morphIndex)},
+            {10, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, position)},
+            {11, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, scale)},
         }};
-        vertexInput.vertexBindingDescriptionCount = 1;
-        vertexInput.pVertexBindingDescriptions = &binding;
-        vertexInput.vertexAttributeDescriptionCount = static_cast<std::uint32_t>(attributes.size());
+        vertexInput.vertexBindingDescriptionCount = gridInstances ? 2 : 1;
+        vertexInput.pVertexBindingDescriptions = bindings.data();
+        vertexInput.vertexAttributeDescriptionCount = gridInstances ? 12 : 10;
         vertexInput.pVertexAttributeDescriptions = attributes.data();
 
         VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -119,7 +126,9 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         createInfo.pDynamicState = &dynamic;
         createInfo.layout = layout_;
 
-        for (std::size_t variant = 0; variant < pipelines_.size(); ++variant) {
+        const auto variantCount = gridInstances ? std::size_t{1} : pipelines_.size();
+
+        for (std::size_t variant = 0; variant < variantCount; ++variant) {
             const bool blend = (variant & 1U) != 0, doubleSided = (variant & 2U) != 0, mirrored = (variant & 4U) != 0;
 
             rasterization.cullMode = doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;

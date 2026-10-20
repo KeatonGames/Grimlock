@@ -851,8 +851,8 @@ int main(int argc, char** argv) {
             require(grid && grid->size() == 192, "navigation scene grid missing");
 
             const auto configuration = grid->configuration();
-            const auto terrain = engine.scene()->object(1).local.matrix();
-            const auto* asset = engine.scene()->animation(1).asset().get();
+            const auto propTransform = engine.scene()->object(4).local.matrix();
+            const auto* propAsset = engine.scene()->animation(4).asset().get();
             const auto objects = engine.scene()->objects().size();
             const auto cellPoint = [&](GridCell cell) {
                 return project(engine.scene()->resolvedCamera(), window, *grid->cellCenter(cell));
@@ -862,15 +862,16 @@ int main(int argc, char** argv) {
             require(grid->walkable(from) && grid->walkable(to), "paint test cells already blocked");
 
             click(engine, id, cellPoint(from));
-            require(engine.selectedObject() == 1, "grid visualization intercepted normal terrain picking");
+            require(!engine.selectedObject(), "generated grid cubes became selectable scene objects");
             require(!document.dirty() && ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.Size > 0,
                     "grid missing or selection dirtied document");
 
+            engine.scene()->selectObject(4);
             navigationMenu(engine, id, "Edit Walkability");
             const auto revision = grid->revision();
             button(id, SDL_BUTTON_LEFT, true, cellPoint(from));
             tick(engine, 3);
-            require(!grid->walkable(from) && grid->revision() == revision + 1 && engine.selectedObject() == 1 &&
+            require(!grid->walkable(from) && grid->revision() == revision + 1 && engine.selectedObject() == 4 &&
                         document.dirty(),
                     "edit mode failed to paint or changed selection");
 
@@ -900,7 +901,7 @@ int main(int argc, char** argv) {
             navigationMenu(engine, id, "Show Grid"); // Hiding also disables painting.
             engine.scene()->selectObject({}, true);
             click(engine, id, cellPoint(from));
-            require(engine.selectedObject() == 1 && grid->revision() == savedRevision,
+            require(!engine.selectedObject() && grid->revision() == savedRevision,
                     "disabling grid edit did not restore picking");
 
             navigationMenu(engine, id, "Grid Settings...");
@@ -993,8 +994,8 @@ int main(int argc, char** argv) {
                         !grid->walkable(to),
                     "edited grid save/reload failed");
             require(engine.scene()->objects().size() == objects &&
-                        engine.scene()->object(1).local.matrix() == terrain &&
-                        engine.scene()->animation(1).asset().get() == asset,
+                        engine.scene()->object(4).local.matrix() == propTransform &&
+                        engine.scene()->animation(4).asset().get() == propAsset,
                     "grid editing changed model geometry/resources/transforms");
 
             auto resized = configuration;

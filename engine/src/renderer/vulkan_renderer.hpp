@@ -9,6 +9,7 @@
 #include "renderer/depth_target.hpp"
 #include "renderer/gpu_materials.hpp"
 #include "renderer/gpu_mesh.hpp"
+#include "renderer/grid_instances.hpp"
 #include "renderer/lighting.hpp"
 #include "renderer/mesh_pipeline.hpp"
 #include "renderer/tone_map_pipeline.hpp"
@@ -33,6 +34,11 @@ struct ModelDraw {
     bool selected = false;
 };
 
+struct GridDraw {
+    std::size_t cubeModel;
+    const Grid& grid;
+};
+
 class VulkanRenderer final {
 public:
     explicit VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube* environment = nullptr);
@@ -43,7 +49,11 @@ public:
     // Internal IDs remain valid until releaseModels; freed slots may be reused.
     [[nodiscard]] std::size_t uploadModel(const assets::ModelData& model);
     void releaseModels(std::span<const std::size_t> models) noexcept;
-    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws, const Lighting& lighting = {});
+    [[nodiscard]] bool drawFrame(const Camera& camera,
+                                 std::span<const ModelDraw> draws,
+                                 const Lighting& lighting = {},
+                                 const GridDraw* grid = nullptr);
+    void invalidateGrid() noexcept;
     void requestSwapchainRecreation() noexcept;
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
@@ -57,7 +67,13 @@ private:
     [[nodiscard]] bool createSwapchain();
     void createImageViews();
     void allocateCommandBuffers();
-    void recordFrame(std::uint32_t imageIndex, const Camera& camera, std::span<const ModelDraw> draws, float exposure);
+    void recordFrame(std::uint32_t imageIndex,
+                     const Camera& camera,
+                     std::span<const ModelDraw> draws,
+                     float exposure,
+                     const GridDraw* grid);
+    void updateGrid(const GridDraw* grid);
+    void recordGrid(VkCommandBuffer command, const GridDraw& grid);
     [[nodiscard]] bool recreateSwapchain();
     [[nodiscard]] VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
     [[nodiscard]] VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
@@ -102,6 +118,10 @@ private:
 
     std::vector<std::unique_ptr<GpuModel>> models_;
     std::optional<Deformation> deformation_;
+    GridInstances gridInstances_;
+    const Grid* cachedGrid_ = nullptr;
+    std::uint64_t gridRevision_ = 0;
+    std::optional<Buffer> gridBuffer_;
 
     VkDescriptorSetLayout cameraLayout_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
@@ -115,6 +135,7 @@ private:
     VkDescriptorSetLayout materialLayout_ = VK_NULL_HANDLE;
     std::optional<Texture> whiteTexture_;
     std::optional<MeshPipeline> pipeline_;
+    std::optional<MeshPipeline> gridPipeline_;
     std::optional<ToneMapPipeline> toneMapPipeline_;
     std::optional<Texture> hdrColor_;
 

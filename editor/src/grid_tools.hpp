@@ -6,16 +6,19 @@ struct SDL_Window;
 
 namespace grimlock::editor {
 
+class GridDebug;
+
 // Session-only debug tools; authored data stays in the real Scene/SceneDocument.
 class GridTools final {
 public:
-    void menu(Scene& scene);
+    void menu(Engine& engine, GridDebug* debug = nullptr);
     void dialog(SceneDocument& document);
     void finishFrame(Engine& engine,
                      SceneDocument& document,
                      const Camera& camera,
                      SDL_Window* window,
-                     bool viewportMouse);
+                     bool viewportMouse,
+                     GridDebug* debug = nullptr);
 
     [[nodiscard]] bool editing() const noexcept {
         return editing_;

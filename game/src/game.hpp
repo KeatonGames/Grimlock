@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grimlock/engine.hpp"
+#include "navigation/navigation_demo.hpp"
 
 namespace grimlock::game {
 
@@ -12,6 +13,7 @@ public:
 private:
     InstanceId loadExample(const std::filesystem::path& path);
     Engine engine_;
+    NavigationDemo navigation_;
 };
 
 } // namespace grimlock::game

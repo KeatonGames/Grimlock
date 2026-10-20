@@ -1,4 +1,8 @@
 # A real Engine consumer: only its public headers and link interface are available.
+add_executable(FlowFieldChecks flow_field.cpp)
+target_link_libraries(FlowFieldChecks PRIVATE GameNavigation)
+add_test(NAME Navigation.FlowField COMMAND FlowFieldChecks)
+
 add_executable(EngineApiChecks engine_api.cpp)
 target_link_libraries(EngineApiChecks PRIVATE Engine)
 set_target_properties(EngineApiChecks PROPERTIES
@@ -17,6 +21,7 @@ add_executable(SceneChecks scene.cpp)
 target_link_libraries(SceneChecks PRIVATE Engine nlohmann_json::nlohmann_json)
 add_test(NAME Scene.Cpu COMMAND SceneChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/scene-output")
 add_executable(GridChecks grid.cpp)
+target_include_directories(GridChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
 target_link_libraries(GridChecks PRIVATE Engine nlohmann_json::nlohmann_json)
 add_test(NAME Grid.Cpu COMMAND GridChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/grid-output")
 
@@ -98,7 +103,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:RendererRuntimeChecks>
         VERBATIM)
 endif()
-add_test(NAME Renderer.Runtime COMMAND RendererRuntimeChecks)
+add_test(NAME Renderer.Runtime COMMAND RendererRuntimeChecks "${PROJECT_SOURCE_DIR}/game/assets/models/cube.obj")
 set_tests_properties(Renderer.Runtime PROPERTIES RUN_SERIAL TRUE)
 
 add_executable(SelectionRuntimeChecks selection_runtime.cpp)
@@ -113,6 +118,18 @@ add_test(NAME Picking.Runtime COMMAND SelectionRuntimeChecks "${PROJECT_SOURCE_D
 set_tests_properties(Picking.Runtime PROPERTIES RUN_SERIAL TRUE)
 
 if(GRIMLOCK_BUILD_EDITOR)
+    add_executable(FlowFieldRuntimeChecks flow_field_runtime.cpp)
+    target_include_directories(FlowFieldRuntimeChecks PRIVATE "${PROJECT_SOURCE_DIR}/editor/src")
+    target_link_libraries(FlowFieldRuntimeChecks PRIVATE GameNavigationDebug DearImGui SDL3::SDL3 Vulkan::Vulkan)
+    set_target_properties(FlowFieldRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+    if(WIN32)
+        add_custom_command(TARGET FlowFieldRuntimeChecks POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:FlowFieldRuntimeChecks>
+            VERBATIM)
+    endif()
+    add_test(NAME Navigation.Runtime COMMAND FlowFieldRuntimeChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/flow-field.json")
+    set_tests_properties(Navigation.Runtime PROPERTIES RUN_SERIAL TRUE)
+
     add_executable(EditorRuntimeChecks editor_runtime.cpp)
     target_include_directories(EditorRuntimeChecks PRIVATE "${PROJECT_SOURCE_DIR}/editor/src")
     target_link_libraries(EditorRuntimeChecks PRIVATE Editor DearImGui SDL3::SDL3 Vulkan::Vulkan)

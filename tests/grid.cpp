@@ -1,3 +1,5 @@
+#include "renderer/grid_instances.hpp"
+
 #include <cmath>
 #include <fstream>
 #include <grimlock/grid.hpp>
@@ -30,6 +32,62 @@ template <class F> void rejects(F operation) {
     require(rejected, "invalid grid accepted");
 }
 
+void checkGridInstances() {
+    Grid grid{{3, 2, 2, {-4, 3, 5}}};
+    renderer::GridInstances instances;
+    renderer::updateGridInstances(grid, instances);
+    require(instances.floorCount == 6 && instances.cubes.size() == 6, "walkable grid needs one floor per cell");
+
+    for (std::size_t index = 0; index < grid.size(); ++index) {
+        const auto& cube = instances.cubes[index];
+        const glm::vec3 center{*grid.cellCenter(*grid.cell(index))};
+        require(cube.position.x == center.x && cube.position.z == center.z &&
+                    std::abs(cube.position.y + cube.scale.y - center.y) < 1e-5F && cube.scale == glm::vec3{1, 0.2F, 1},
+                "floor cube does not match the grid cell and surface height");
+    }
+
+    grid.setWalkable({0, 0}, false);
+    grid.setWalkable({2, 1}, false);
+    renderer::updateGridInstances(grid, instances);
+    require(instances.floorCount == 6 && instances.cubes.size() == 8, "blocked cells lost floors or walls");
+    require(instances.cubes[6].position == glm::vec3{-3, 4.5F, 6} &&
+                instances.cubes[7].position == glm::vec3{1, 4.5F, 8} &&
+                instances.cubes[7].scale == glm::vec3{1, 1.5F, 1},
+            "walls do not sit above their blocked cells");
+
+    const auto capacity = instances.cubes.capacity();
+    grid.setWalkable({0, 0}, true);
+    renderer::updateGridInstances(grid, instances);
+    require(instances.cubes.size() == 7 && instances.cubes.capacity() == capacity &&
+                instances.cubes.back().position == glm::vec3{1, 4.5F, 8},
+            "unblocking failed to remove only its wall or reuse instance storage");
+
+    grid.configure({1, 1, 0.5, {10, -2, 20}});
+    renderer::updateGridInstances(grid, instances);
+    require(instances.floorCount == 1 && instances.cubes.size() == 1 &&
+                instances.cubes[0].position == glm::vec3{10.25F, -2.05F, 20.25F} &&
+                instances.cubes[0].scale == glm::vec3{0.25F, 0.05F, 0.25F},
+            "grid resizing retained stale geometry");
+
+    Grid maximum{{256, 256, 1, {0, 0, 0}}};
+    for (std::size_t index = 0; index < maximum.size(); ++index) {
+        maximum.setWalkable(*maximum.cell(index), false);
+    }
+    renderer::updateGridInstances(maximum, instances);
+    require(instances.floorCount == Grid::maximumCells && instances.cubes.size() == Grid::maximumCells * 2,
+            "maximum grid lost floor or wall instances");
+
+    rejects([&] {
+        renderer::updateGridInstances(Grid{{1, 1, 1e100, {0, 0, 0}}}, instances);
+    });
+    rejects([&] {
+        renderer::updateGridInstances(Grid{{1, 1, 1e-100, {0, 0, 0}}}, instances);
+    });
+    rejects([&] {
+        renderer::updateGridInstances(Grid{{1, 1, 1, {0, 1e100, 0}}}, instances);
+    });
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -38,6 +96,7 @@ int main(int argc, char** argv) {
 
         const std::filesystem::path game{argv[1]}, output{argv[2]};
         std::filesystem::create_directories(output);
+        checkGridInstances();
         Grid grid{{5, 3, 0.5, {-2, 7, -1}}};
         require(grid.size() == 15 && grid.revision() == 1, "grid initialization failed");
 
@@ -130,7 +189,7 @@ int main(int argc, char** argv) {
 
         auto example = Scene::load(game / "assets/scenes/navigation.json");
         require(example->navigationGrid()->size() == 192 && !example->navigationGrid()->walkable({3, 3}) &&
-                    example->objects().size() == 7,
+                    example->objects().size() == 4 && example->object(4).model == "models/blackrat.glb",
                 "Game test scene failed");
 
         std::ifstream stream(output / "grid.json");

@@ -12,7 +12,7 @@ namespace grimlock::editor {
 
 class Editor final : public RenderOverlay {
 public:
-    explicit Editor(Engine& engine, const std::filesystem::path& initialScene = {});
+    explicit Editor(Engine& engine, const std::filesystem::path& initialScene = {}, GridDebug* gridDebug = nullptr);
     ~Editor() override;
     Editor(const Editor&) = delete;
     Editor& operator=(const Editor&) = delete;
@@ -75,6 +75,7 @@ private:
     Engine& engine_;
     SceneDocument document_;
     GridTools gridTools_;
+    GridDebug* gridDebug_ = nullptr;
     bool viewportMouse_ = false;
 
     OverlayContext native_{};

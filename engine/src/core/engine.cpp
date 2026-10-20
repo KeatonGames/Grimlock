@@ -224,6 +224,17 @@ struct Engine::Impl {
 
     void sceneFrame(double delta, Camera& frameCamera, Lighting& frameLighting) {
         prepare(*activeScene);
+
+        if (activeScene->navigationGrid()) {
+            if (!gridCubeAsset) {
+                const auto model = load(assetRoot / "models/cube.obj", false);
+                gridCubeAsset = resources[model]->asset;
+                gridCubeGpuModel = resources[model]->gpuModel;
+            }
+        } else {
+            gridCubeAsset.reset();
+        }
+
         activeScene->updateAnimations(delta);
         sceneDraws.clear();
         sceneDraws.reserve(activeScene->objects_.size());
@@ -387,15 +398,14 @@ struct Engine::Impl {
     }
 
     void standaloneFrame(double delta, Lighting& frameLighting) {
-        for (const auto& instance : instances) {
-            instance->update(delta);
-        }
-
         bool imported = false;
-
-        for (const auto& instance : instances) {
-            for (const auto node : instance->pose().activeNodes) {
-                imported = imported || instance->model().nodes[node].light.has_value();
+        for (std::size_t i = 0; i < instances.size(); ++i) {
+            if (!instances[i] || (activeScene && !sceneInstances[i])) {
+                continue;
+            }
+            instances[i]->update(delta);
+            for (const auto node : instances[i]->pose().activeNodes) {
+                imported = imported || instances[i]->model().nodes[node].light.has_value();
             }
         }
 
@@ -403,11 +413,16 @@ struct Engine::Impl {
             return;
         }
 
-        frameLighting.directional.intensity = 0;
-        frameLighting.pointCount = frameLighting.spotCount = 0;
-        bool directionalUsed = false;
+        if (!activeScene) {
+            frameLighting.directional.intensity = 0;
+            frameLighting.pointCount = frameLighting.spotCount = 0;
+        }
+        bool directionalUsed = frameLighting.directional.intensity > 0;
 
         for (std::size_t i = 0; i < instances.size(); ++i) {
+            if (!instances[i] || (activeScene && !sceneInstances[i])) {
+                continue;
+            }
             renderer::addModelLights(frameLighting,
                                      instances[i]->model(),
                                      instances[i]->pose(),
@@ -416,7 +431,7 @@ struct Engine::Impl {
         }
     }
 
-    bool update() {
+    bool update(const std::function<void(double)>& gameUpdate) {
         pollEvents();
 
         if (!running) {
@@ -441,26 +456,40 @@ struct Engine::Impl {
         const auto now = std::chrono::steady_clock::now();
         const double delta = previousFrame ? std::chrono::duration<double>(now - *previousFrame).count() : 0;
         previousFrame = now;
-        auto frameCamera = camera;
+        auto frameCamera = currentCamera();
         auto frameLighting = lighting;
-        std::span<const renderer::ModelDraw> frameDraws = draws;
-
-        if (activeScene) {
-            sceneFrame(delta, frameCamera, frameLighting);
-            frameDraws = sceneDraws;
-        } else {
-            standaloneFrame(delta, frameLighting);
-        }
 
         navigate(frameCamera);
-        updateSelection(frameCamera, !capture.selection);
-        collectUnused();
-
         if (overlay) {
             overlay->finishFrame(frameCamera);
         }
+        if (gameUpdate) {
+            gameUpdate(delta);
+        }
 
-        if (renderer.drawFrame(frameCamera, frameDraws, frameLighting)) {
+        if (activeScene) {
+            sceneFrame(delta, frameCamera, frameLighting);
+        } else {
+            sceneDraws.clear();
+        }
+
+        standaloneFrame(delta, frameLighting);
+        for (std::size_t i = 0; i < instances.size(); ++i) {
+            if (instances[i] && (!activeScene || sceneInstances[i])) {
+                sceneDraws.push_back(draws[i]);
+            }
+        }
+        updateSelection(frameCamera, !capture.selection);
+        collectUnused();
+
+        std::optional<renderer::GridDraw> gridDraw;
+
+        // The editor paints during finishFrame; use its updated revision for this presentation.
+        if (activeScene && activeScene->navigationGrid()) {
+            gridDraw.emplace(gridCubeGpuModel, *activeScene->navigationGrid());
+        }
+
+        if (renderer.drawFrame(frameCamera, sceneDraws, frameLighting, gridDraw ? &*gridDraw : nullptr)) {
             startup.firstPresent();
         } else {
             SDL_Delay(16);
@@ -487,7 +516,10 @@ struct Engine::Impl {
 
     std::vector<std::unique_ptr<Resource>> resources;
     std::map<std::filesystem::path, std::size_t> modelPaths;
+    std::shared_ptr<const assets::ModelData> gridCubeAsset;
+    std::size_t gridCubeGpuModel = 0;
     std::vector<std::unique_ptr<assets::ModelInstance>> instances;
+    std::vector<bool> sceneInstances;
     std::vector<renderer::ModelDraw> draws, sceneDraws;
     std::unique_ptr<Scene> activeScene;
 
@@ -516,7 +548,7 @@ ModelInfo Engine::modelInfo(ModelId model) const {
     return impl_->resources.at(model.index_)->info;
 }
 
-InstanceId Engine::createInstance(ModelId model) {
+InstanceId Engine::createInstance(ModelId model, bool visibleInScenes) {
     const auto& resource = *impl_->resources.at(model.index_);
     auto instance = std::make_unique<assets::ModelInstance>(resource.asset);
     renderer::ModelDraw draw{resource.gpuModel, glm::mat4{1}};
@@ -531,6 +563,7 @@ InstanceId Engine::createInstance(ModelId model) {
         impl_->draws.reserve(size * 2);
     }
 
+    impl_->sceneInstances.push_back(visibleInScenes);
     impl_->instances.push_back(std::move(instance));
     impl_->draws.push_back(draw);
 
@@ -539,6 +572,11 @@ InstanceId Engine::createInstance(ModelId model) {
 
 void Engine::setTransform(InstanceId instance, const glm::mat4& transform) {
     impl_->draws.at(instance.index_).transform = transform;
+}
+
+void Engine::removeInstance(InstanceId instance) {
+    impl_->instances.at(instance.index_).reset();
+    impl_->draws.at(instance.index_) = {};
 }
 
 void Engine::setTransform(InstanceId instance, const Transform& transform) {
@@ -605,6 +643,12 @@ void Engine::setScene(std::unique_ptr<Scene> scene) {
 
     impl_->sceneDraws.clear();
     impl_->activeScene = std::move(scene);
+    impl_->renderer.invalidateGrid();
+
+    if (!impl_->activeScene->navigationGrid()) {
+        impl_->gridCubeAsset.reset();
+    }
+
     impl_->previousFrame.reset();
     impl_->resetNavigation();
     impl_->collectUnused();
@@ -645,6 +689,8 @@ void Engine::detachOverlay() noexcept {
 void Engine::unloadScene() {
     impl_->sceneDraws.clear();
     impl_->activeScene.reset();
+    impl_->gridCubeAsset.reset();
+    impl_->renderer.invalidateGrid();
     impl_->previousFrame.reset();
     impl_->resetNavigation();
     impl_->collectUnused();
@@ -718,8 +764,8 @@ void Engine::configureCameraNavigation(const OrbitCameraConfig& config) {
     impl_->navigationSynchronized = true;
 }
 
-bool Engine::update() {
-    return impl_->update();
+bool Engine::update(const std::function<void(double)>& gameUpdate) {
+    return impl_->update(gameUpdate);
 }
 
 } // namespace grimlock

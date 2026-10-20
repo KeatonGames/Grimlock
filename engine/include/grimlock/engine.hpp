@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -79,7 +80,10 @@ public:
     [[nodiscard]] ModelId loadModel(const std::filesystem::path& path);
     [[nodiscard]] ModelId addModel(assets::ModelData model);
     [[nodiscard]] ModelInfo modelInfo(ModelId model) const;
-    [[nodiscard]] InstanceId createInstance(ModelId model);
+    // Scene-visible runtime instances are independent of scene serialization and picking.
+    [[nodiscard]] InstanceId createInstance(ModelId model, bool visibleInScenes = false);
+    // Invalidates this instance ID; IDs are not reused.
+    void removeInstance(InstanceId instance);
     void setTransform(InstanceId instance, const glm::mat4& transform);
     void setTransform(InstanceId instance, const Transform& transform);
     [[nodiscard]] glm::mat4 transform(InstanceId instance) const;
@@ -120,7 +124,8 @@ public:
 
     // Polls events, advances animations/lights and renders. False only when closing;
     // a minimized window still updates, but rendering is deferred.
-    [[nodiscard]] bool update();
+    // Game updates run after viewport tools, before animation and draw preparation.
+    [[nodiscard]] bool update(const std::function<void(double)>& gameUpdate = {});
 
 private:
     struct Impl;

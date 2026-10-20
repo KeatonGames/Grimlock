@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <grimlock/grid_debug.hpp>
 #include <grimlock/ray.hpp>
 #include <imgui.h>
 #include <stdexcept>
@@ -131,7 +132,8 @@ void paintLine(SceneDocument& document, GridCell from, GridCell to, bool walkabl
 
 } // namespace
 
-void GridTools::menu(Scene& scene) {
+void GridTools::menu(Engine& engine, GridDebug* debug) {
+    const auto& scene = *engine.scene();
     const auto* grid = scene.navigationGrid();
 
     if (!grid) {
@@ -173,6 +175,10 @@ void GridTools::menu(Scene& scene) {
             origin_ = c.origin;
             error_.clear();
             openSettings_ = true;
+        }
+
+        if (debug) {
+            debug->menu(engine);
         }
 
         ImGui::EndMenu();
@@ -241,7 +247,8 @@ void GridTools::finishFrame(Engine& engine,
                             SceneDocument& document,
                             const Camera& camera,
                             SDL_Window* window,
-                            bool viewportMouse) {
+                            bool viewportMouse,
+                            GridDebug* debug) {
     auto* grid = engine.scene()->navigationGrid();
 
     if (!grid || !visible_) {
@@ -307,11 +314,28 @@ void GridTools::finishFrame(Engine& engine,
         lastCell_.reset();
     }
 
+    const auto debugView = debug ? debug->view(engine) : GridDebugView{};
+    double maximumCost = 1;
+    if (debugView.showCosts) {
+        for (const auto cost : debugView.costs) {
+            if (std::isfinite(cost)) {
+                maximumCost = std::max(maximumCost, cost);
+            }
+        }
+    }
     const auto matrix =
         glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
     std::array<ImVec2, 12> points{};
+    const auto project = [&](glm::dvec3 world) -> std::optional<ImVec2> {
+        const auto p = matrix * glm::dvec4{world, 1};
+        if (!std::isfinite(p.w) || p.w <= 0 || std::abs(p.x) > p.w || std::abs(p.y) > p.w || p.z < 0 || p.z > p.w) {
+            return {};
+        }
+        return ImVec2{viewport->Pos.x + static_cast<float>((p.x / p.w + 1) * 0.5) * viewport->Size.x,
+                      viewport->Pos.y + static_cast<float>((p.y / p.w + 1) * 0.5) * viewport->Size.y};
+    };
 
     for (std::uint32_t z = 0; z < c.height; ++z) {
         for (std::uint32_t x = 0; x < c.width; ++x) {
@@ -323,15 +347,54 @@ void GridTools::finishFrame(Engine& engine,
             }
 
             const bool highlight = editing_ && hover == cell;
-            const ImU32 fill = highlight              ? IM_COL32(160, 100, 20, 90)
-                               : grid->walkable(cell) ? IM_COL32(12, 65, 28, 24)
-                                                      : IM_COL32(100, 18, 14, 85);
+            ImU32 fill = highlight              ? IM_COL32(160, 100, 20, 90)
+                         : grid->walkable(cell) ? IM_COL32(12, 65, 28, 24)
+                                                : IM_COL32(100, 18, 14, 85);
+            const auto index = *grid->index(cell);
+            if (!highlight && grid->walkable(cell) && debugView.showCosts && index < debugView.costs.size()) {
+                const double cost = debugView.costs[index];
+                const float ratio = static_cast<float>(cost / maximumCost);
+                fill = std::isfinite(cost)
+                           ? ImGui::ColorConvertFloat4ToU32({0.65F * ratio, 0.45F * (1 - ratio), 0.08F, 0.35F})
+                           : IM_COL32(70, 70, 80, 100);
+            }
             draw->AddConvexPolyFilled(points.data(), count, fill);
             draw->AddPolyline(points.data(),
                               count,
                               highlight ? IM_COL32(150, 110, 25, 200) : IM_COL32(42, 90, 65, 85),
                               1.0F,
                               ImDrawFlags_Closed);
+
+            const auto center = *grid->cellCenter(cell);
+            const auto point = project(center);
+            if (!point) {
+                continue;
+            }
+            if (debugView.destination == cell) {
+                draw->AddCircle(*point, 7, IM_COL32(240, 200, 30, 255), 16, 2);
+                draw->AddCircleFilled(*point, 2, IM_COL32(240, 200, 30, 255));
+            }
+            if (debugView.showDirections && index < debugView.directions.size()) {
+                const auto direction = debugView.directions[index];
+                const auto end =
+                    project(center + glm::dvec3{direction.x * c.cellSize * 0.32, 0, direction.y * c.cellSize * 0.32});
+                if (direction == glm::vec2{0} || !end) {
+                    continue;
+                }
+                const glm::vec2 offset{end->x - point->x, end->y - point->y};
+                const float length = glm::length(offset);
+                if (length < 2) {
+                    continue;
+                }
+                const auto back = offset * (std::min(5.0F, length * 0.45F) / length);
+                const glm::vec2 side{-back.y * 0.6F, back.x * 0.6F};
+                const auto color = IM_COL32(120, 195, 225, 230);
+                draw->AddLine(*point, *end, color, 1.4F);
+                draw->AddTriangleFilled(*end,
+                                        {end->x - back.x + side.x, end->y - back.y + side.y},
+                                        {end->x - back.x - side.x, end->y - back.y - side.y},
+                                        color);
+            }
         }
     }
 }

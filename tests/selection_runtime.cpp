@@ -133,6 +133,9 @@ int main(int argc, char** argv) {
         camera.position = {0, 2, 7};
         camera.target = {0, 0, 0};
         candidate->setCamera("main", SceneCamera{camera});
+        candidate->setNavigationGrid(GridConfiguration{8, 8, 1, {-4, -1, -4}});
+        candidate->navigationGrid()->setWalkable({2, 5}, false);
+        candidate->navigationGrid()->setWalkable({6, 5}, false);
         engine.setScene(std::move(candidate));
         engine.setCameraNavigationEnabled();
         engine.setObjectSelectionEnabled();
@@ -160,6 +163,11 @@ int main(int argc, char** argv) {
         click(engine, id, right);
         require(engine.selectedObject() == b, "shared model instance did not transfer selection");
         require(engine.scene()->resolvedCamera().position == view.position, "left click moved camera");
+
+        click(engine, id, project(engine.scene()->resolvedCamera(), {0, -1, 2.5F}, window));
+        require(!engine.selectedObject(), "generated floor intercepted object selection");
+        click(engine, id, project(engine.scene()->resolvedCamera(), {2.5F, 0.5F, 1.5F}, window));
+        require(!engine.selectedObject(), "generated wall became selectable");
 
         button(id, SDL_BUTTON_LEFT, true, left);
         require(engine.update(), "held setup closed");

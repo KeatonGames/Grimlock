@@ -16,6 +16,7 @@ Game::Game(const std::filesystem::path& path, const std::filesystem::path& envir
         engine_.setScene(engine_.loadScene(path.empty() ? "assets/scenes/demo.json" : path));
         engine_.setCameraNavigationEnabled();
         engine_.setObjectSelectionEnabled();
+        navigation_.spawn(engine_);
 
         return;
     }
@@ -56,7 +57,9 @@ InstanceId Game::loadExample(const std::filesystem::path& path) {
 }
 
 void Game::run() {
-    while (engine_.update()) {
+    while (engine_.update([&](double delta) {
+        navigation_.update(engine_, delta);
+    })) {
     }
 }
 

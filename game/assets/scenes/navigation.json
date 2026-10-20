@@ -16,12 +16,6 @@
     "exposure":1
   },
   "objects": [
-    {"id":"1","name":"Flat terrain (existing cube mesh)","model":"models/cube.obj","tint":[0.24,0.30,0.25,1],
-      "transform":{"position":[0,-0.15,0],"scale":[8,0.15,6]}},
-    {"id":"2","name":"Blocked area A","model":"models/cube.obj","tint":[0.5,0.4,0.3,1],
-      "transform":{"position":[-4,0.6,-2],"scale":[1,0.6,1]}},
-    {"id":"3","name":"Blocked area B","model":"models/cube.obj","tint":[0.45,0.38,0.32,1],
-      "transform":{"position":[3,0.4,1.5],"scale":[1,0.4,1.5]}},
     {"id":"4","name":"Rat A","model":"models/blackrat.glb",
       "transform":{"position":[-1,0.04,-3],"scale":[3.2,3.2,3.2]},
       "animation":{"clip":"idle_A1","autoplay":true,"loop":true,"speed":0.75}},

@@ -185,7 +185,10 @@ void VulkanRenderer::releaseModels(std::span<const std::size_t> models) noexcept
     }
 }
 
-bool VulkanRenderer::drawFrame(const Camera& camera, const std::span<const ModelDraw> draws, const Lighting& lighting) {
+bool VulkanRenderer::drawFrame(const Camera& camera,
+                               const std::span<const ModelDraw> draws,
+                               const Lighting& lighting,
+                               const GridDraw* grid) {
     diagnostics::StartupSpan profile{"frame.first_render"};
 
     if (!hasDrawableExtent()) {
@@ -208,11 +211,17 @@ bool VulkanRenderer::drawFrame(const Camera& camera, const std::span<const Model
         }
     }
 
+    if (grid && (grid->cubeModel >= models_.size() || !models_[grid->cubeModel])) {
+        throw std::invalid_argument("Unknown grid cube model ID.");
+    }
+
     const VkDevice device = context_.device();
     {
         diagnostics::StartupSpan waitProfile{"wait.frame.fence"};
         checkVk(vkWaitForFences(device, 1, &inFlight_, VK_TRUE, UINT64_MAX), "vkWaitForFences");
     }
+
+    updateGrid(grid); // The single frame in flight has finished using the instance buffer.
 
     const CameraUniforms uniforms{
         camera.view(),
@@ -239,7 +248,7 @@ bool VulkanRenderer::drawFrame(const Camera& camera, const std::span<const Model
         checkVk(acquire, "vkAcquireNextImageKHR");
     }
 
-    recordFrame(imageIndex, camera, draws, lighting.exposure);
+    recordFrame(imageIndex, camera, draws, lighting.exposure, grid);
     checkVk(vkResetFences(device, 1, &inFlight_), "vkResetFences");
 
     VkSemaphoreSubmitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO};
@@ -683,10 +692,90 @@ void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command, std::span<con
     }
 }
 
+void VulkanRenderer::invalidateGrid() noexcept {
+    cachedGrid_ = nullptr;
+}
+
+void VulkanRenderer::updateGrid(const GridDraw* grid) {
+    if (!grid) {
+        invalidateGrid();
+        return;
+    }
+
+    if (cachedGrid_ == &grid->grid && gridRevision_ == grid->grid.revision()) {
+        return;
+    }
+
+    if (!gridPipeline_) {
+        gridPipeline_.emplace(context_.device(),
+                              VK_FORMAT_R16G16B16A16_SFLOAT,
+                              depthFormat_,
+                              cameraLayout_,
+                              materialLayout_,
+                              deformation_->layout(),
+                              true);
+    }
+
+    updateGridInstances(grid->grid, gridInstances_);
+    const auto bytes = gridInstances_.cubes.size() * sizeof(GridCubeInstance);
+
+    if (!gridBuffer_ || gridBuffer_->size() < bytes) {
+        // Reserve room for every wall so painting does not repeatedly allocate GPU buffers.
+        gridBuffer_.emplace(context_,
+                            gridInstances_.cubes.capacity() * sizeof(GridCubeInstance),
+                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    }
+
+    gridBuffer_->write(gridInstances_.cubes.data(), bytes);
+    cachedGrid_ = &grid->grid;
+    gridRevision_ = grid->grid.revision();
+}
+
+void VulkanRenderer::recordGrid(const VkCommandBuffer command, const GridDraw& grid) {
+    const auto& model = *models_[grid.cubeModel];
+    const auto layout = gridPipeline_->layout();
+    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, gridPipeline_->handle(false, false, false));
+    const VkBuffer buffer = gridBuffer_->handle();
+    constexpr VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(command, 1, 1, &buffer, &offset);
+
+    DrawConstants constants;
+    constants.normalColumn0 = {1, 0, 0, 1};
+    constants.normalColumn1 = {0, 1, 0, 0};
+    constants.normalColumn2 = {0, 0, 1, 0};
+    const auto walls = static_cast<std::uint32_t>(gridInstances_.cubes.size()) - gridInstances_.floorCount;
+
+    for (std::size_t mesh = 0; mesh < model.meshes.size(); ++mesh) {
+        const auto set = model.materials->at(model.meshMaterials[mesh]).set;
+        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1, &set, 0, nullptr);
+        constants.baseColor = {0.24F, 0.32F, 0.38F, 1.0F};
+        vkCmdPushConstants(command,
+                           layout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(constants),
+                           &constants);
+        model.meshes[mesh].draw(command, 0, gridInstances_.floorCount);
+
+        if (walls > 0) {
+            constants.baseColor = {0.65F, 0.28F, 0.10F, 1.0F};
+            vkCmdPushConstants(command,
+                               layout,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(constants),
+                               &constants);
+            model.meshes[mesh].draw(command, gridInstances_.floorCount, walls);
+        }
+    }
+}
+
 void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
                                  const Camera& camera,
                                  const std::span<const ModelDraw> draws,
-                                 const float exposure) {
+                                 const float exposure,
+                                 const GridDraw* grid) {
     const auto command = commandBuffers_.at(imageIndex);
     checkVk(vkResetCommandBuffer(command, 0), "vkResetCommandBuffer");
 
@@ -768,6 +857,10 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
                             &cameraSet_,
                             0,
                             nullptr);
+
+    if (grid) {
+        recordGrid(command, *grid);
+    }
 
     auto primitives = preparePrimitiveDraws(camera, draws);
     sortPrimitiveDraws(primitives);
@@ -953,6 +1046,8 @@ void VulkanRenderer::destroy() noexcept {
 
     destroySwapchainResources();
     pipeline_.reset();
+    gridPipeline_.reset();
+    gridBuffer_.reset();
     toneMapPipeline_.reset();
     models_.clear();
     deformation_.reset();

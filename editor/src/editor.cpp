@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <grimlock/editor.hpp>
+#include <grimlock/grid_debug.hpp>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
@@ -153,7 +154,8 @@ bool vectorControl(const char* label, glm::vec3& value, float speed) {
 
 } // namespace
 
-Editor::Editor(Engine& engine, const std::filesystem::path& initialScene) : engine_(engine), document_(engine) {
+Editor::Editor(Engine& engine, const std::filesystem::path& initialScene, GridDebug* gridDebug)
+    : engine_(engine), document_(engine), gridDebug_(gridDebug) {
     if (!engine_.scene()) {
         document_.newScene();
     }
@@ -405,7 +407,7 @@ void Editor::menu() {
         ImGui::EndMenu();
     }
 
-    gridTools_.menu(*engine_.scene());
+    gridTools_.menu(engine_, gridDebug_);
     ImGui::Separator();
     ImGui::Text("%s%s", engine_.scene()->name().c_str(), document_.dirty() ? " *" : "");
 
@@ -1263,7 +1265,7 @@ OverlayInput Editor::frame() {
 
 void Editor::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
-    gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_);
+    gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_, gridDebug_);
     ImGui::Render();
 }
 
@@ -1272,11 +1274,17 @@ void Editor::render(VkCommandBuffer command) {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command);
 }
 
-void run(const std::filesystem::path& scene, const std::filesystem::path& environment) {
+void run(const std::filesystem::path& scene, const std::filesystem::path& environment, GridDebug* gridDebug) {
     Engine engine{EngineConfig{.windowTitle = "Grimlock Scene Editor", .environmentFolder = environment}};
-    Editor editor{engine, scene.empty() ? engine.assetRoot() / "scenes" / "demo.json" : scene};
+    Editor editor{engine, scene.empty() ? engine.assetRoot() / "scenes" / "demo.json" : scene, gridDebug};
 
-    while (engine.update()) {
+    std::function<void(double)> update;
+    if (gridDebug) {
+        update = [&](double delta) {
+            gridDebug->update(engine, delta);
+        };
+    }
+    while (engine.update(update)) {
     }
 }
 

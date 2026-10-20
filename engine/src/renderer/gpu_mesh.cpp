@@ -73,12 +73,14 @@ GpuMesh::GpuMesh(const VulkanContext& context, const VkCommandPool uploadPool, c
     });
 }
 
-void GpuMesh::draw(const VkCommandBuffer command, const std::uint32_t firstInstance) const {
+void GpuMesh::draw(const VkCommandBuffer command,
+                   const std::uint32_t firstInstance,
+                   const std::uint32_t instanceCount) const {
     const VkBuffer buffer = vertices_.handle();
     constexpr VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(command, 0, 1, &buffer, &offset);
     vkCmdBindIndexBuffer(command, indices_.handle(), 0, VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(command, indexCount_, 1, 0, 0, firstInstance);
+    vkCmdDrawIndexed(command, indexCount_, instanceCount, 0, 0, firstInstance);
 }
 
 } // namespace grimlock::renderer

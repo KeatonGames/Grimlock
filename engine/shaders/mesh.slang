@@ -62,6 +62,10 @@ struct VertexInput {
     [[vk::location(7)]] float4 weights0 : BLENDWEIGHT0;
     [[vk::location(8)]] float4 weights1 : BLENDWEIGHT1;
     [[vk::location(9)]] uint morphIndex : TEXCOORD2;
+#ifdef GRID_INSTANCES
+    [[vk::location(10)]] float3 instancePosition : TEXCOORD3;
+    [[vk::location(11)]] float3 instanceScale : TEXCOORD4;
+#endif
 };
 struct VertexOutput {
     float4 position : SV_Position;
@@ -74,6 +78,10 @@ struct VertexOutput {
 [shader("vertex")]
 VertexOutput vertMain(VertexInput input, uint instance : SV_VulkanInstanceID) {
     VertexOutput output;
+#ifdef GRID_INSTANCES
+    input.position = input.position * input.instanceScale + input.instancePosition;
+    input.normal /= input.instanceScale;
+#else
     DeformDraw deform = deformationDraws[instance];
     for (uint target = 0; target < deform.counts.y; ++target) {
         float weight = morphWeights[deform.offsets.y + target];
@@ -99,6 +107,7 @@ VertexOutput vertMain(VertexInput input, uint instance : SV_VulkanInstanceID) {
         input.tangent.xyz = mul((float3x3)skin,input.tangent.xyz);
         input.tangent.w *= determinant < 0 ? -1 : 1;
     }
+#endif
     float4 world = mul(draw.model, float4(input.position, 1));
     output.position = mul(camera.projection, mul(camera.view, world));
     output.worldPosition = world.xyz;

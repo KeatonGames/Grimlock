@@ -17,7 +17,7 @@ struct GridCell {
 struct GridConfiguration {
     std::uint32_t width = 16, height = 16;
     double cellSize = 1;
-    glm::dvec3 origin{0}; // Minimum X/Z corner; Y is the logical/debug plane, not terrain geometry.
+    glm::dvec3 origin{0}; // Minimum X/Z corner; Y is the grid plane and generated floor surface.
     bool operator==(const GridConfiguration&) const = default;
 };
 
