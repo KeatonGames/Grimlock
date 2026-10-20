@@ -1,11 +1,19 @@
 #pragma once
+
 #include <array>
 #include <cstddef>
 #include <glm/vec2.hpp>
 #include <optional>
 
 namespace grimlock {
-enum class MouseButton : std::size_t { left, middle, right, x1, x2 };
+
+enum class MouseButton : std::size_t {
+    left,
+    middle,
+    right,
+    x1,
+    x2
+};
 
 struct ButtonState {
     bool pressed = false, held = false, released = false;
@@ -25,6 +33,9 @@ struct InputState {
         return mouseButtons.at(static_cast<std::size_t>(button));
     }
 
-    [[nodiscard]] const ButtonState& key(std::size_t scancode) const { return keys.at(scancode); }
+    [[nodiscard]] const ButtonState& key(std::size_t scancode) const {
+        return keys.at(scancode);
+    }
 };
+
 } // namespace grimlock

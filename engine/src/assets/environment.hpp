@@ -18,6 +18,7 @@ struct EnvironmentMaps {
 
 [[nodiscard]] EnvironmentCube loadEnvironmentCube(const std::filesystem::path& folder);
 [[nodiscard]] EnvironmentCube fallbackEnvironment();
+
 // Startup-only cosine convolution, GGX importance prefilter, and split-sum LUT.
 [[nodiscard]] EnvironmentMaps preprocessEnvironment(const EnvironmentCube& source);
 [[nodiscard]] glm::vec3 cubeDirection(std::size_t face, float u, float v);

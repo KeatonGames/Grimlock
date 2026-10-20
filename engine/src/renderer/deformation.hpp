@@ -1,4 +1,5 @@
 #pragma once
+
 #include "renderer/buffer.hpp"
 
 #include <glm/glm.hpp>
@@ -6,6 +7,7 @@
 #include <vector>
 
 namespace grimlock::renderer {
+
 // One fence-protected frame arena; immutable mesh sets share its three buffers.
 class Deformation final {
 public:
@@ -14,13 +16,16 @@ public:
     Deformation(const Deformation&) = delete;
     Deformation& operator=(const Deformation&) = delete;
 
-    [[nodiscard]] VkDescriptorSetLayout layout() const noexcept { return layout_; }
+    [[nodiscard]] VkDescriptorSetLayout layout() const noexcept {
+        return layout_;
+    }
 
     [[nodiscard]] VkDescriptorSet meshSet(VkBuffer morphs, VkDeviceSize size);
     void releaseMeshSets(std::span<const VkDescriptorSet> sets) noexcept;
     void begin();
     [[nodiscard]] std::uint32_t append(std::span<const glm::mat4> joints,
-                                       std::span<const float> weights, std::uint32_t morphVertices,
+                                       std::span<const float> weights,
+                                       std::uint32_t morphVertices,
                                        std::uint32_t morphTargets);
     void upload();
 
@@ -41,4 +46,5 @@ private:
     std::vector<glm::mat4> joints_;
     std::vector<float> weights_;
 };
+
 } // namespace grimlock::renderer

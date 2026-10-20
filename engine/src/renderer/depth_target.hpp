@@ -13,9 +13,13 @@ public:
 
     [[nodiscard]] static VkFormat chooseFormat(VkPhysicalDevice device);
 
-    [[nodiscard]] VkImage image() const noexcept { return image_; }
+    [[nodiscard]] VkImage image() const noexcept {
+        return image_;
+    }
 
-    [[nodiscard]] VkImageView view() const noexcept { return view_; }
+    [[nodiscard]] VkImageView view() const noexcept {
+        return view_;
+    }
 
 private:
     void destroy() noexcept;

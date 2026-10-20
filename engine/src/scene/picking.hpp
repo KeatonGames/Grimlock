@@ -1,4 +1,5 @@
 #pragma once
+
 #include "grimlock/assets/animation.hpp"
 #include "grimlock/ray.hpp"
 
@@ -7,6 +8,7 @@
 #include <vector>
 
 namespace grimlock::picking {
+
 using grimlock::mouseRay; // Existing picking users share the public unprojection utility.
 using grimlock::Ray;
 
@@ -15,9 +17,12 @@ class Geometry final {
 public:
     Geometry() = default;
     explicit Geometry(const assets::ModelData& model);
-    [[nodiscard]] std::optional<double>
-    intersect(const Ray& ray, const assets::ModelInstance& instance, const glm::mat4& world,
-              std::optional<std::size_t> material, double closest, float opacity = 1);
+    [[nodiscard]] std::optional<double> intersect(const Ray& ray,
+                                                  const assets::ModelInstance& instance,
+                                                  const glm::mat4& world,
+                                                  std::optional<std::size_t> material,
+                                                  double closest,
+                                                  float opacity = 1);
 
 private:
     struct Bounds {
@@ -27,4 +32,5 @@ private:
     std::vector<Bounds> bounds_;
     std::vector<glm::dvec3> positions_; // Reused only on clicks for skinned/morphed nodes.
 };
+
 } // namespace grimlock::picking

@@ -1,10 +1,12 @@
 #pragma once
+
 #include <chrono>
 #include <map>
 #include <string>
 #include <string_view>
 
 namespace grimlock::diagnostics {
+
 class StartupSpan;
 
 // Engine-owned, single-thread startup capture. The thread-local pointer only routes
@@ -50,4 +52,5 @@ private:
     std::chrono::steady_clock::time_point start_;
     double children_ = 0;
 };
+
 } // namespace grimlock::diagnostics

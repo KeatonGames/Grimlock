@@ -1,9 +1,11 @@
 #pragma once
+
 #include "grimlock/input.hpp"
 
 #include <SDL3/SDL.h>
 
 namespace grimlock::platform {
+
 // Owns only SDL mouse-mode state; Window must outlive it. Engine polls events.
 class Input final {
 public:
@@ -17,7 +19,9 @@ public:
     void cancelNavigation();
     void capture(bool mouse, bool keyboard);
 
-    [[nodiscard]] const InputState& state() const noexcept { return state_; }
+    [[nodiscard]] const InputState& state() const noexcept {
+        return state_;
+    }
 
 private:
     void clearButtons(bool keyboard);
@@ -28,4 +32,5 @@ private:
     glm::vec2 dragPosition_{};
     bool relative_ = false;
 };
+
 } // namespace grimlock::platform

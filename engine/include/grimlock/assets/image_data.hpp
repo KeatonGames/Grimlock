@@ -1,10 +1,12 @@
 #pragma once
+
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
 
 namespace grimlock::assets {
+
 // Top-left origin, tightly packed RGBA8. Color space belongs to the texture's
 // usage, not to its decoded bytes (base color is sRGB; data textures are linear).
 struct ImageData {

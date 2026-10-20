@@ -17,9 +17,13 @@ public:
 
     void draw(VkCommandBuffer command, std::uint32_t firstInstance = 0) const;
 
-    [[nodiscard]] VkBuffer morphBuffer() const noexcept { return morphs_.handle(); }
+    [[nodiscard]] VkBuffer morphBuffer() const noexcept {
+        return morphs_.handle();
+    }
 
-    [[nodiscard]] VkDeviceSize morphSize() const noexcept { return morphs_.size(); }
+    [[nodiscard]] VkDeviceSize morphSize() const noexcept {
+        return morphs_.size();
+    }
 
     std::uint32_t morphVertexCount = 0, morphTargetCount = 0;
 

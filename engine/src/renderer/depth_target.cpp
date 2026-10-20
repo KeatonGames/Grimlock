@@ -9,19 +9,20 @@ namespace grimlock::renderer {
 
 VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device) {
     constexpr std::array formats{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D16_UNORM};
+
     for (const auto format : formats) {
         VkFormatProperties properties{};
         vkGetPhysicalDeviceFormatProperties(device, format, &properties);
-        if ((properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) !=
-            0) {
+
+        if ((properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
             return format;
         }
     }
+
     throw std::runtime_error("No supported depth attachment format (D32_SFLOAT or D16_UNORM).");
 }
 
-DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent,
-                         const VkFormat format)
+DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, const VkFormat format)
     : device_(context.device()) {
     try {
         VkImageCreateInfo image{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -35,16 +36,17 @@ DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent,
         image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         checkVk(vkCreateImage(device_, &image, nullptr, &image_), "vkCreateImage(depth)");
+
         VkMemoryRequirements requirements{};
         vkGetImageMemoryRequirements(device_, image_, &requirements);
+
         VkMemoryAllocateInfo allocation{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
         allocation.allocationSize = requirements.size;
         allocation.memoryTypeIndex =
-            findMemoryType(context.physicalDevice(), requirements.memoryTypeBits,
-                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        checkVk(vkAllocateMemory(device_, &allocation, nullptr, &memory_),
-                "vkAllocateMemory(depth)");
+            findMemoryType(context.physicalDevice(), requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        checkVk(vkAllocateMemory(device_, &allocation, nullptr, &memory_), "vkAllocateMemory(depth)");
         checkVk(vkBindImageMemory(device_, image_, memory_, 0), "vkBindImageMemory(depth)");
+
         VkImageViewCreateInfo view{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         view.image = image_;
         view.viewType = VK_IMAGE_VIEW_TYPE_2D;

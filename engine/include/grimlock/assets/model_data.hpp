@@ -23,10 +23,9 @@ struct Vertex {
     std::uint32_t morphIndex = 0; // Original accessor index; retained across normal/tangent seams.
 
     bool operator==(const Vertex& other) const noexcept {
-        return position == other.position && normal == other.normal && uv == other.uv &&
-               uv1 == other.uv1 && tangent == other.tangent && joints0 == other.joints0 &&
-               joints1 == other.joints1 && weights0 == other.weights0 &&
-               weights1 == other.weights1 && morphIndex == other.morphIndex;
+        return position == other.position && normal == other.normal && uv == other.uv && uv1 == other.uv1 &&
+               tangent == other.tangent && joints0 == other.joints0 && joints1 == other.joints1 &&
+               weights0 == other.weights0 && weights1 == other.weights1 && morphIndex == other.morphIndex;
     }
 };
 
@@ -46,10 +45,28 @@ struct MeshData {
     std::uint32_t morphVertexCount = 0, morphTargetCount = 0;
 };
 
-enum class AlphaMode { opaque, mask, blend };
-enum class TextureFilter { nearest, linear };
-enum class MipmapFilter { none, nearest, linear };
-enum class TextureWrap { repeat, mirroredRepeat, clampToEdge };
+enum class AlphaMode {
+    opaque,
+    mask,
+    blend
+};
+
+enum class TextureFilter {
+    nearest,
+    linear
+};
+
+enum class MipmapFilter {
+    none,
+    nearest,
+    linear
+};
+
+enum class TextureWrap {
+    repeat,
+    mirroredRepeat,
+    clampToEdge
+};
 
 struct SamplerData {
     TextureFilter mag = TextureFilter::linear, min = TextureFilter::linear;
@@ -77,26 +94,25 @@ struct MaterialData {
     AlphaMode alphaMode = AlphaMode::opaque;
     float alphaCutoff = 0.5F;
     bool doubleSided = false;
+
     // glTF metallic-roughness factors are linear; packed texture G=roughness, B=metallic.
     float metallic = 1.0F, roughness = 1.0F;
     glm::vec3 emissive{0.0F};
-    std::optional<TextureReference> metallicRoughnessTexture, normalTexture, occlusionTexture,
-        emissiveTexture;
+    std::optional<TextureReference> metallicRoughnessTexture, normalTexture, occlusionTexture, emissiveTexture;
     float normalScale = 1.0F, occlusionStrength = 1.0F;
     bool unlit = false;
     float emissiveStrength = 1.0F, ior = 1.5F, specular = 1.0F;
     glm::vec3 specularColor{1.0F};
     float clearcoat = 0, clearcoatRoughness = 0, clearcoatNormalScale = 1;
-    std::optional<TextureReference> specularTexture, specularColorTexture, clearcoatTexture,
-        clearcoatRoughnessTexture, clearcoatNormalTexture;
+    std::optional<TextureReference> specularTexture, specularColorTexture, clearcoatTexture, clearcoatRoughnessTexture,
+        clearcoatNormalTexture;
+
     // Preserved optional advanced layers. Rendering requires a future transmission/volume/sheen
     // path.
-    float transmission = 0, thickness = 0,
-          attenuationDistance = std::numeric_limits<float>::infinity();
+    float transmission = 0, thickness = 0, attenuationDistance = std::numeric_limits<float>::infinity();
     glm::vec3 attenuationColor{1}, sheenColor{0};
     float sheenRoughness = 0;
-    std::optional<TextureReference> transmissionTexture, thicknessTexture, sheenColorTexture,
-        sheenRoughnessTexture;
+    std::optional<TextureReference> transmissionTexture, thicknessTexture, sheenColorTexture, sheenRoughnessTexture;
 };
 
 struct ModelNode {
@@ -104,6 +120,7 @@ struct ModelNode {
     std::optional<std::size_t> parent;
     std::vector<std::size_t> children;
     std::vector<std::size_t> meshes;
+
     // glTF TRS is converted to T * R * S; explicit matrices are kept unchanged.
     glm::mat4 localTransform{1.0F};
     glm::vec3 translation{0}, scale{1};
@@ -111,8 +128,7 @@ struct ModelNode {
     bool matrixTransform = true;
     std::optional<std::size_t> skin, light;
     std::vector<float> weights;
-    bool bindPosePreview =
-        false; // Diagnosed legacy assets with missing rest-joint transforms only.
+    bool bindPosePreview = false; // Diagnosed legacy assets with missing rest-joint transforms only.
 };
 
 struct SkinData {
@@ -121,8 +137,19 @@ struct SkinData {
     std::vector<glm::mat4> inverseBindMatrices;
     std::optional<std::size_t> skeleton;
 };
-enum class AnimationPath { translation, rotation, scale, weights };
-enum class Interpolation { step, linear, cubicSpline };
+
+enum class AnimationPath {
+    translation,
+    rotation,
+    scale,
+    weights
+};
+
+enum class Interpolation {
+    step,
+    linear,
+    cubicSpline
+};
 
 struct AnimationSampler {
     std::vector<float> times, values; // glTF ordering; cubic = in/value/out per key.
@@ -141,7 +168,12 @@ struct AnimationData {
     std::vector<AnimationChannel> channels;
     float start = 0, end = 0;
 };
-enum class LightType { directional, point, spot };
+
+enum class LightType {
+    directional,
+    point,
+    spot
+};
 
 struct LightData {
     std::string name;
@@ -155,6 +187,7 @@ struct ModelData {
     std::vector<ModelNode> nodes;
     std::vector<std::size_t> roots; // Selected scene only; other nodes remain preserved.
     std::vector<MaterialData> materials{MaterialData{}};
+
     // Images referenced by supported PBR channels are decoded once per source index.
     std::vector<std::optional<ImageData>> images;
     std::vector<TextureData> textures;
@@ -173,6 +206,7 @@ struct ModelNodeTransform {
 
 // Validates the forest and returns selected-scene nodes in parent-first order.
 [[nodiscard]] std::vector<ModelNodeTransform> modelNodeTransforms(const ModelData& model);
+
 // Bounds include only selected-scene geometry, with imported node transforms applied.
 void updateModelBounds(ModelData& model);
 

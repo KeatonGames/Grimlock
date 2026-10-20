@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace grimlock::diagnostics {
+
 thread_local StartupProfile* StartupProfile::active_ = nullptr;
 
 StartupProfile::StartupProfile() : start_(Clock::now()) {
@@ -21,6 +22,7 @@ StartupProfile::~StartupProfile() {
     if (!finished_) {
         report("aborted_before_first_present");
     }
+
     if (active_ == this) {
         active_ = previous_;
     }
@@ -39,29 +41,30 @@ void StartupProfile::firstPresent() {
 
 void StartupProfile::report(std::string_view result) noexcept {
     try {
-        const double elapsed =
-            std::chrono::duration<double, std::milli>(Clock::now() - start_).count();
-        std::vector<std::pair<std::string, Measurement>> rows(measurements_.begin(),
-                                                              measurements_.end());
-        std::sort(rows.begin(), rows.end(),
-                  [](const auto& a, const auto& b) { return a.second.self > b.second.self; });
+        const double elapsed = std::chrono::duration<double, std::milli>(Clock::now() - start_).count();
+        std::vector<std::pair<std::string, Measurement>> rows(measurements_.begin(), measurements_.end());
+        std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+            return a.second.self > b.second.self;
+        });
         std::ostringstream out;
-        out << std::fixed << std::setprecision(3) << "[startup] result=" << result
-            << " total_ms=" << elapsed << '\n'
+        out << std::fixed << std::setprecision(3) << "[startup] result=" << result << " total_ms=" << elapsed << '\n'
             << "[startup] steady-clock wall times; inclusive rows overlap; self excludes nested "
                "spans. Wait rows measure host blocking, not GPU execution.\n";
         for (const auto& [phase, m] : rows) {
-            out << "[startup] phase=" << std::quoted(phase) << " calls=" << m.calls
-                << " inclusive_ms=" << m.inclusive << " self_ms=" << m.self << '\n';
+            out << "[startup] phase=" << std::quoted(phase) << " calls=" << m.calls << " inclusive_ms=" << m.inclusive
+                << " self_ms=" << m.self << '\n';
         }
+
         std::clog << out.str() << std::flush;
     } catch (...) {
-    } // Diagnostics must not mask initialization/cleanup errors.
+        // Diagnostics must not mask initialization/cleanup errors.
+    }
 }
 
 StartupSpan::StartupSpan(std::string_view phase) {
 #ifndef NDEBUG
     profile_ = StartupProfile::active_;
+
     if (profile_) {
         phase_ = phase;
         parent_ = profile_->top_;
@@ -78,13 +81,14 @@ StartupSpan::~StartupSpan() {
     if (!profile_) {
         return;
     }
-    const double elapsed =
-        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_)
-            .count();
+
+    const double elapsed = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_).count();
     profile_->top_ = parent_;
+
     if (parent_) {
         parent_->children_ += elapsed;
     }
+
     try {
         auto& m = profile_->measurements_[std::string{phase_}];
         ++m.calls;
@@ -94,4 +98,5 @@ StartupSpan::~StartupSpan() {
     }
 #endif
 }
+
 } // namespace grimlock::diagnostics

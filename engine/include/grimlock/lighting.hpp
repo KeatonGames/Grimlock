@@ -1,9 +1,11 @@
 #pragma once
+
 #include <array>
 #include <cstdint>
 #include <glm/glm.hpp>
 
 namespace grimlock {
+
 inline constexpr std::uint32_t maxPointLights = 8;
 
 struct DirectionalLight {

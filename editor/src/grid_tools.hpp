@@ -1,17 +1,25 @@
 #pragma once
+
 #include "scene_document.hpp"
+
 struct SDL_Window;
 
 namespace grimlock::editor {
+
 // Session-only debug tools; authored data stays in the real Scene/SceneDocument.
 class GridTools final {
 public:
     void menu(Scene& scene);
     void dialog(SceneDocument& document);
-    void finishFrame(Engine& engine, SceneDocument& document, const Camera& camera,
-                     SDL_Window* window, bool viewportMouse);
+    void finishFrame(Engine& engine,
+                     SceneDocument& document,
+                     const Camera& camera,
+                     SDL_Window* window,
+                     bool viewportMouse);
 
-    [[nodiscard]] bool editing() const noexcept { return editing_; }
+    [[nodiscard]] bool editing() const noexcept {
+        return editing_;
+    }
 
     void resetInteraction() noexcept {
         editing_ = false;
@@ -26,4 +34,5 @@ private:
     std::string error_;
     std::optional<GridCell> lastCell_;
 };
+
 } // namespace grimlock::editor

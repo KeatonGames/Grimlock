@@ -1,8 +1,10 @@
 #pragma once
+
 #include "grimlock/camera.hpp"
 #include "grimlock/input.hpp"
 
 namespace grimlock {
+
 struct OrbitCameraConfig {
     glm::vec3 target{0};
     float distance = 10, yaw = 0, pitch = 0.610865238F; // Angles in radians, pitch above XZ.
@@ -18,7 +20,9 @@ public:
     explicit OrbitCameraController(const OrbitCameraConfig& config = {});
     void configure(const OrbitCameraConfig& config);
 
-    [[nodiscard]] const OrbitCameraConfig& config() const noexcept { return config_; }
+    [[nodiscard]] const OrbitCameraConfig& config() const noexcept {
+        return config_;
+    }
 
     // Derives target/distance/angles, retaining sensitivity/bounds. Applies only
     // necessary limits/world-up correction, preserving normal authored poses.
@@ -28,8 +32,13 @@ public:
     void cancelDrag() noexcept;
 
 private:
-    enum class Drag { none, pan, orbit };
+    enum class Drag {
+        none,
+        pan,
+        orbit
+    };
     OrbitCameraConfig config_;
     Drag drag_ = Drag::none;
 };
+
 } // namespace grimlock

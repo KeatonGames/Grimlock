@@ -23,21 +23,37 @@ public:
     VulkanContext(const VulkanContext&) = delete;
     VulkanContext& operator=(const VulkanContext&) = delete;
 
-    [[nodiscard]] VkPhysicalDevice physicalDevice() const noexcept { return physicalDevice_; }
+    [[nodiscard]] VkPhysicalDevice physicalDevice() const noexcept {
+        return physicalDevice_;
+    }
 
-    [[nodiscard]] VkInstance instance() const noexcept { return instance_; }
+    [[nodiscard]] VkInstance instance() const noexcept {
+        return instance_;
+    }
 
-    [[nodiscard]] VkDevice device() const noexcept { return device_; }
+    [[nodiscard]] VkDevice device() const noexcept {
+        return device_;
+    }
 
-    [[nodiscard]] VkSurfaceKHR surface() const noexcept { return surface_; }
+    [[nodiscard]] VkSurfaceKHR surface() const noexcept {
+        return surface_;
+    }
 
-    [[nodiscard]] VkQueue graphicsQueue() const noexcept { return graphicsQueue_; }
+    [[nodiscard]] VkQueue graphicsQueue() const noexcept {
+        return graphicsQueue_;
+    }
 
-    [[nodiscard]] VkQueue presentQueue() const noexcept { return presentQueue_; }
+    [[nodiscard]] VkQueue presentQueue() const noexcept {
+        return presentQueue_;
+    }
 
-    [[nodiscard]] std::uint32_t graphicsFamily() const noexcept { return *families_.graphics; }
+    [[nodiscard]] std::uint32_t graphicsFamily() const noexcept {
+        return *families_.graphics;
+    }
 
-    [[nodiscard]] std::uint32_t presentFamily() const noexcept { return *families_.present; }
+    [[nodiscard]] std::uint32_t presentFamily() const noexcept {
+        return *families_.present;
+    }
 
     [[nodiscard]] SwapchainSupport swapchainSupport() const;
 
@@ -46,7 +62,9 @@ private:
         std::optional<std::uint32_t> graphics;
         std::optional<std::uint32_t> present;
 
-        [[nodiscard]] bool complete() const noexcept { return graphics && present; }
+        [[nodiscard]] bool complete() const noexcept {
+            return graphics && present;
+        }
     };
 
     void createInstance();

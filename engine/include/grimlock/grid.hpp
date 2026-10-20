@@ -1,4 +1,5 @@
 #pragma once
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <vector>
 
 namespace grimlock {
+
 struct GridCell {
     std::uint32_t x = 0, z = 0;
     bool operator==(const GridCell&) const = default;
@@ -27,17 +29,21 @@ struct GridNeighbors {
 // Generic, CPU-only rectangular data. No collision, diagonal policy or pathfinding.
 class Grid final {
 public:
-    static constexpr std::size_t maximumCells =
-        65536; // One byte per cell, bounded debug/scene data.
+    static constexpr std::size_t maximumCells = 65536; // One byte per cell, bounded debug/scene data.
     explicit Grid(GridConfiguration configuration = {});
-    void configure(
-        GridConfiguration configuration); // Preserve blocked states in overlapping coordinates.
+    void configure(GridConfiguration configuration); // Preserve blocked states in overlapping coordinates.
 
-    [[nodiscard]] const GridConfiguration& configuration() const noexcept { return configuration_; }
+    [[nodiscard]] const GridConfiguration& configuration() const noexcept {
+        return configuration_;
+    }
 
-    [[nodiscard]] std::size_t size() const noexcept { return walkable_.size(); }
+    [[nodiscard]] std::size_t size() const noexcept {
+        return walkable_.size();
+    }
 
-    [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
+    [[nodiscard]] std::uint64_t revision() const noexcept {
+        return revision_;
+    }
 
     [[nodiscard]] std::optional<std::size_t> index(GridCell cell) const noexcept;
     [[nodiscard]] std::optional<GridCell> cell(std::size_t index) const noexcept;
@@ -45,11 +51,14 @@ public:
     [[nodiscard]] std::optional<glm::dvec3> cellCenter(GridCell cell) const noexcept;
     [[nodiscard]] GridNeighbors neighbors4(GridCell cell) const noexcept;
     [[nodiscard]] bool walkable(GridCell cell) const noexcept; // Out of bounds is non-walkable.
-    bool setWalkable(GridCell cell,
-                     bool value) noexcept; // True only when an in-bounds cell changed.
+
+    // True only when an in-bounds cell changed.
+    bool setWalkable(GridCell cell, bool value) noexcept;
+
 private:
     GridConfiguration configuration_{};
     std::vector<std::uint8_t> walkable_;
     std::uint64_t revision_ = 0;
 };
+
 } // namespace grimlock

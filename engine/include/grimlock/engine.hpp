@@ -1,4 +1,5 @@
 #pragma once
+
 #include "grimlock/camera.hpp"
 #include "grimlock/lighting.hpp"
 #include "grimlock/orbit_camera.hpp"
@@ -13,12 +14,15 @@
 #include <vector>
 
 namespace grimlock {
+
 class Scene;
 class RenderOverlay;
 
 namespace assets {
+
 struct ModelData;
 class ModelInstance;
+
 } // namespace assets
 
 struct EngineConfig {
@@ -36,7 +40,8 @@ public:
 private:
     friend class Engine;
 
-    explicit ModelId(std::size_t index) : index_(index) {}
+    explicit ModelId(std::size_t index) : index_(index) {
+    }
 
     std::size_t index_ = static_cast<std::size_t>(-1);
 };
@@ -49,7 +54,8 @@ public:
 private:
     friend class Engine;
 
-    explicit InstanceId(std::size_t index) : index_(index) {}
+    explicit InstanceId(std::size_t index) : index_(index) {
+    }
 
     std::size_t index_ = static_cast<std::size_t>(-1);
 };
@@ -79,24 +85,29 @@ public:
     [[nodiscard]] glm::mat4 transform(InstanceId instance) const;
     void setTint(InstanceId instance, const glm::vec4& color);
     void setMaterialOverride(InstanceId instance, std::optional<std::size_t> material);
+
     // Playback controls are CPU-only; update() advances every instance automatically.
     [[nodiscard]] assets::ModelInstance& animation(InstanceId instance);
     [[nodiscard]] Camera& camera() noexcept;
     [[nodiscard]] Lighting& lighting() noexcept;
+
     // File paths are executable-relative. Scene model paths are asset-root-relative.
     [[nodiscard]] std::unique_ptr<Scene> loadScene(const std::filesystem::path& path) const;
     void saveScene(const std::filesystem::path& path) const;
+
     // Validates/loads the candidate before replacing the active scene.
     void setScene(std::unique_ptr<Scene> scene);
     [[nodiscard]] Scene* scene() noexcept;
     [[nodiscard]] const Scene* scene() const noexcept;
     void unloadScene();
     [[nodiscard]] const std::filesystem::path& assetRoot() const noexcept;
+
     // Load/validate pending model changes before the next update; errors reach the caller.
     void prepareScene(Scene& scene);
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
     [[nodiscard]] const InputState& input() const noexcept;
+
     // Scene-only left-press picking. Disabling clears selection; navigation is independent.
     void setObjectSelectionEnabled(bool enabled = true);
     [[nodiscard]] bool objectSelectionEnabled() const noexcept;
@@ -106,6 +117,7 @@ public:
     [[nodiscard]] bool cameraNavigationEnabled() const noexcept;
     [[nodiscard]] const OrbitCameraConfig& cameraNavigationConfig() const noexcept;
     void configureCameraNavigation(const OrbitCameraConfig& config);
+
     // Polls events, advances animations/lights and renders. False only when closing;
     // a minimized window still updates, but rendering is deferred.
     [[nodiscard]] bool update();
@@ -114,4 +126,5 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+
 } // namespace grimlock

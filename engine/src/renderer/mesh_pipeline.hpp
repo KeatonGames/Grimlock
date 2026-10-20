@@ -30,8 +30,11 @@ static_assert(offsetof(DrawConstants, baseColor) == 112);
 
 class MeshPipeline final {
 public:
-    MeshPipeline(VkDevice device, VkFormat colorFormat, VkFormat depthFormat,
-                 VkDescriptorSetLayout cameraLayout, VkDescriptorSetLayout materialLayout,
+    MeshPipeline(VkDevice device,
+                 VkFormat colorFormat,
+                 VkFormat depthFormat,
+                 VkDescriptorSetLayout cameraLayout,
+                 VkDescriptorSetLayout materialLayout,
                  VkDescriptorSetLayout deformationLayout);
     ~MeshPipeline();
 
@@ -40,13 +43,16 @@ public:
 
     [[nodiscard]] VkPipeline handle(bool blend, bool doubleSided, bool mirrored) const noexcept;
 
-    [[nodiscard]] VkPipelineLayout layout() const noexcept { return layout_; }
+    [[nodiscard]] VkPipelineLayout layout() const noexcept {
+        return layout_;
+    }
 
 private:
     void destroy() noexcept;
 
     VkDevice device_ = VK_NULL_HANDLE;
     VkPipelineLayout layout_ = VK_NULL_HANDLE;
+
     // Fixed state variants, shared by all compatible materials and model instances.
     std::array<VkPipeline, 8> pipelines_{};
 };

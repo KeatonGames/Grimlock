@@ -1,7 +1,9 @@
 #pragma once
+
 #include <grimlock/engine.hpp>
 
 namespace grimlock::editor {
+
 // Editing commands operate on Engine's real Scene; no parallel object graph.
 class SceneDocument final {
 public:
@@ -11,6 +13,7 @@ public:
     void save(const std::filesystem::path& path);
     [[nodiscard]] ObjectId createGroup();
     [[nodiscard]] ObjectId groupObject(ObjectId object);
+
     // Editor moves preserve world space; Scene's lower-level API retains local TRS.
     void reparent(ObjectId object, std::optional<ObjectId> parent);
     [[nodiscard]] ObjectId addModel(const std::filesystem::path& model);
@@ -25,9 +28,13 @@ public:
     void observeCamera();
     void refreshModels();
 
-    [[nodiscard]] bool dirty() const noexcept { return dirty_; }
+    [[nodiscard]] bool dirty() const noexcept {
+        return dirty_;
+    }
 
-    [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
+    [[nodiscard]] const std::filesystem::path& path() const noexcept {
+        return path_;
+    }
 
     [[nodiscard]] const std::vector<std::filesystem::path>& models() const noexcept {
         return models_;
@@ -45,4 +52,5 @@ private:
     std::optional<Camera> camera_;
     bool dirty_ = false;
 };
+
 } // namespace grimlock::editor

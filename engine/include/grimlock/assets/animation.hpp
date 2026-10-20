@@ -1,9 +1,11 @@
 #pragma once
+
 #include "grimlock/assets/model_data.hpp"
 
 #include <memory>
 
 namespace grimlock::assets {
+
 struct ModelPose {
     std::vector<glm::mat4> local, world;
     std::vector<std::vector<float>> weights;
@@ -18,38 +20,66 @@ public:
     void play(std::size_t clip = 0, bool loop = true);
     void stop(bool restoreRestPose = true);
 
-    void pause() noexcept { paused_ = true; }
+    void pause() noexcept {
+        paused_ = true;
+    }
 
-    void resume() noexcept { paused_ = false; }
+    void resume() noexcept {
+        paused_ = false;
+    }
 
     void setSpeed(float speed);
 
-    void setLoop(bool loop) noexcept { loop_ = loop; }
+    void setLoop(bool loop) noexcept {
+        loop_ = loop;
+    }
 
     void seek(float seconds);
     void update(double deltaSeconds);
 
-    [[nodiscard]] bool playing() const noexcept { return playing_ && !paused_; }
+    [[nodiscard]] bool playing() const noexcept {
+        return playing_ && !paused_;
+    }
 
-    [[nodiscard]] float time() const noexcept { return time_; }
+    [[nodiscard]] float time() const noexcept {
+        return time_;
+    }
 
-    [[nodiscard]] std::size_t clip() const noexcept { return clip_; }
+    [[nodiscard]] std::size_t clip() const noexcept {
+        return clip_;
+    }
 
-    [[nodiscard]] float speed() const noexcept { return speed_; }
+    [[nodiscard]] float speed() const noexcept {
+        return speed_;
+    }
 
-    [[nodiscard]] bool looping() const noexcept { return loop_; }
+    [[nodiscard]] bool looping() const noexcept {
+        return loop_;
+    }
 
-    [[nodiscard]] bool paused() const noexcept { return paused_; }
+    [[nodiscard]] bool paused() const noexcept {
+        return paused_;
+    }
 
-    [[nodiscard]] bool running() const noexcept { return playing_; }
+    [[nodiscard]] bool running() const noexcept {
+        return playing_;
+    }
 
-    [[nodiscard]] bool restPose() const noexcept { return !animatedPose_; }
+    [[nodiscard]] bool restPose() const noexcept {
+        return !animatedPose_;
+    }
 
-    [[nodiscard]] const ModelPose& pose() const noexcept { return pose_; }
+    [[nodiscard]] const ModelPose& pose() const noexcept {
+        return pose_;
+    }
 
-    [[nodiscard]] const ModelData& model() const noexcept { return *model_; }
+    [[nodiscard]] const ModelData& model() const noexcept {
+        return *model_;
+    }
 
-    [[nodiscard]] const std::shared_ptr<const ModelData>& asset() const noexcept { return model_; }
+    [[nodiscard]] const std::shared_ptr<const ModelData>& asset() const noexcept {
+        return model_;
+    }
 
 private:
     void evaluate(bool animated);
@@ -64,4 +94,5 @@ private:
     bool playing_ = false, paused_ = false, loop_ = true;
     bool animatedPose_ = false;
 };
+
 } // namespace grimlock::assets

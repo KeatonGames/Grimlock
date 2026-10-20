@@ -1,11 +1,14 @@
 #pragma once
+
 // Opt-in native rendering bridge. Engine's normal public API has no SDL/Vulkan includes.
 #include <cstdint>
 #include <vulkan/vulkan.h>
+
 struct SDL_Window;
 union SDL_Event;
 
 namespace grimlock {
+
 struct Camera;
 
 struct OverlayTarget {
@@ -38,11 +41,13 @@ public:
     virtual void processEvent(const SDL_Event& event) = 0;
     virtual OverlayInput frame() = 0; // Polling is complete; mutations precede scene preparation.
 
+    // Final camera is available; finish world-space debug UI here.
     virtual void finishFrame(const Camera&) {
-    } // Final camera is available; finish world-space debug UI here.
+    }
 
-    virtual void render(VkCommandBuffer command) = 0; // After tone mapping, inside color rendering.
+    virtual void render(VkCommandBuffer command) = 0;            // After tone mapping, inside color rendering.
     virtual void targetChanged(const OverlayTarget& target) = 0; // Device is idle.
-    virtual bool requestClose() = 0; // False defers closing (e.g. unsaved document).
+    virtual bool requestClose() = 0;                             // False defers closing (e.g. unsaved document).
 };
+
 } // namespace grimlock

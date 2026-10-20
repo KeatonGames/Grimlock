@@ -1,4 +1,5 @@
 #pragma once
+
 #include "grimlock/assets/animation.hpp"
 #include "grimlock/camera.hpp"
 #include "grimlock/grid.hpp"
@@ -17,16 +18,15 @@
 #include <vector>
 
 namespace grimlock {
-using ObjectId =
-    std::uint64_t; // Nonzero, never reused within a Scene; serialized as decimal strings.
+
+using ObjectId = std::uint64_t; // Nonzero, never reused within a Scene; serialized as decimal strings.
 
 // Live playback snapshot / legacy initial-state input. Scene saves authored configuration instead.
 struct AnimationSettings {
     std::size_t clip = 0;
     float time = 0, speed = 1;
     bool loop = true, playing = true, paused = false, restPose = false;
-    std::optional<std::string>
-        clipName; // Legacy initial-state records may still address clips by index.
+    std::optional<std::string> clipName; // Legacy initial-state records may still address clips by index.
 };
 
 // Authored configuration, separate from the advancing per-instance playback state.
@@ -34,8 +34,7 @@ struct AnimationConfiguration {
     std::size_t clip = 0;
     bool autoplay = false, loop = true;
     float speed = 1;
-    std::optional<std::string>
-        clipName; // When supplied, a unique imported name takes precedence over clip.
+    std::optional<std::string> clipName; // When supplied, a unique imported name takes precedence over clip.
 };
 
 struct SceneObject {
@@ -78,13 +77,17 @@ public:
     Scene(const Scene&) = delete;
     Scene& operator=(const Scene&) = delete;
 
-    [[nodiscard]] const std::string& name() const noexcept { return name_; }
+    [[nodiscard]] const std::string& name() const noexcept {
+        return name_;
+    }
 
     void setName(std::string name);
     [[nodiscard]] ObjectId createObject(std::string name = {}, std::optional<ObjectId> parent = {});
     void removeObject(ObjectId id);
 
-    [[nodiscard]] bool contains(ObjectId id) const noexcept { return objects_.contains(id); }
+    [[nodiscard]] bool contains(ObjectId id) const noexcept {
+        return objects_.contains(id);
+    }
 
     [[nodiscard]] const SceneObject& object(ObjectId id) const;
 
@@ -101,6 +104,7 @@ public:
     void setParent(ObjectId id, std::optional<ObjectId> parent);
     void setEnabled(ObjectId id, bool enabled);
     void setSelectable(ObjectId id, bool selectable);
+
     // Including inactive/empty objects is useful for tools; mouse picking keeps the default policy.
     void selectObject(std::optional<ObjectId> id, bool includeInactive = false);
     [[nodiscard]] std::optional<ObjectId> selectedObject() const;
@@ -113,17 +117,20 @@ public:
     void setModel(ObjectId id, std::optional<std::filesystem::path> model);
     void setTint(ObjectId id, const glm::vec4& tint);
     void setMaterialOverride(ObjectId id, std::optional<std::size_t> material);
+
     // Legacy initial-state input, also usable before model binding; retained for existing
     // scenes/code.
     void setAnimation(ObjectId id, std::optional<AnimationSettings> settings);
     [[nodiscard]] assets::ModelInstance& animation(ObjectId id);
-    [[nodiscard]] AnimationSettings
-    animationSettings(ObjectId id) const; // Current playback, not saved configuration.
+    [[nodiscard]] AnimationSettings animationSettings(ObjectId id) const; // Current playback, not saved configuration.
+
     // Read-only shared clips. The span remains valid while this object's model is bound.
     [[nodiscard]] std::span<const assets::AnimationData> availableAnimations(ObjectId id) const;
+
     // A missing named clip resolves to clip == availableAnimations(id).size(); it stays at rest.
     [[nodiscard]] AnimationConfiguration animationConfiguration(ObjectId id) const;
     void setAnimationConfiguration(ObjectId id, AnimationConfiguration configuration);
+
     // Runtime/preview controls never change authored configuration. play restarts; resume retains
     // time.
     void playAnimation(ObjectId id, std::size_t clip, bool loop = true);
@@ -142,14 +149,19 @@ public:
         return cameras_;
     }
 
-    [[nodiscard]] const std::string& activeCamera() const noexcept { return activeCamera_; }
+    [[nodiscard]] const std::string& activeCamera() const noexcept {
+        return activeCamera_;
+    }
 
     [[nodiscard]] Camera resolvedCamera() const;
+
     // Writes a world-space view into the selected camera, retaining its attachment.
     void setResolvedCamera(const Camera& camera);
     void setLighting(const SceneLighting& lighting);
 
-    [[nodiscard]] const SceneLighting& lighting() const noexcept { return lighting_; }
+    [[nodiscard]] const SceneLighting& lighting() const noexcept {
+        return lighting_;
+    }
 
     [[nodiscard]] Lighting resolvedLighting() const;
 
@@ -163,6 +175,7 @@ public:
     }
 
     void setNavigationGrid(std::optional<GridConfiguration> configuration);
+
     // Native filesystem paths; Engine's wrappers add executable-relative resolution.
     [[nodiscard]] static std::unique_ptr<Scene> load(const std::filesystem::path& path);
     void save(const std::filesystem::path& path) const;
@@ -185,4 +198,5 @@ private:
     bool selectionIncludesInactive_ = false;
     mutable std::vector<ObjectId> scratch_;
 };
+
 } // namespace grimlock

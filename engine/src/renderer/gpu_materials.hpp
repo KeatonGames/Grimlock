@@ -37,14 +37,18 @@ static_assert(offsetof(MaterialUniforms, coordinates) == 96);
 // instances reference these sets; no descriptor updates occur during drawing.
 class GpuMaterials final {
 public:
-    GpuMaterials(const VulkanContext& context, VkCommandPool uploadPool,
-                 VkDescriptorSetLayout layout, const Texture& white,
+    GpuMaterials(const VulkanContext& context,
+                 VkCommandPool uploadPool,
+                 VkDescriptorSetLayout layout,
+                 const Texture& white,
                  const assets::ModelData& model);
     ~GpuMaterials();
     GpuMaterials(const GpuMaterials&) = delete;
     GpuMaterials& operator=(const GpuMaterials&) = delete;
 
-    [[nodiscard]] const MaterialBinding& at(std::size_t index) const { return bindings_.at(index); }
+    [[nodiscard]] const MaterialBinding& at(std::size_t index) const {
+        return bindings_.at(index);
+    }
 
 private:
     void destroy() noexcept;

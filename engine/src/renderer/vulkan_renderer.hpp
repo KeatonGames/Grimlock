@@ -27,17 +27,15 @@ namespace grimlock::renderer {
 struct ModelDraw {
     std::size_t model = 0;
     glm::mat4 transform{1.0F};
-    glm::vec4 baseColor{1.0F}; // Optional linear-space instance tint, neutral by default.
+    glm::vec4 baseColor{1.0F};                   // Optional linear-space instance tint, neutral by default.
     std::optional<std::size_t> materialOverride; // Share geometry in the PBR comparison scene.
-    const assets::ModelPose* pose =
-        nullptr; // Instance-owned; immutable for the duration of drawFrame.
+    const assets::ModelPose* pose = nullptr;     // Instance-owned; immutable for the duration of drawFrame.
     bool selected = false;
 };
 
 class VulkanRenderer final {
 public:
-    explicit VulkanRenderer(SDL_Window* window,
-                            const assets::EnvironmentCube* environment = nullptr);
+    explicit VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube* environment = nullptr);
     ~VulkanRenderer();
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
@@ -45,8 +43,7 @@ public:
     // Internal IDs remain valid until releaseModels; freed slots may be reused.
     [[nodiscard]] std::size_t uploadModel(const assets::ModelData& model);
     void releaseModels(std::span<const std::size_t> models) noexcept;
-    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws,
-                                 const Lighting& lighting = {});
+    [[nodiscard]] bool drawFrame(const Camera& camera, std::span<const ModelDraw> draws, const Lighting& lighting = {});
     void requestSwapchainRecreation() noexcept;
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
@@ -60,13 +57,10 @@ private:
     [[nodiscard]] bool createSwapchain();
     void createImageViews();
     void allocateCommandBuffers();
-    void recordFrame(std::uint32_t imageIndex, const Camera& camera,
-                     std::span<const ModelDraw> draws, float exposure);
+    void recordFrame(std::uint32_t imageIndex, const Camera& camera, std::span<const ModelDraw> draws, float exposure);
     [[nodiscard]] bool recreateSwapchain();
-    [[nodiscard]] VkSurfaceFormatKHR
-    chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
-    [[nodiscard]] VkExtent2D
-    chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+    [[nodiscard]] VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
+    [[nodiscard]] VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
     [[nodiscard]] bool hasDrawableExtent() const;
     void destroySwapchainResources() noexcept;
     void destroy() noexcept;
@@ -114,6 +108,7 @@ private:
     std::vector<VkImage> swapchainImages_;
     std::vector<VkImageView> swapchainImageViews_;
     VkFormat depthFormat_ = VK_FORMAT_UNDEFINED;
+
     // One depth target and camera buffer suffice while there is one frame in flight.
     std::optional<DepthTarget> depth_;
     std::vector<VkCommandBuffer> commandBuffers_;

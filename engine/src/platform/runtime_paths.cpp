@@ -14,10 +14,13 @@ std::filesystem::path runtimePath(const std::filesystem::path& relative) {
     if (relative.is_absolute()) {
         return relative;
     }
+
     const char* base = SDL_GetBasePath();
+
     if (base == nullptr) {
         throw std::runtime_error(std::string{"SDL_GetBasePath failed: "} + SDL_GetError());
     }
+
     return utf8Path(base) / relative;
 }
 
