@@ -18,7 +18,7 @@ struct alignas(16) MaterialUniforms {
     glm::vec4 baseColor{1.0F};
     glm::vec4 emissiveRoughness{};
     glm::vec4 factors{}; // metallic, normal scale, occlusion strength, alpha cutoff
-    glm::vec4 state{};   // alpha mode, double-sided
+    glm::vec4 state{};   // alpha mode, double-sided, unlit, clearcoat normal scale
     glm::vec4 specularColorIor{1, 1, 1, 1.5F};
     glm::vec4 extensions{}; // clearcoat, coat roughness, specular weight, emissive strength
 

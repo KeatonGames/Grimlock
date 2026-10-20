@@ -985,224 +985,243 @@ void Editor::performance() {
 
 void Editor::dialogs() {
     gridTools_.dialog(document_);
+    deleteDialog();
+    sceneFileDialog();
+    unsavedChangesDialog();
+    errorDialog();
+}
 
+void Editor::deleteDialog() {
     if (openDelete_) {
         ImGui::OpenPopup("Delete from Scene");
         openDelete_ = false;
     }
 
-    if (ImGui::BeginPopupModal("Delete from Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        auto& scene = *engine_.scene();
-
-        if (!deleteObject_ || !scene.contains(*deleteObject_)) {
-            deleteObject_.reset();
-            ImGui::CloseCurrentPopup();
-        } else {
-            const auto id = *deleteObject_;
-            const auto& object = scene.object(id);
-            std::vector<ObjectId> descendants{id};
-
-            for (std::size_t index = 0; index < descendants.size(); ++index) {
-                const auto children = scene.children(descendants[index]);
-                descendants.insert(descendants.end(), children.begin(), children.end());
-            }
-
-            ImGui::Text("Delete '%s'?", object.name.c_str());
-
-            if (descendants.size() > 1) {
-                ImGui::Text("This also deletes all %zu descendant objects.", descendants.size() - 1);
-            } else {
-                ImGui::TextUnformatted("This removes the object from the scene.");
-            }
-
-            ImGui::TextUnformatted("Move children to Scene Root first if you want to keep them.");
-            ImGui::Spacing();
-
-            if (ImGui::Button("Delete")) {
-                attempt([&] {
-                    document_.remove(id);
-                });
-                deleteObject_.reset();
-                ImGui::CloseCurrentPopup();
-            }
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Cancel")) {
-                deleteObject_.reset();
-                ImGui::CloseCurrentPopup();
-            }
-        }
-
-        ImGui::EndPopup();
+    if (!ImGui::BeginPopupModal("Delete from Scene", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
     }
 
+    auto& scene = *engine_.scene();
+
+    if (!deleteObject_ || !scene.contains(*deleteObject_)) {
+        deleteObject_.reset();
+        ImGui::CloseCurrentPopup();
+    } else {
+        const auto id = *deleteObject_;
+        const auto& object = scene.object(id);
+        std::vector<ObjectId> descendants{id};
+
+        for (std::size_t index = 0; index < descendants.size(); ++index) {
+            const auto children = scene.children(descendants[index]);
+            descendants.insert(descendants.end(), children.begin(), children.end());
+        }
+
+        ImGui::Text("Delete '%s'?", object.name.c_str());
+
+        if (descendants.size() > 1) {
+            ImGui::Text("This also deletes all %zu descendant objects.", descendants.size() - 1);
+        } else {
+            ImGui::TextUnformatted("This removes the object from the scene.");
+        }
+
+        ImGui::TextUnformatted("Move children to Scene Root first if you want to keep them.");
+        ImGui::Spacing();
+
+        if (ImGui::Button("Delete")) {
+            attempt([&] {
+                document_.remove(id);
+            });
+            deleteObject_.reset();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel")) {
+            deleteObject_.reset();
+            ImGui::CloseCurrentPopup();
+        }
+    }
+
+    ImGui::EndPopup();
+}
+
+void Editor::sceneFileList() {
+    std::error_code error;
+    const auto folder = engine_.assetRoot() / "scenes";
+
+    if (!std::filesystem::is_directory(folder, error) || !ImGui::BeginListBox("Scenes", {580, 120})) {
+        return;
+    }
+
+    for (std::filesystem::directory_iterator
+             item{folder, std::filesystem::directory_options::skip_permission_denied, error},
+         end;
+         item != end;
+         item.increment(error)) {
+        if (error) {
+            break;
+        }
+
+        if (!item->is_regular_file(error) || item->path().extension() != ".json") {
+            continue;
+        }
+
+        const auto label = text(item->path().filename());
+
+        if (ImGui::Selectable(label.c_str())) {
+            filePath_ = text(item->path());
+        }
+    }
+
+    if (error) {
+        ImGui::TextWrapped("Cannot list scenes: %s", error.message().c_str());
+    }
+
+    ImGui::EndListBox();
+}
+
+bool Editor::saveSceneFromDialog(const std::filesystem::path& filename) {
+    bool saved = false;
+    attempt([&] {
+        document_.save(filename);
+        saved = true;
+    });
+
+    if (!saved) {
+        dialogError_ = error_;
+        openError_ = false;
+    }
+
+    return saved;
+}
+
+void Editor::sceneFileDialog() {
     if (openFilePopup_) {
         ImGui::OpenPopup("Scene File");
         openFilePopup_ = false;
     }
 
-    if (ImGui::BeginPopupModal("Scene File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted(fileMode_ == FileMode::open ? "Open a JSON scene" : "Save scene as JSON");
-        ImGui::SetNextItemWidth(580);
-        ImGui::InputText("Path", &filePath_);
-        ImGui::TextWrapped("Enter an absolute path, or an executable-relative path. Existing files "
-                           "can be overwritten.");
-        ImGui::TextWrapped("Builds restage runtime assets. Use Save As to choose your authored "
-                           "source scene when keeping edits across builds.");
-        if (!dialogError_.empty()) {
-            ImGui::PushTextWrapPos(580);
-            ImGui::TextUnformatted(dialogError_.c_str());
-            ImGui::PopTextWrapPos();
-        }
+    if (!ImGui::BeginPopupModal("Scene File", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
+    }
+
+    ImGui::TextUnformatted(fileMode_ == FileMode::open ? "Open a JSON scene" : "Save scene as JSON");
+    ImGui::SetNextItemWidth(580);
+    ImGui::InputText("Path", &filePath_);
+    ImGui::TextWrapped("Enter an absolute path, or an executable-relative path. Existing files "
+                       "can be overwritten.");
+    ImGui::TextWrapped("Builds restage runtime assets. Use Save As to choose your authored "
+                       "source scene when keeping edits across builds.");
+    if (!dialogError_.empty()) {
+        ImGui::PushTextWrapPos(580);
+        ImGui::TextUnformatted(dialogError_.c_str());
+        ImGui::PopTextWrapPos();
+    }
+
+    if (fileMode_ == FileMode::open) {
+        sceneFileList();
+    }
+
+    if (ImGui::Button(fileMode_ == FileMode::open ? "Open" : "Save")) {
+        const auto selectedPath = path(filePath_);
 
         if (fileMode_ == FileMode::open) {
-            std::error_code error;
-            const auto folder = engine_.assetRoot() / "scenes";
-
-            if (std::filesystem::is_directory(folder, error) && ImGui::BeginListBox("Scenes", {580, 120})) {
-                for (std::filesystem::directory_iterator
-                         item{folder, std::filesystem::directory_options::skip_permission_denied, error},
-                     end;
-                     item != end;
-                     item.increment(error)) {
-                    if (error) {
-                        break;
-                    }
-
-                    if (item->is_regular_file(error) && item->path().extension() == ".json") {
-                        const auto label = text(item->path().filename());
-
-                        if (ImGui::Selectable(label.c_str())) {
-                            filePath_ = text(item->path());
-                        }
-                    }
-                }
-
-                if (error) {
-                    ImGui::TextWrapped("Cannot list scenes: %s", error.message().c_str());
-                }
-
-                ImGui::EndListBox();
-            }
-        }
-
-        if (ImGui::Button(fileMode_ == FileMode::open ? "Open" : "Save")) {
-            const auto selectedPath = path(filePath_);
-
-            if (fileMode_ == FileMode::open) {
-                ImGui::CloseCurrentPopup();
-                fileMode_ = FileMode::none;
-                request(Operation::open, selectedPath);
-            } else {
-                bool saved = false;
-                attempt([&] {
-                    document_.save(selectedPath);
-                    saved = true;
-                });
-
-                if (!saved) {
-                    dialogError_ = error_;
-                    openError_ = false;
-                }
-
-                if (saved) {
-                    ImGui::CloseCurrentPopup();
-                    fileMode_ = FileMode::none;
-
-                    if (resumeAfterSave_) {
-                        resumeAfterSave_ = false;
-                        executePending();
-                    }
-                }
-            }
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+            fileMode_ = FileMode::none;
+            request(Operation::open, selectedPath);
+        } else if (saveSceneFromDialog(selectedPath)) {
             ImGui::CloseCurrentPopup();
             fileMode_ = FileMode::none;
 
             if (resumeAfterSave_) {
                 resumeAfterSave_ = false;
-                pending_ = Operation::none;
+                executePending();
             }
         }
-
-        ImGui::EndPopup();
     }
 
+    ImGui::SameLine();
+
+    if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
+        fileMode_ = FileMode::none;
+
+        if (resumeAfterSave_) {
+            resumeAfterSave_ = false;
+            pending_ = Operation::none;
+        }
+    }
+
+    ImGui::EndPopup();
+}
+
+void Editor::unsavedChangesDialog() {
     if (confirm_) {
         ImGui::OpenPopup("Unsaved Changes");
         confirm_ = false;
     }
 
-    if (ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Save scene changes before continuing?");
+    if (!ImGui::BeginPopupModal("Unsaved Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
+    }
 
-        if (!dialogError_.empty()) {
-            ImGui::PushTextWrapPos(580);
-            ImGui::TextUnformatted(dialogError_.c_str());
-            ImGui::PopTextWrapPos();
-        }
+    ImGui::TextUnformatted("Save scene changes before continuing?");
 
-        if (ImGui::Button("Save and Continue")) {
-            if (document_.path().empty()) {
-                resumeAfterSave_ = true;
-                ImGui::CloseCurrentPopup();
-                fileDialog(FileMode::save);
-            } else {
-                bool saved = false;
-                attempt([&] {
-                    document_.save(document_.path());
-                    saved = true;
-                });
+    if (!dialogError_.empty()) {
+        ImGui::PushTextWrapPos(580);
+        ImGui::TextUnformatted(dialogError_.c_str());
+        ImGui::PopTextWrapPos();
+    }
 
-                if (saved) {
-                    ImGui::CloseCurrentPopup();
-                    executePending();
-                } else {
-                    dialogError_ = error_;
-                    openError_ = false;
-                }
-            }
-        }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Discard")) {
+    if (ImGui::Button("Save and Continue")) {
+        if (document_.path().empty()) {
+            resumeAfterSave_ = true;
+            ImGui::CloseCurrentPopup();
+            fileDialog(FileMode::save);
+        } else if (saveSceneFromDialog(document_.path())) {
             ImGui::CloseCurrentPopup();
             executePending();
         }
-
-        ImGui::SameLine();
-
-        if (ImGui::Button("Cancel")) {
-            ImGui::CloseCurrentPopup();
-            pending_ = Operation::none;
-            pendingPath_.clear();
-        }
-
-        ImGui::EndPopup();
     }
 
+    ImGui::SameLine();
+
+    if (ImGui::Button("Discard")) {
+        ImGui::CloseCurrentPopup();
+        executePending();
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
+        pending_ = Operation::none;
+        pendingPath_.clear();
+    }
+
+    ImGui::EndPopup();
+}
+
+void Editor::errorDialog() {
     if (openError_) {
         ImGui::OpenPopup("Editor Error");
         openError_ = false;
     }
 
-    if (ImGui::BeginPopupModal("Editor Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::PushTextWrapPos(600);
-        ImGui::TextUnformatted(error_.c_str());
-        ImGui::PopTextWrapPos();
-
-        if (ImGui::Button("OK")) {
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
+    if (!ImGui::BeginPopupModal("Editor Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        return;
     }
+
+    ImGui::PushTextWrapPos(600);
+    ImGui::TextUnformatted(error_.c_str());
+    ImGui::PopTextWrapPos();
+
+    if (ImGui::Button("OK")) {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
 }
 
 OverlayInput Editor::frame() {

@@ -169,6 +169,150 @@ glm::vec2 project(const Camera& camera, SDL_Window* window, glm::dvec3 world) {
     return glm::vec2{(glm::dvec2{clip} / clip.w + 1.0) * 0.5 * glm::dvec2{logical}};
 }
 
+void fileMenu(Engine& engine, SDL_WindowID windowId, const char* label) {
+    click(engine, windowId, {18, 11});
+    const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+    require(!popups.empty() && popups.back().Window, "File menu missing");
+    const auto* popup = popups.back().Window;
+    const auto widget = ImHashStr(label, 0, popup->ID);
+    for (float y = popup->DC.CursorStartPos.y + 4; y < popup->ClipRect.Max.y; y += 4) {
+        const glm::vec2 point{popup->DC.CursorStartPos.x + 50, y};
+        motion(engine, windowId, point);
+        if (ImGui::GetHoveredID() == widget) {
+            click(engine, windowId, point);
+            return;
+        }
+    }
+    throw std::runtime_error(std::string{"File menu item missing: "} + label);
+}
+
+bool popupOpen(const char* name) {
+    const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+    if (!name) {
+        return !popups.empty();
+    }
+    return std::any_of(popups.begin(), popups.end(), [name](const auto& popup) {
+        return popup.Window && std::string_view{popup.Window->Name} == name;
+    });
+}
+
+void popupButton(Engine& engine, SDL_WindowID windowId, const char* label) {
+    const auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
+    require(!popups.empty() && popups.back().Window, "dialog missing");
+    const auto* popup = popups.back().Window;
+    const auto widget = ImHashStr(label, 0, popup->ID);
+    const auto y = popup->DC.CursorPosPrevLine.y + ImGui::GetFrameHeight() * 0.5F;
+    for (float x = popup->DC.CursorStartPos.x + 4; x < popup->ClipRect.Max.x; x += 4) {
+        const glm::vec2 point{x, y};
+        motion(engine, windowId, point);
+        if (ImGui::GetHoveredID() == widget) {
+            click(engine, windowId, point);
+            return;
+        }
+    }
+    throw std::runtime_error(std::string{"Dialog button missing: "} + label);
+}
+
+void sceneFilePath(Engine& engine, const std::filesystem::path& filename) {
+    require(popupOpen("Scene File"), "scene-file dialog missing");
+    const auto* popup = ImGui::FindWindowByName("Scene File");
+    const auto widget = ImHashStr("Path", 0, popup->ID);
+    ImGui::ActivateItemByID(widget);
+    ImGui::GetCurrentContext()->NavNextActivateFlags = ImGuiActivateFlags_PreferInput;
+    tick(engine);
+    require(ImGui::GetActiveID() == widget, "scene path did not activate");
+    auto& io = ImGui::GetIO();
+    io.AddKeyEvent(ImGuiMod_Ctrl, true);
+    io.AddKeyEvent(ImGuiKey_A, true);
+    tick(engine);
+    io.AddKeyEvent(ImGuiKey_A, false);
+    io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    tick(engine);
+    const auto encoded = filename.generic_u8string();
+    io.AddInputCharactersUTF8(reinterpret_cast<const char*>(encoded.c_str()));
+    tick(engine);
+    io.AddKeyEvent(ImGuiKey_Enter, true);
+    tick(engine);
+    io.AddKeyEvent(ImGuiKey_Enter, false);
+    tick(engine);
+}
+
+void checkDialogs(Engine& engine, const std::filesystem::path& output) {
+    editor::Editor editor{engine};
+    auto& document = editor.document();
+    document.newScene();
+    const auto original = document.createGroup();
+    document.rename(original, "Saved through dialog");
+    tick(engine);
+    int count = 0;
+    auto windows = SDL_GetWindows(&count);
+    require(windows && count == 1, "expected dialog test window");
+    const auto id = SDL_GetWindowID(windows[0]);
+    SDL_free(windows);
+
+    fileMenu(engine, id, "New Scene");
+    require(popupOpen("Unsaved Changes"), "New Scene skipped dirty confirmation");
+    popupButton(engine, id, "Cancel");
+    require(document.dirty() && engine.scene()->contains(original) && !popupOpen(nullptr),
+            "unsaved Cancel changed the document");
+
+    fileMenu(engine, id, "New Scene");
+    popupButton(engine, id, "Save and Continue");
+    sceneFilePath(engine, output / "invalid.txt");
+    popupButton(engine, id, "Save");
+    require(popupOpen("Scene File") && !popupOpen("Editor Error") && document.dirty() && document.path().empty() &&
+                engine.scene()->contains(original),
+            "failed Save As lost the pending document or opened an error modal");
+    popupButton(engine, id, "Cancel");
+    require(!popupOpen(nullptr) && document.dirty() && engine.scene()->contains(original),
+            "Save As Cancel resumed the pending operation");
+
+    fileMenu(engine, id, "New Scene");
+    require(popupOpen("Unsaved Changes"), "Save As Cancel retained a pending operation");
+    popupButton(engine, id, "Save and Continue");
+    const auto savedPath = output / "dialog-saved.json";
+    sceneFilePath(engine, savedPath);
+    popupButton(engine, id, "Save");
+    require(!popupOpen(nullptr) && !document.dirty() && document.path().empty() && engine.scene()->objects().empty(),
+            "successful Save As did not resume New Scene");
+    require(Scene::load(savedPath)->object(original).name == "Saved through dialog",
+            "Save As continuation lost the original edits");
+
+    const auto current = document.createGroup();
+    document.rename(current, "Keep until discard");
+    tick(engine);
+    fileMenu(engine, id, "Save Scene As...");
+    popupButton(engine, id, "Cancel");
+    require(document.dirty() && engine.scene()->object(current).name == "Keep until discard",
+            "ordinary Save As Cancel changed the document");
+
+    fileMenu(engine, id, "Open Scene...");
+    sceneFilePath(engine, savedPath);
+    popupButton(engine, id, "Open");
+    require(popupOpen("Unsaved Changes"), "Open Scene skipped dirty confirmation");
+    popupButton(engine, id, "Cancel");
+    require(document.dirty() && document.path().empty() && engine.scene()->object(current).name == "Keep until discard",
+            "Open Scene Cancel changed the document");
+
+    fileMenu(engine, id, "Open Scene...");
+    sceneFilePath(engine, savedPath);
+    popupButton(engine, id, "Open");
+    popupButton(engine, id, "Discard");
+    require(!popupOpen(nullptr) && !document.dirty() && document.path() == savedPath &&
+                engine.scene()->object(original).name == "Saved through dialog",
+            "Discard lost the pending open path or did not replace the document");
+
+    auto* previous = engine.scene();
+    fileMenu(engine, id, "Open Scene...");
+    sceneFilePath(engine, output / "missing-dialog-scene.json");
+    popupButton(engine, id, "Open");
+    require(popupOpen("Editor Error") && engine.scene() == previous && document.path() == savedPath &&
+                !document.dirty(),
+            "failed Open Scene changed the document or lost its error modal");
+    popupButton(engine, id, "OK");
+    require(!popupOpen(nullptr), "error dialog did not close");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -895,6 +1039,9 @@ int main(int argc, char** argv) {
         }
 
         require(ImGui::GetCurrentContext() == nullptr, "grid editor context leaked");
+
+        checkDialogs(engine, output);
+        require(ImGui::GetCurrentContext() == nullptr, "dialog editor context leaked");
 
         {
             editor::Editor editor{engine, output / "saved.json"};

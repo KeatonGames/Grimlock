@@ -21,6 +21,21 @@ bool sameCamera(const Camera& a, const Camera& b) {
            a.verticalFovDegrees == b.verticalFovDegrees && a.nearPlane == b.nearPlane && a.farPlane == b.farPlane;
 }
 
+bool preservesTransform(const glm::dmat4& actual, const glm::dmat4& expected) {
+    for (int column = 0; column < 4; ++column) {
+        const auto difference = glm::abs(actual[column] - expected[column]);
+        const double tolerance = 2e-5 * std::max(1.0, glm::length(expected[column]));
+
+        for (int row = 0; row < 4; ++row) {
+            if (!std::isfinite(actual[column][row]) || difference[row] > tolerance) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 Transform localTransform(const glm::dmat4& matrix) {
     Transform result;
     result.position = glm::vec3{matrix[3]};
@@ -53,15 +68,8 @@ Transform localTransform(const glm::dmat4& matrix) {
     result.rotation = glm::normalize(glm::quat{glm::quat_cast(basis)});
     const glm::dmat4 rebuilt{result.matrix()};
 
-    for (int column = 0; column < 4; ++column) {
-        const auto difference = glm::abs(rebuilt[column] - matrix[column]);
-        const double tolerance = 2e-5 * std::max(1.0, glm::length(matrix[column]));
-
-        for (int row = 0; row < 4; ++row) {
-            if (!std::isfinite(rebuilt[column][row]) || difference[row] > tolerance) {
-                throw std::invalid_argument("Cannot preserve this object's transform accurately. Nothing was moved.");
-            }
-        }
+    if (!preservesTransform(rebuilt, matrix)) {
+        throw std::invalid_argument("Cannot preserve this object's transform accurately. Nothing was moved.");
     }
 
     return result;
@@ -186,15 +194,8 @@ void SceneDocument::reparent(ObjectId id, std::optional<ObjectId> parent) {
     // Check float composition too: large parent translations/scales can amplify rounding.
     const glm::dmat4 composed{glm::mat4{parentWorld} * local.matrix()};
 
-    for (int column = 0; column < 4; ++column) {
-        const auto difference = glm::abs(composed[column] - world[column]);
-        const double tolerance = 2e-5 * std::max(1.0, glm::length(world[column]));
-
-        for (int row = 0; row < 4; ++row) {
-            if (!std::isfinite(composed[column][row]) || difference[row] > tolerance) {
-                throw std::invalid_argument("This move would lose world-transform precision. Nothing was moved.");
-            }
-        }
+    if (!preservesTransform(composed, world)) {
+        throw std::invalid_argument("This move would lose world-transform precision. Nothing was moved.");
     }
 
     try {

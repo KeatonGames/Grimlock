@@ -83,6 +83,11 @@ public:
 
 private:
     void evaluate(bool animated);
+    void resetPoseChannels();
+    void applyAnimationChannel(const AnimationChannel& channel, const AnimationSampler& sampler);
+    void updateNodeTransforms();
+    void updateSkinMatrices();
+
     std::shared_ptr<const ModelData> model_;
     ModelPose pose_;
     std::vector<std::size_t> order_;

@@ -3,6 +3,7 @@
 #include "core/startup_profile.hpp"
 #include "renderer/vulkan_helpers.hpp"
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 

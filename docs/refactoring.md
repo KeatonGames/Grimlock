@@ -10,9 +10,9 @@ function size alone is not a refactoring target.
 | 2 | glTF model assembly | Separate parsing/validation, nodes, meshes, and hierarchy checks in `loadGltf`; keep storage validation ordering. | Complete |
 | 3 | glTF animation and material import | Separate skin/light/clip conversion and sampler decoding, then material conversion and referenced-image loading in separate iterations. | Complete |
 | 4 | Vulkan frame recording | Separate draw preparation, ordering, and command recording in `VulkanRenderer::recordFrame`; preserve barriers and resource lifetimes. | Complete |
-| 5 | Editor dialogs | Separate delete, file, unsaved-change, and error popups in `Editor::dialogs`; preserve pending-operation state. | Pending |
-| 6 | Animation evaluation | Separate sampling, local/world pose updates, and skin matrices in `ModelInstance::evaluate`; preserve math and allocations. | Pending |
-| 7 | Scene serialization and Engine coordination | Review `Scene::load`/`save` and Engine frame/resource preparation in separate iterations. | Pending |
+| 5 | Editor dialogs | Separate delete, file, unsaved-change, and error popups in `Editor::dialogs`; preserve pending-operation state. | Complete |
+| 6 | Animation evaluation | Separate sampling, local/world pose updates, and skin matrices in `ModelInstance::evaluate`; preserve math and allocations. | Complete |
+| 7 | Scene serialization and Engine coordination | Separate scene JSON conversion and Engine resource/frame preparation; preserve validation, activation, and cleanup order. | Complete |
 
 Other reviewed areas include picking, grid tools, OBJ/image loading, environment
 preprocessing, input, cameras, Vulkan resource setup (including `MeshPipeline`),
@@ -21,6 +21,10 @@ reassess them after the higher-priority work rather than refactoring by size.
 
 Refactor one module per explicit request, then build, verify, record progress,
 and stop. Preserve completed iterations and existing work.
+
+The final request completed Scene and Engine work together, followed by a review
+of all 96 project-owned C++ files. All planned modules are complete. The records
+below retain each iteration's scope and verification results.
 
 ## Iteration 1: glTF primitive conversion
 
@@ -168,3 +172,124 @@ and stop. Preserve completed iterations and existing work.
   Test registration and this progress record accompany the new runtime check.
 - Next requested iteration: Editor dialogs (`Editor::dialogs`). Stop here until
   explicitly requested to continue.
+
+## Iteration 6: Editor dialogs
+
+- Completed: `Editor::dialogs` coordinates private `deleteDialog`,
+  `sceneFileDialog`, `unsavedChangesDialog`, and `errorDialog` helpers after the
+  existing grid dialog. `sceneFileList` handles browsing separately, and
+  `saveSceneFromDialog` shares save-result and inline-error handling.
+- Guard clauses flatten closed-popup handling and scene-file filtering. Sharing
+  save handling removes duplicated callbacks and simplifies continuation branches.
+  ImGui popup/list-box begin/end calls remain balanced; widget IDs, labels, layout,
+  and popup processing order are unchanged.
+- Preserved pending operations/paths, deferred Save As continuation, distinct
+  cancellation state changes, inline errors, deletion, and cleanup. Existing
+  request/execution, document commands, frame handling, public APIs, and stored
+  state are unchanged; no new UI or abstractions were added.
+- Extended `Editor.Runtime` through actual menu, modal, and text-input interactions
+  for dirty New/Open cancellation, failed Save As, cancellation of a deferred save,
+  successful Save As followed by New Scene, pending Open/Discard paths, failed Open
+  preserving the active document, and error dismissal. Existing deletion and close
+  checks remain intact. The expanded check passed against the original code before
+  extraction and the refactored implementation afterward.
+- Verification succeeded: complete Debug and Release builds with Editor and tests
+  enabled; all 15 CTest checks passed in each configuration with Vulkan core and
+  synchronization validation enabled. Captured logs contain no Vulkan validation
+  errors. clang-format verification and `git diff --check` passed. No dependencies,
+  CMake changes, or additional external setup were needed.
+- Scope review: production edits are confined to dialog rendering and private
+  helpers in `editor.cpp`/`editor.hpp`; the existing Editor runtime check and this
+  progress record accompany them. Source/hash comparison confirms other Editor
+  methods and earlier modules are unchanged.
+- Next requested iteration: animation evaluation (`ModelInstance::evaluate`). Stop
+  here until explicitly requested to continue.
+
+## Iteration 7: animation evaluation
+
+- Completed: `ModelInstance::evaluate` coordinates private `resetPoseChannels`,
+  `applyAnimationChannel`, `updateNodeTransforms`, and `updateSkinMatrices`
+  helpers. An anonymous-namespace `isFinite` shares matrix validation and removes
+  duplicated nested loops from transform and skin updates.
+- Channel application uses a guard return for linear quaternion interpolation.
+  Key, interval, component, node, and joint names clarify sampling and matrix
+  construction. Helpers retain existing scratch buffers and add no allocations,
+  pose copies, traversal passes, public APIs, or stored state.
+- Preserved interpolation arithmetic/order, quaternion normalization, channel
+  ordering, morph defaults, explicit matrices, parent-first world updates,
+  selected-scene membership, mesh-local skin palettes, bind-pose previews, and
+  validation diagnostics/order. All world transforms still finish before skin
+  matrices are evaluated. Constructor and playback methods are unchanged.
+- Added `Animation.Cpu` regressions for step/linear/cubic sampling, nonuniform
+  intervals and key boundaries, single keys, quaternion modes/tangents, morph
+  weights, clip/rest-pose transitions, independent instances, shared asset data,
+  selected/unselected hierarchy nodes, mirrored/nonuniform skin transforms,
+  inverse binds, preview palettes, pose-buffer reuse, and evaluation errors.
+  These checks passed against the original evaluator before extraction and the
+  refactored evaluator afterward.
+- Verification succeeded: complete Debug and Release builds with Editor and tests
+  enabled; all 16 CTest checks passed in each configuration with Vulkan core and
+  synchronization validation enabled. Captured logs contain no Vulkan validation
+  errors. The final Debug animation regression rerun, clang-format verification,
+  and `git diff --check` passed. Logs are under `out/refactoring-iteration-7/`.
+  No dependencies or additional external setup were needed.
+- Scope review: only `animation.cpp` and private declarations in `animation.hpp`
+  changed among the 95 pre-existing C++ files checked this iteration. The new CPU
+  check, its CMake registration, and this progress record accompany them.
+  Existing Editor changes and earlier modules are intact.
+- Next requested iteration: Scene serialization (`Scene::load`/`save`); review
+  Engine coordination separately afterward. Stop here until explicitly requested
+  to continue.
+
+## Iteration 8: Scene serialization and Engine coordination
+
+- Completed: `Scene::load` delegates bounded JSON reading/parsing to
+  `readSceneDocument` and property conversion to `readObjectProperties`.
+  `Scene::save` delegates grid, object, camera, and light records to `writeGrid`,
+  `writeObject`, `writeCamera`, and `writeLighting`; `writeSceneDocument` retains
+  serialization before opening the destination. Helpers stay in the implementation
+  file, with no JSON types or new dependencies in public headers.
+- Preserved object insertion before parent linking, forward references, stable
+  IDs, camera selection/order, authored animation settings, grid/light records,
+  schema limits, error context/precedence, and validation before writing.
+- `Engine::Impl::prepare` coordinates `bindSceneModels` and
+  `validateSceneFrameLimits`. `update` delegates event processing to `pollEvents`
+  and standalone animation/lighting to `standaloneFrame`. Clear counter names and
+  const validation helpers make the stages easier to follow.
+- Preserved frame sequencing, resource-cache behavior, activation rollback,
+  ownership, member destruction order, limits, and cleanup. Public Engine methods
+  and resource collection are unchanged; extraction adds no frame allocations,
+  model copies, or traversal passes. Vulkan command recording/synchronization and
+  animation math are unchanged.
+- Expanded `Scene.Cpu` for forward references, camera/map ordering, light
+  attachments, explicit next IDs, validation precedence/context, and preserving
+  an existing destination when serialization fails. Extended `Scene.Runtime` for
+  mixed standalone imported-light/static instances and scene/unload transitions.
+  These regressions passed before and after extraction. All 17 Scene/Grid fixture
+  files match the original implementation byte-for-byte.
+
+## Final codebase review
+
+- Reviewed all 96 project-owned C++ files across Engine, Game, Editor, and tests,
+  including earlier refactoring iterations. Retained readable code and existing
+  algorithms in asset import, animation, cameras/input, grid tools, launchers, and
+  Vulkan resource/pipeline setup rather than splitting functions by size.
+- Shared the Editor's duplicated transform-precision check in a file-local
+  `preservesTransform` helper, retaining arithmetic, tolerances, and diagnostics.
+  Extracted Engine nearest-hit picking into `pickSceneObject` with an invalid-ray
+  guard; input policy and draw highlighting remain in `updateSelection`.
+  Flattened triangle-hit/alpha rejection in `Geometry::intersect`. Added the direct
+  standard algorithm include in `gpu_mesh.cpp` and corrected material-uniform
+  component documentation.
+- This pass changed eight C++ files (six production, two existing tests), plus
+  this progress record. No project files, dependencies, public APIs, or CMake/style
+  configuration changes were needed. Earlier Editor and animation work is intact.
+- Final verification succeeded: complete Debug and Release builds with Editor
+  and tests enabled; all 16 CTest checks passed in each configuration, including
+  CPU, rendering, picking, camera, resource-stress, and Editor interactions.
+  Vulkan core and synchronization validation were enabled; captured logs contain
+  no validation errors. Modified C++ files were formatted, all 96 files passed
+  clang-format verification, and `git diff --check` passed.
+- Build/test logs, baseline snapshots, and the scope check are in the ignored
+  `out/refactoring-final/` directory. No additional external setup is required;
+  no planned modules remain.

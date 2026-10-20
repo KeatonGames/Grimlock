@@ -5,6 +5,8 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 
 using namespace grimlock;
 using Json = nlohmann::json;
@@ -56,6 +58,75 @@ void write(const std::filesystem::path& path, const Json& j) {
     }
 }
 
+void serializationChecks(const std::filesystem::path& output) {
+    const auto path = output / "forward-references.json";
+    const Json document = {{"version", 1},
+                           {"next_id", "100"},
+                           {"objects",
+                            Json::array({{{"id", "9"}, {"parent", "42"}, {"name", "child"}},
+                                         {{"id", "42"}, {"transform", {{"position", {2, 3, 4}}}}}})},
+                           {"cameras", Json::array({{{"id", "z-first"}, {"object", "9"}}, {{"id", "a-second"}}})},
+                           {"lighting",
+                            {{"points", Json::array({{{"object", "42"}, {"intensity", 2}}, {{"range", 5}}})},
+                             {"spots", Json::array({{{"object", "9"}, {"inner_cone", 0.1}, {"outer_cone", 0.5}}})}}}};
+    write(path, document);
+    auto scene = Scene::load(path);
+    require(scene->object(9).parent == 42 && near(scene->worldTransform(9), glm::translate(glm::mat4{1}, {2, 3, 4})),
+            "forward parent reference changed");
+    require(scene->activeCamera() == "z-first" && scene->cameras().size() == 2 && !scene->cameras().contains("main"),
+            "first camera/default camera replacement changed");
+    require(scene->lighting().pointObjects[0] == 42 && scene->lighting().spotObjects[0] == 9 &&
+                scene->lighting().values.pointCount == 2 && scene->lighting().values.spotCount == 1,
+            "light references or array ordering changed");
+    require(scene->createObject() == 100, "explicit next ID changed");
+    scene->save(output / "forward-references-saved.json");
+    auto saved = read(output / "forward-references-saved.json");
+    require(saved["objects"][0]["id"] == "9" && saved["cameras"][0]["id"] == "a-second" &&
+                saved["active_camera"] == "z-first",
+            "serialized map ordering or active camera changed");
+
+    const auto invalid = [&](Json input, std::string_view diagnostic) {
+        write(output / "serialization-invalid.json", input);
+        try {
+            (void)Scene::load(output / "serialization-invalid.json");
+        } catch (const std::exception& error) {
+            require(std::string_view{error.what()}.find(diagnostic) != std::string_view::npos,
+                    "serialization validation order/context changed");
+            return;
+        }
+        throw std::runtime_error("invalid serialized scene accepted");
+    };
+    auto bad = document;
+    bad["objects"][0]["parent"] = "999";
+    bad["objects"][1]["enabled"] = "invalid";
+    invalid(bad, "$.objects[1].enabled: expected a boolean");
+    bad = document;
+    bad["objects"][1]["id"] = "9";
+    bad["objects"][1]["transform"]["scale"] = {0, 0, 0};
+    invalid(bad, "$.objects[1].id: Object ID must be unique");
+    bad = document;
+    bad["cameras"][1]["id"] = "z-first";
+    invalid(bad, "$.cameras[1].id: duplicate camera ID");
+    bad = document;
+    bad["cameras"] = Json::array();
+    invalid(bad, "$.cameras: at least one camera is required");
+    bad = document;
+    bad["next_id"] = "42";
+    invalid(bad, "$.next_id: must exceed every object ID");
+    bad = document;
+    bad["objects"][0]["model"] = nullptr;
+    bad["objects"][0]["animation"] = Json::object();
+    invalid(bad, "Animation requires a model.");
+
+    const auto protectedPath = output / "preserve-on-invalid-save.json";
+    write(protectedPath, {{"preserved", true}});
+    Scene invalidSave{std::string(1, static_cast<char>(0xFF))};
+    rejects([&] {
+        invalidSave.save(protectedPath);
+    });
+    require(read(protectedPath) == Json{{"preserved", true}}, "invalid save truncated the destination");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -64,6 +135,8 @@ int main(int argc, char** argv) {
 
         const std::filesystem::path root{argv[1]}, output{argv[2]};
         std::filesystem::create_directories(output);
+        serializationChecks(output);
+
         Scene scene{"Round trip \"scene\" / Unicode \xE2\x98\x83"};
         const auto parent = scene.createObject("parent"), child = scene.createObject("child", parent),
                    leaf = scene.createObject("leaf", child);

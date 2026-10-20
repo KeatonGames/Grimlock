@@ -105,12 +105,7 @@ struct Engine::Impl {
                                "definition before activation.");
     }
 
-    void prepare(Scene& scene) {
-        diagnostics::StartupSpan profile{"scene.bind_resources"};
-        scene.updateTransforms();
-        (void)scene.resolvedCamera();
-        (void)scene.resolvedLighting();
-
+    void bindSceneModels(Scene& scene) {
         for (const auto& [id, object] : scene.objects_) {
             if (!object.model) {
                 continue;
@@ -139,8 +134,12 @@ struct Engine::Impl {
                                          "', fields model/animation/material_override: " + e.what());
             }
         }
+    }
 
-        std::size_t primitiveDraws = 0, joints = 0, weights = 0;
+    void validateSceneFrameLimits(const Scene& scene) const {
+        std::size_t primitiveDraws = 0;
+        std::size_t jointMatrices = 0;
+        std::size_t morphWeights = 0;
 
         for (const auto& [id, object] : scene.objects_) {
             (void)id;
@@ -152,22 +151,31 @@ struct Engine::Impl {
             const auto& pose = object.instance_->pose();
 
             for (const auto node : pose.activeNodes) {
-                const auto count = object.instance_->model().nodes[node].meshes.size();
-                primitiveDraws += count;
-                joints += count * pose.joints[node].size();
-                weights += count * pose.weights[node].size();
+                const auto meshCount = object.instance_->model().nodes[node].meshes.size();
+                primitiveDraws += meshCount;
+                jointMatrices += meshCount * pose.joints[node].size();
+                morphWeights += meshCount * pose.weights[node].size();
 
-                if (primitiveDraws > 4096 || joints > 65536 || weights > 65536) {
+                if (primitiveDraws > 4096 || jointMatrices > 65536 || morphWeights > 65536) {
                     throw std::runtime_error("Scene exceeds existing frame limits: 4096 primitive "
                                              "draws, 65536 joint matrices or morph weights.");
                 }
             }
         }
+    }
 
+    void prepare(Scene& scene) {
+        diagnostics::StartupSpan profile{"scene.bind_resources"};
+        scene.updateTransforms();
+        (void)scene.resolvedCamera();
+        (void)scene.resolvedLighting();
+
+        bindSceneModels(scene);
+        validateSceneFrameLimits(scene);
         (void)sceneLighting(scene); // Reject combined scene/imported-light overflow before activation.
     }
 
-    Lighting sceneLighting(const Scene& scene) {
+    Lighting sceneLighting(const Scene& scene) const {
         auto result = scene.resolvedLighting();
         bool directionalUsed = result.directional.intensity > 0;
 
@@ -241,6 +249,41 @@ struct Engine::Impl {
         return activeScene ? activeScene->resolvedCamera() : camera;
     }
 
+    void pickSceneObject(const Camera& view, glm::vec2 cursor) {
+        glm::ivec2 windowSize{}, drawableSize{};
+        SDL_GetWindowSize(window.native(), &windowSize.x, &windowSize.y);
+        SDL_GetWindowSizeInPixels(window.native(), &drawableSize.x, &drawableSize.y);
+
+        const auto ray = picking::mouseRay(view, cursor, windowSize, drawableSize);
+
+        if (!ray) {
+            return;
+        }
+
+        std::optional<ObjectId> selected;
+        double nearest = ray->maximum;
+
+        for (const auto& [id, object] : activeScene->objects_) {
+            if (!object.instance_ || !object.visible_ || !object.selectable) {
+                continue;
+            }
+
+            auto& resource = resourceFor(*object.instance_);
+
+            if (const auto hit = resource.picking.intersect(*ray,
+                                                            *object.instance_,
+                                                            object.world_,
+                                                            object.materialOverride,
+                                                            nearest,
+                                                            object.tint.a)) {
+                nearest = *hit;
+                selected = id;
+            }
+        }
+
+        activeScene->selectObject(selected);
+    }
+
     void updateSelection(const Camera& view, bool allowPicking) {
         if (!activeScene) {
             return;
@@ -256,34 +299,7 @@ struct Engine::Impl {
         if (selectionEnabled && allowPicking && state.focused && state.button(MouseButton::left).pressed &&
             state.leftPressPosition && !navigationButton(MouseButton::right) &&
             !navigationButton(MouseButton::middle)) {
-            glm::ivec2 windowSize{}, drawableSize{};
-            SDL_GetWindowSize(window.native(), &windowSize.x, &windowSize.y);
-            SDL_GetWindowSizeInPixels(window.native(), &drawableSize.x, &drawableSize.y);
-
-            if (const auto ray = picking::mouseRay(view, *state.leftPressPosition, windowSize, drawableSize)) {
-                std::optional<ObjectId> selected;
-                double nearest = ray->maximum;
-
-                for (const auto& [id, object] : activeScene->objects_) {
-                    if (!object.instance_ || !object.visible_ || !object.selectable) {
-                        continue;
-                    }
-
-                    auto& resource = resourceFor(*object.instance_);
-
-                    if (const auto hit = resource.picking.intersect(*ray,
-                                                                    *object.instance_,
-                                                                    object.world_,
-                                                                    object.materialOverride,
-                                                                    nearest,
-                                                                    object.tint.a)) {
-                        nearest = *hit;
-                        selected = id;
-                    }
-                }
-
-                activeScene->selectObject(selected);
-            }
+            pickSceneObject(view, *state.leftPressPosition);
         }
 
         const auto selected = activeScene->selectedObject();
@@ -340,7 +356,7 @@ struct Engine::Impl {
         }
     }
 
-    bool update() {
+    void pollEvents() {
         input.beginFrame();
         SDL_Event event;
 
@@ -368,6 +384,40 @@ struct Engine::Impl {
                 break;
             }
         }
+    }
+
+    void standaloneFrame(double delta, Lighting& frameLighting) {
+        for (const auto& instance : instances) {
+            instance->update(delta);
+        }
+
+        bool imported = false;
+
+        for (const auto& instance : instances) {
+            for (const auto node : instance->pose().activeNodes) {
+                imported = imported || instance->model().nodes[node].light.has_value();
+            }
+        }
+
+        if (!imported) {
+            return;
+        }
+
+        frameLighting.directional.intensity = 0;
+        frameLighting.pointCount = frameLighting.spotCount = 0;
+        bool directionalUsed = false;
+
+        for (std::size_t i = 0; i < instances.size(); ++i) {
+            renderer::addModelLights(frameLighting,
+                                     instances[i]->model(),
+                                     instances[i]->pose(),
+                                     draws[i].transform,
+                                     directionalUsed);
+        }
+    }
+
+    bool update() {
+        pollEvents();
 
         if (!running) {
             return false;
@@ -399,31 +449,7 @@ struct Engine::Impl {
             sceneFrame(delta, frameCamera, frameLighting);
             frameDraws = sceneDraws;
         } else {
-            for (const auto& instance : instances) {
-                instance->update(delta);
-            }
-
-            bool imported = false;
-
-            for (const auto& instance : instances) {
-                for (const auto node : instance->pose().activeNodes) {
-                    imported = imported || instance->model().nodes[node].light.has_value();
-                }
-            }
-
-            if (imported) {
-                frameLighting.directional.intensity = 0;
-                frameLighting.pointCount = frameLighting.spotCount = 0;
-                bool directionalUsed = false;
-
-                for (std::size_t i = 0; i < instances.size(); ++i) {
-                    renderer::addModelLights(frameLighting,
-                                             instances[i]->model(),
-                                             instances[i]->pose(),
-                                             draws[i].transform,
-                                             directionalUsed);
-                }
-            }
+            standaloneFrame(delta, frameLighting);
         }
 
         navigate(frameCamera);

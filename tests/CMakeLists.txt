@@ -36,6 +36,10 @@ add_executable(CameraNavigationChecks camera_navigation.cpp)
 target_link_libraries(CameraNavigationChecks PRIVATE Engine)
 add_test(NAME Camera.Navigation COMMAND CameraNavigationChecks)
 
+add_executable(AnimationChecks animation.cpp)
+target_link_libraries(AnimationChecks PRIVATE Engine)
+add_test(NAME Animation.Cpu COMMAND AnimationChecks)
+
 add_executable(InputChecks input.cpp)
 target_include_directories(InputChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
 target_link_libraries(InputChecks PRIVATE Engine SDL3::SDL3)

@@ -60,6 +60,12 @@ private:
     void performance();
 
     void dialogs();
+    void deleteDialog();
+    void sceneFileDialog();
+    void sceneFileList();
+    void unsavedChangesDialog();
+    void errorDialog();
+    [[nodiscard]] bool saveSceneFromDialog(const std::filesystem::path& filename);
     void attempt(const std::function<void()>& operation);
     void request(Operation operation, std::filesystem::path path = {});
     void executePending();

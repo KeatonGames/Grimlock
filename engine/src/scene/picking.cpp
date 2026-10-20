@@ -257,19 +257,20 @@ std::optional<double> Geometry::intersect(const Ray& ray,
             const auto& surface = model.materials.at(material.value_or(mesh.material));
 
             for (std::size_t index = 0; index + 2 < mesh.indices.size(); index += 3) {
-                if (const auto hit = triangle(origin,
-                                              direction,
-                                              point(mesh.indices[index]),
-                                              point(mesh.indices[index + 1]),
-                                              point(mesh.indices[index + 2]),
-                                              surface.doubleSided,
-                                              ray.minimum,
-                                              nearest)) {
-                    if (covered(model, mesh, surface, index, *hit, opacity)) {
-                        nearest = hit->distance;
-                        result = nearest;
-                    }
+                const auto hit = triangle(origin,
+                                          direction,
+                                          point(mesh.indices[index]),
+                                          point(mesh.indices[index + 1]),
+                                          point(mesh.indices[index + 2]),
+                                          surface.doubleSided,
+                                          ray.minimum,
+                                          nearest);
+                if (!hit || !covered(model, mesh, surface, index, *hit, opacity)) {
+                    continue;
                 }
+
+                nearest = hit->distance;
+                result = nearest;
             }
         }
     }

@@ -469,46 +469,203 @@ void attach(Json& j, std::optional<ObjectId> object) {
     }
 }
 
+Json readSceneDocument(const std::filesystem::path& path) {
+    std::ifstream stream(path, std::ios::binary | std::ios::ate);
+
+    if (!stream) {
+        fail("$", "cannot open scene file");
+    }
+
+    const auto size = stream.tellg();
+
+    if (size < 0 || size > 16 * 1024 * 1024) {
+        fail("$", "scene exceeds 16 MiB");
+    }
+
+    stream.seekg(0);
+    std::vector<std::set<std::string>> keys;
+    const auto callback = [&](int depth, Json::parse_event_t event, Json& parsed) {
+        if (depth > 128) {
+            fail("$", "JSON nesting exceeds 128 levels");
+        }
+
+        if (event == Json::parse_event_t::object_start) {
+            keys.emplace_back();
+        } else if (event == Json::parse_event_t::key && !keys.back().insert(parsed.get<std::string>()).second) {
+            fail("$", "duplicate JSON key: " + parsed.get<std::string>());
+        } else if (event == Json::parse_event_t::object_end) {
+            keys.pop_back();
+        }
+
+        return true;
+    };
+
+    Json root;
+    context("$", [&] {
+        root = Json::parse(stream, callback);
+    });
+
+    return root;
+}
+
+void readObjectProperties(Scene& scene, ObjectId object, const Json& record, const std::string& field) {
+    if (record.contains("transform")) {
+        readTransform(scene, object, record.at("transform"), field + ".transform");
+    }
+
+    if (record.contains("enabled")) {
+        scene.setEnabled(object, boolean(record.at("enabled"), field + ".enabled"));
+    }
+
+    if (record.contains("model") && !record.at("model").is_null()) {
+        const auto text = string(record.at("model"), field + ".model");
+        context(field + ".model", [&] {
+            scene.setModel(object, std::filesystem::path{std::u8string{text.begin(), text.end()}});
+        });
+    }
+
+    if (record.contains("tint")) {
+        scene.setTint(object, vector<4>(record.at("tint"), field + ".tint"));
+    }
+
+    if (record.contains("material_override")) {
+        scene.setMaterialOverride(object, index(record.at("material_override"), field + ".material_override"));
+    }
+
+    if (record.contains("animation")) {
+        scene.setAnimation(object, readAnimation(record.at("animation"), field + ".animation"));
+    }
+
+    if (!scene.object(object).model && (record.contains("animation") || record.contains("material_override"))) {
+        fail(field, "animation/material_override requires a model");
+    }
+}
+
+Json writeGrid(const Grid& grid) {
+    const auto& configuration = grid.configuration();
+    Json blocked = Json::array();
+
+    for (std::size_t i = 0; i < grid.size(); ++i) {
+        const auto cell = *grid.cell(i);
+
+        if (!grid.walkable(cell)) {
+            blocked.push_back({cell.x, cell.z});
+        }
+    }
+
+    return {{"width", configuration.width},
+            {"height", configuration.height},
+            {"cell_size", configuration.cellSize},
+            {"origin", Json::array({configuration.origin.x, configuration.origin.y, configuration.origin.z})},
+            {"blocked", std::move(blocked)}};
+}
+
+Json writeObject(ObjectId id, const SceneObject& object) {
+    const auto& transform = object.local;
+    Json record = {
+        {"id", std::to_string(id)},
+        {"name", object.name},
+        {"enabled", object.enabled},
+        {"tint", json(object.tint)},
+        {"transform",
+         {{"position", json(transform.position)},
+          {"rotation",
+           json(glm::vec4{transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w})},
+          {"scale", json(transform.scale)}}}};
+
+    if (object.parent) {
+        record["parent"] = std::to_string(*object.parent);
+    }
+
+    if (object.model) {
+        const auto text = object.model->generic_u8string();
+        record["model"] = std::string{text.begin(), text.end()};
+    }
+
+    if (object.materialOverride) {
+        record["material_override"] = *object.materialOverride;
+    }
+
+    return record;
+}
+
+Json writeCamera(const std::string& id, const SceneCamera& sceneCamera) {
+    const auto& camera = sceneCamera.camera;
+    Json record = {{"id", id},
+                   {"position", json(camera.position)},
+                   {"target", json(camera.target)},
+                   {"up", json(camera.up)},
+                   {"vertical_fov_degrees", camera.verticalFovDegrees},
+                   {"near", camera.nearPlane},
+                   {"far", camera.farPlane}};
+    attach(record, sceneCamera.object);
+
+    return record;
+}
+
+Json writeLighting(const SceneLighting& value) {
+    const auto& lighting = value.values;
+    const auto& directional = lighting.directional;
+    Json lights = {{"environment_intensity", lighting.environmentIntensity},
+                   {"environment_rotation", lighting.environmentRotation},
+                   {"exposure", lighting.exposure},
+                   {"directional",
+                    {{"direction", json(directional.direction)},
+                     {"color", json(directional.color)},
+                     {"intensity", directional.intensity}}},
+                   {"points", Json::array()},
+                   {"spots", Json::array()}};
+    attach(lights["directional"], value.directionalObject);
+
+    for (std::uint32_t i = 0; i < lighting.pointCount; ++i) {
+        const auto& point = lighting.points[i];
+        Json record = {{"position", json(point.position)},
+                       {"color", json(point.color)},
+                       {"intensity", point.intensity},
+                       {"range", point.range}};
+        attach(record, value.pointObjects[i]);
+        lights["points"].push_back(std::move(record));
+    }
+
+    for (std::uint32_t i = 0; i < lighting.spotCount; ++i) {
+        const auto& spot = lighting.spots[i];
+        Json record = {{"position", json(spot.position)},
+                       {"color", json(spot.color)},
+                       {"intensity", spot.intensity},
+                       {"range", spot.range},
+                       {"direction", json(spot.direction)},
+                       {"inner_cone", spot.innerCone},
+                       {"outer_cone", spot.outerCone}};
+        attach(record, value.spotObjects[i]);
+        lights["spots"].push_back(std::move(record));
+    }
+
+    return lights;
+}
+
+void writeSceneDocument(const std::filesystem::path& path, const Json& root) {
+    const auto text = root.dump(2) + '\n'; // Build/validate before opening the destination.
+    std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+
+    if (!stream) {
+        fail("$", "cannot open output file");
+    }
+
+    stream.write(text.data(), static_cast<std::streamsize>(text.size()));
+    stream.close();
+
+    if (!stream) {
+        fail("$", "failed writing scene file");
+    }
+}
+
 } // namespace
 
 std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
     diagnostics::StartupSpan profile{"scene.read_parse_validate"};
 
     try {
-        std::ifstream stream(path, std::ios::binary | std::ios::ate);
-
-        if (!stream) {
-            fail("$", "cannot open scene file");
-        }
-
-        const auto size = stream.tellg();
-
-        if (size < 0 || size > 16 * 1024 * 1024) {
-            fail("$", "scene exceeds 16 MiB");
-        }
-
-        stream.seekg(0);
-        std::vector<std::set<std::string>> keys;
-        const auto callback = [&](int depth, Json::parse_event_t event, Json& parsed) {
-            if (depth > 128) {
-                fail("$", "JSON nesting exceeds 128 levels");
-            }
-
-            if (event == Json::parse_event_t::object_start) {
-                keys.emplace_back();
-            } else if (event == Json::parse_event_t::key && !keys.back().insert(parsed.get<std::string>()).second) {
-                fail("$", "duplicate JSON key: " + parsed.get<std::string>());
-            } else if (event == Json::parse_event_t::object_end) {
-                keys.pop_back();
-            }
-
-            return true;
-        };
-
-        Json root;
-        context("$", [&] {
-            root = Json::parse(stream, callback);
-        });
+        const auto root = readSceneDocument(path);
         fields(root,
                "$",
                {"version", "name", "next_id", "objects", "cameras", "active_camera", "lighting", "navigation_grid"});
@@ -528,10 +685,10 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
             array(objects, "$.objects", 10000);
 
             for (std::size_t i = 0; i < objects.size(); ++i) {
-                const auto& j = objects[i];
-                const auto f = "$.objects[" + std::to_string(i) + "]";
-                fields(j,
-                       f,
+                const auto& record = objects[i];
+                const auto field = "$.objects[" + std::to_string(i) + "]";
+                fields(record,
+                       field,
                        {"id",
                         "name",
                         "parent",
@@ -541,47 +698,20 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
                         "tint",
                         "material_override",
                         "animation"});
-                const auto object = id(required(j, "id", f), f + ".id");
-                context(f + ".id", [&] {
-                    scene->insertObject(object, j.contains("name") ? string(j.at("name"), f + ".name") : "");
+                const auto object = id(required(record, "id", field), field + ".id");
+                context(field + ".id", [&] {
+                    scene->insertObject(object,
+                                        record.contains("name") ? string(record.at("name"), field + ".name") : "");
                 });
 
-                if (j.contains("transform")) {
-                    readTransform(*scene, object, j.at("transform"), f + ".transform");
-                }
-
-                if (j.contains("enabled")) {
-                    scene->setEnabled(object, boolean(j.at("enabled"), f + ".enabled"));
-                }
-
-                if (j.contains("model") && !j.at("model").is_null()) {
-                    const auto text = string(j.at("model"), f + ".model");
-                    context(f + ".model", [&] {
-                        scene->setModel(object, std::filesystem::path{std::u8string{text.begin(), text.end()}});
-                    });
-                }
-
-                if (j.contains("tint")) {
-                    scene->setTint(object, vector<4>(j.at("tint"), f + ".tint"));
-                }
-
-                if (j.contains("material_override")) {
-                    scene->setMaterialOverride(object, index(j.at("material_override"), f + ".material_override"));
-                }
-
-                if (j.contains("animation")) {
-                    scene->setAnimation(object, readAnimation(j.at("animation"), f + ".animation"));
-                }
-
-                if (!scene->object(object).model && (j.contains("animation") || j.contains("material_override"))) {
-                    fail(f, "animation/material_override requires a model");
-                }
+                readObjectProperties(*scene, object, record, field);
             }
 
+            // Link parents after inserting all objects, including forward references.
             for (std::size_t i = 0; i < objects.size(); ++i) {
-                const auto f = "$.objects[" + std::to_string(i) + "]";
-                context(f + ".parent", [&] {
-                    scene->setParent(id(objects[i].at("id"), f + ".id"), reference(objects[i], "parent", f));
+                const auto field = "$.objects[" + std::to_string(i) + "]";
+                context(field + ".parent", [&] {
+                    scene->setParent(id(objects[i].at("id"), field + ".id"), reference(objects[i], "parent", field));
                 });
             }
         }
@@ -607,16 +737,16 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
             scene->cameras_.clear();
 
             for (std::size_t i = 0; i < cameras.size(); ++i) {
-                const auto f = "$.cameras[" + std::to_string(i) + "]";
-                const auto& j = cameras[i];
-                const auto camera = readCamera(j, f);
-                const auto key = string(required(j, "id", f), f + ".id");
+                const auto field = "$.cameras[" + std::to_string(i) + "]";
+                const auto& record = cameras[i];
+                const auto camera = readCamera(record, field);
+                const auto key = string(required(record, "id", field), field + ".id");
 
                 if (scene->cameras_.contains(key)) {
-                    fail(f + ".id", "duplicate camera ID");
+                    fail(field + ".id", "duplicate camera ID");
                 }
 
-                context(f, [&] {
+                context(field, [&] {
                     scene->setCamera(key, camera);
                 });
 
@@ -666,46 +796,11 @@ void Scene::save(const std::filesystem::path& path) const {
                      {"objects", Json::array()},
                      {"cameras", Json::array()}};
         if (const auto* grid = navigationGrid()) {
-            const auto& c = grid->configuration();
-            Json blocked = Json::array();
-
-            for (std::size_t i = 0; i < grid->size(); ++i) {
-                const auto cell = *grid->cell(i);
-
-                if (!grid->walkable(cell)) {
-                    blocked.push_back({cell.x, cell.z});
-                }
-            }
-
-            root["navigation_grid"] = {{"width", c.width},
-                                       {"height", c.height},
-                                       {"cell_size", c.cellSize},
-                                       {"origin", Json::array({c.origin.x, c.origin.y, c.origin.z})},
-                                       {"blocked", std::move(blocked)}};
+            root["navigation_grid"] = writeGrid(*grid);
         }
 
         for (const auto& [id, value] : objects_) {
-            const auto& t = value.local;
-            Json j = {{"id", std::to_string(id)},
-                      {"name", value.name},
-                      {"enabled", value.enabled},
-                      {"tint", json(value.tint)},
-                      {"transform",
-                       {{"position", json(t.position)},
-                        {"rotation", json(glm::vec4{t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w})},
-                        {"scale", json(t.scale)}}}};
-            if (value.parent) {
-                j["parent"] = std::to_string(*value.parent);
-            }
-
-            if (value.model) {
-                const auto text = value.model->generic_u8string();
-                j["model"] = std::string{text.begin(), text.end()};
-            }
-
-            if (value.materialOverride) {
-                j["material_override"] = *value.materialOverride;
-            }
+            auto j = writeObject(id, value);
 
             if (value.initialAnimation || (value.instance_ && !value.instance_->model().animations.empty())) {
                 j["animation"] = json(animationConfiguration(id));
@@ -715,66 +810,12 @@ void Scene::save(const std::filesystem::path& path) const {
         }
 
         for (const auto& [id, value] : cameras_) {
-            const auto& c = value.camera;
-            Json j = {{"id", id},
-                      {"position", json(c.position)},
-                      {"target", json(c.target)},
-                      {"up", json(c.up)},
-                      {"vertical_fov_degrees", c.verticalFovDegrees},
-                      {"near", c.nearPlane},
-                      {"far", c.farPlane}};
-            attach(j, value.object);
+            auto j = writeCamera(id, value);
             root["cameras"].push_back(std::move(j));
         }
 
-        const auto& l = lighting_.values;
-        const auto& d = l.directional;
-        Json lights = {
-            {"environment_intensity", l.environmentIntensity},
-            {"environment_rotation", l.environmentRotation},
-            {"exposure", l.exposure},
-            {"directional", {{"direction", json(d.direction)}, {"color", json(d.color)}, {"intensity", d.intensity}}},
-            {"points", Json::array()},
-            {"spots", Json::array()}};
-        attach(lights["directional"], lighting_.directionalObject);
-
-        for (std::uint32_t i = 0; i < l.pointCount; ++i) {
-            const auto& p = l.points[i];
-            Json j = {{"position", json(p.position)},
-                      {"color", json(p.color)},
-                      {"intensity", p.intensity},
-                      {"range", p.range}};
-            attach(j, lighting_.pointObjects[i]);
-            lights["points"].push_back(std::move(j));
-        }
-
-        for (std::uint32_t i = 0; i < l.spotCount; ++i) {
-            const auto& s = l.spots[i];
-            Json j = {{"position", json(s.position)},
-                      {"color", json(s.color)},
-                      {"intensity", s.intensity},
-                      {"range", s.range},
-                      {"direction", json(s.direction)},
-                      {"inner_cone", s.innerCone},
-                      {"outer_cone", s.outerCone}};
-            attach(j, lighting_.spotObjects[i]);
-            lights["spots"].push_back(std::move(j));
-        }
-
-        root["lighting"] = std::move(lights);
-        const auto text = root.dump(2) + '\n'; // Build/validate before opening the destination.
-        std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-
-        if (!stream) {
-            fail("$", "cannot open output file");
-        }
-
-        stream.write(text.data(), static_cast<std::streamsize>(text.size()));
-        stream.close();
-
-        if (!stream) {
-            fail("$", "failed writing scene file");
-        }
+        root["lighting"] = writeLighting(lighting_);
+        writeSceneDocument(path, root);
     } catch (const std::exception& e) {
         throw std::runtime_error("Scene '" + path.string() + "': " + e.what());
     }

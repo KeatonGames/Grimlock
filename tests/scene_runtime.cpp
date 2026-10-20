@@ -328,6 +328,16 @@ int main(int argc, char** argv) {
         require(engine.scene() == lit, "combined light overflow replaced scene");
 
         engine.unloadScene();
+        const auto standaloneModel = engine.loadModel(output / "lights.gltf");
+        (void)engine.createInstance(standaloneModel);
+        const auto secondInstance = engine.createInstance(engine.loadModel(output / "cube.obj"));
+        engine.setTransform(secondInstance, glm::translate(glm::mat4{1}, glm::vec3{1, 0, 0}));
+        require(engine.update(), "standalone imported lights failed");
+        engine.setScene(std::make_unique<Scene>());
+        require(engine.update(), "scene activation with retained standalone instances failed");
+        engine.unloadScene();
+        require(engine.update(), "standalone frame after scene unload failed");
+
         std::cout << "PASS Scene runtime: shared resources/independent playback, disabled parents, "
                      "save/reload, rollback, retention, unload and 4160 descriptor allocations.\n";
         return 0;
