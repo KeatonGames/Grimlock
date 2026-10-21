@@ -36,7 +36,11 @@ engine/
   shaders/                  Slang shader sources
 editor/                     Inspector, hierarchy and scene editing commands
 game/
-  src/                      Executable launcher and Game code
+  src/entities/             Enemy IDs, shared definitions and runtime data
+  src/systems/              Enemy lifecycle, transforms, animation and local crowd steering
+  src/navigation/           Wall clearance utilities and scene movement session
+  src/debug/                Game navigation/enemy ImGui controls
+  src/{main.cpp,game.*}     Executable launcher and Game application
   assets/{models,scenes}/   Source models, scenes and Game navigation configuration
 tests/                      CPU and Vulkan/editor runtime checks
 docs/                       Historical project notes
@@ -145,8 +149,7 @@ New saves store `clip`, `autoplay`, `loop` and `speed`, using a unique imported 
 
 Open `assets/scenes/navigation.json` for a cube floor, blocked-cell walls and existing GLB props. Every grid cell has a blue-grey floor cube; blocked cells also have a taller orange wall. Painting walkability updates the geometry in the same frame. Engine instances the shared `models/cube.obj` asset from the configured asset root; it creates no per-cell mesh resources or scene objects. GLB props stay independent and do not automatically block cells.
 
-- **Navigation > Show Grid** toggles the session-only overlay: green is walkable, red is blocked.
-- **Navigation > Edit Walkability** enables left-drag painting. Choose **Paint Blocked** or **Paint Walkable**; the menu bar shows the active mode. Disable editing to restore normal model picking. Camera controls remain available.
+- **Navigation > Edit Walkability** shows the grid overlay and enables left-drag painting. Green is walkable, red is blocked, and the hovered cell is highlighted. Choose **Paint Blocked** or **Paint Walkable**; disable editing to hide every grid line/highlight and restore normal picking. Camera controls remain available. Cube floors and walls stay visible in both modes.
 - **Grid Settings...** changes X/Z dimensions, cell size and world origin; scenes without a grid offer **Create Grid...**. Overlapping cell coordinates retain their states when resized; shrinking discards cells outside the new bounds. The limit is 65,536 cells.
 - **File > Save/Save As** saves the grid with the scene. As with other edits, save into the source scene directory to keep changes across builds.
 
@@ -154,40 +157,46 @@ Cell `(x,z)` spans `[origin.x + x*s, origin.x + (x+1)*s)` and the equivalent Z i
 
 `grid.hpp` provides allocation-free coordinate/neighbor queries and a revision counter that advances only on changes. The optional scene `navigation_grid` stores `width`, `height`, `cell_size`, `origin: [x,y,z]` and sparse `blocked: [[x,z], ...]`; omitted cells are walkable. Existing scenes without it still load. Game scene data owns configuration and authored obstacles; Engine supplies generic storage, serialization and editor infrastructure.
 
-### Flow Field navigation prototype
+### Chicken enemies and free movement
 
-Build with `GRIMLOCK_BUILD_EDITOR=ON` and open the corridor scenario:
+Open the chicken test scene:
 
 ```powershell
-.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/flow_field.json
+.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/chickens.json
 ```
 
-The existing **Navigation** menu contains **Destination X/Z**, **Show Flow Directions**, **Show Integration Costs**, **Agent Speed**, **Spawn Test Agents**, and **Reset Test Agents**. The gold ring marks the destination. Cost colors run from green (near) to orange (far); grey cells are unreachable. **Show Grid** also hides these debug overlays. Spawn creates up to six green cube instances with different speeds; Reset removes them. Speed is in world units per second, with per-agent multipliers configured in `game/src/navigation/navigation_demo.cpp`. Running this scene without `--editor` spawns the agents automatically and uses the last grid cell as the destination.
+Use **Navigation > Spawn Chickens** (default count 100), **Clear Chickens**, **Movement Speed**, and **Spawn Area (world X/Z)**. **Destination X/Z** accepts continuous world coordinates, including negative/fractional positions and positions outside the terrain. The initial destination is near the far corner of the scene. For a clear route on the spawn side of the walls, try `(-9.37, -3.29)`. Enemy count, arrival count, update time, neighbor checks and frame time/FPS remain in the same menu. Grid scenes spawn 100 chickens automatically in standalone Game mode. In the editor, spawning also works without a grid.
 
-Game's `FlowField` runs reverse Dijkstra from the shared destination. Cardinal steps cost 1 cell, diagonals cost sqrt(2), and a diagonal requires both adjacent cardinal cells to be walkable. Blocked/unreachable cells have infinite integration cost and zero direction. A contiguous cost/direction/successor field and reusable heap serve every agent; unchanged frames only compare the grid pointer, revision and destination. Grid edits, resizing, scene replacement or a new destination rebuild it once. Invalid or blocked destinations stop agents safely.
+Enemies steer directly toward the destination using normalized X/Z vectors, acceleration/deceleration, delta-time integration and smoothed facing. Their existing Y position is preserved. They never query grid directions, cell centers, successors or reachability. Changing the destination affects the next update without any navigation rebuild. Movement stops within the physical radius of the world destination; the shared definition's existing `despawnOnArrival` option controls removal (enabled by default).
 
-Agents follow the field's safe center-to-center successors, consuming a speed-times-delta distance budget across as many edges as needed. Swept X/Z clearance accounts for the small cubes' rotated footprint and prevents crossing walls or blocked corners, even with a long frame. Only facing rotation is smoothed; routes do not round blocked corners. Grid changes retain a safe downhill waypoint where possible, otherwise recenter before taking the new route. If a wall is painted under/against an agent, it stops in place until there is clearance again; it is not teleported out of the edited wall. There is no physics or agent-to-agent avoidance.
+There is no pathfinder. Wall faces and rounded corners retain the swept-circle collision and wall-sliding checks. If the direct route is blocked, an enemy can stop against the wall; it will not calculate a route around it. Wall edits affect collisions immediately. Painting a wall under an enemy stops it until clearance returns. Only actual blocked cells are obstacles: the terrain rectangle is not an invisible boundary, and the grid's size/origin/cell size do not guide movement. Authored GLB props remain separate from wall collision.
 
-Navigation calculation, movement, prototype configuration and ImGui controls live in `game/src/navigation/`. Editor receives non-owning field views through `editor/include/grimlock/grid_debug.hpp` and reuses the grid overlay. Engine supplies a generic update callback after viewport tools and before draw preparation, plus scene-visible runtime model instances. These instances share the existing cube asset, do not participate in picking or serialization, and are removed on Reset or scene/grid replacement. Authored grid walls retain the existing JSON format; destination, agents and visualization settings are session-only.
+Each shared `EnemyDefinition` supplies its physical `radius`, speed, acceleration/deceleration, health data and animation configuration. Instances copy their type's radius; the crowd solver supports different radii using each pair's summed footprints. Radius has no ImGui slider. Set it in the type definition instead. Visual size uses the independent `visualHeight` (0.36 world units by default); the chicken radius defaults to 0.22. No additional enemy types or collision shapes are implemented.
 
-`Navigation.FlowField` checks costs, corner rules, coordinate conversions, revision caching, maximum grid size, shared movement, dynamic obstacles, arrival and 15/30/60/144 FPS consistency. `Navigation.Runtime` exercises the actual editor controls, coexistence with animated GLBs, runtime instances, wall updates, destination changes, reset and scene save/load.
+The existing spatial hash, local separation, contact sliding and bounded overlap recovery remain in `game/src/systems/`. Runtime data stays in `game/src/entities/`. The scene movement session and grid wall queries remain in `game/src/navigation/`; Game's editor controls stay in `game/src/debug/`. Engine and Editor have no enemy movement behavior. Updates retain bounded substeps: at most 0.25 seconds and 64 substeps after a stalled frame, discarding excess elapsed time.
 
-Phase 11 implementation files:
+All chickens share the cached `models/chicken.glb` mesh/material/texture/rig resources, with independent transforms and playback state. This asset has no animation clips and uses its rest pose. Animated configurations still select a requested movement clip or walk/run fallback, pause/resume with movement and retain independent playback. Runtime instances do not participate in picking or scene JSON, and clearing/replacing the scene releases their poses while retaining the shared Engine model cache.
 
-| Status | Files |
+The grid's existing JSON format, generated cube geometry and wall-painting tools are preserved. Grid lines, cell fills and hover highlights appear only during **Edit Walkability**. Destination, enemies and development controls remain session-only.
+
+`Terrain.Clearance` verifies true circle footprints, corners, tangency, wall sliding, live wall changes and world movement beyond terrain bounds. `Enemies.Crowd` checks direct arbitrary-angle routes, arrival, braking, 15/30/60/144 FPS consistency, independence from empty grid configuration, wall blocking/removal, mixed radii, overlap recovery, frame spikes and crowds of 100/500. `Enemies.Runtime` exercises edit-only overlays, spawn/clear, world destinations, predefined radii independent of visual scale, model sharing/lifetimes, 100/500 rendered chickens, grid-free movement and animations. Existing camera, picking, terrain serialization, renderer and editor regression checks remain enabled.
+
+Verification: complete Debug and Release builds passed, and all 19 CTest checks passed in each configuration. Runtime checks ran with Vulkan validation and synchronization validation enabled, with no validation errors reported.
+
+Changed files for this task:
+
+| Change | Files |
 | --- | --- |
-| Added | `game/src/navigation/flow_field.hpp`, `flow_field.cpp`, `agent.hpp`, `agent.cpp` |
-| Added | `game/src/navigation/navigation_demo.hpp`, `navigation_demo.cpp`, `navigation_debug.hpp`, `navigation_debug.cpp` |
-| Added | `editor/include/grimlock/grid_debug.hpp`, `game/assets/scenes/flow_field.json` |
-| Added | `tests/flow_field.cpp`, `tests/flow_field_runtime.cpp` |
-| Modified | `engine/include/grimlock/engine.hpp`, `engine/src/core/engine.cpp` |
-| Modified | `editor/include/grimlock/editor.hpp`, `editor/src/editor.hpp`, `editor/src/editor.cpp`, `editor/src/grid_tools.hpp`, `editor/src/grid_tools.cpp` |
-| Modified | `game/src/game.hpp`, `game/src/game.cpp`, `game/src/main.cpp` |
-| Modified | `game/CMakeLists.txt`, `tests/CMakeLists.txt`, `README.md` |
+| Removed | Old field algorithm and waypoint agent sources/headers, obsolete field scenario and algorithm tests |
+| Updated | `game/src/entities/enemy.hpp`, `game/src/systems/{crowd_movement,enemy_system}.{hpp,cpp}` |
+| Updated | `game/src/navigation/{navigation_session,grid_clearance}.{hpp,cpp}`, `game/src/debug/navigation_debug.{hpp,cpp}`, `game/src/game.cpp`, `game/CMakeLists.txt` |
+| Updated | `editor/include/grimlock/grid_debug.hpp`, `editor/src/grid_tools.{hpp,cpp}`, `editor/src/editor.cpp` |
+| Updated | `tests/enemy_crowd.cpp`, `tests/editor_runtime.cpp`, `tests/CMakeLists.txt`, `README.md` |
+| Replaced/renamed | Field tests became `tests/grid_clearance.cpp`; field runtime checks became `tests/enemy_runtime.cpp` |
 
 ## Current Limitations
 
-- Navigation is a shared-destination movement prototype. There is no height sampling, automatic obstacle detection from GLBs, physics, agent avoidance, enemy behavior or combat. Navigation obstacles come only from the authored walkable/blocked grid.
+- Enemies move directly toward one world destination with local separation and wall contact handling. There is no obstacle routing, height sampling, automatic collision with GLB props or physics. Blocked routes and oversized circles may stop against walls. Tight spawn areas can fit fewer enemies than requested; type radii should cover their fixed visual model footprint.
 - No animation blending, state machines, timelines, keyframe editing or retargeting.
 - No multi-selection, undo/redo, transform gizmos, material editor or asset hot reload. Editor layouts are session-only.
 - Reparenting that requires shear is rejected rather than changing the model's appearance.

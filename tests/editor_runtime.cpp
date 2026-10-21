@@ -863,11 +863,13 @@ int main(int argc, char** argv) {
 
             click(engine, id, cellPoint(from));
             require(!engine.selectedObject(), "generated grid cubes became selectable scene objects");
-            require(!document.dirty() && ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.Size > 0,
-                    "grid missing or selection dirtied document");
+            require(!document.dirty() && ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
+                    "grid visible outside editing or selection dirtied document");
 
             engine.scene()->selectObject(4);
             navigationMenu(engine, id, "Edit Walkability");
+            require(!ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
+                    "editing did not reveal the grid");
             const auto revision = grid->revision();
             button(id, SDL_BUTTON_LEFT, true, cellPoint(from));
             tick(engine, 3);
@@ -891,14 +893,13 @@ int main(int argc, char** argv) {
             const auto savedRevision = grid->revision();
 
             // UI interaction is not a brush stroke, even with editing active.
-            navigationMenu(engine, id, "Show Grid");
+            navigationMenu(engine, id, "Edit Walkability");
             require(!document.dirty() && grid->revision() == savedRevision, "visibility changed authored grid");
 
             tick(engine);
             require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
                     "hidden grid still drawn");
 
-            navigationMenu(engine, id, "Show Grid"); // Hiding also disables painting.
             engine.scene()->selectObject({}, true);
             click(engine, id, cellPoint(from));
             require(!engine.selectedObject() && grid->revision() == savedRevision,
@@ -997,6 +998,10 @@ int main(int argc, char** argv) {
                         engine.scene()->object(4).local.matrix() == propTransform &&
                         engine.scene()->animation(4).asset().get() == propAsset,
                     "grid editing changed model geometry/resources/transforms");
+
+            require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
+                    "scene replacement showed the grid outside editing");
+            navigationMenu(engine, id, "Edit Walkability");
 
             auto resized = configuration;
             resized.width = 17;

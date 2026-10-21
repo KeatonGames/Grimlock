@@ -1,7 +1,7 @@
 #include "game.hpp"
 #ifdef GRIMLOCK_WITH_EDITOR
+#include "debug/navigation_debug.hpp"
 #include "grimlock/editor.hpp"
-#include "navigation/navigation_debug.hpp"
 #endif
 #include <cstdlib>
 #include <exception>

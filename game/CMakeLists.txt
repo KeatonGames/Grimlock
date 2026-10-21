@@ -1,19 +1,20 @@
-add_library(GameNavigation STATIC
-    src/navigation/flow_field.cpp
-    src/navigation/agent.cpp
-    src/navigation/navigation_demo.cpp)
-target_include_directories(GameNavigation PUBLIC src)
-target_link_libraries(GameNavigation PUBLIC Engine)
-set_target_properties(GameNavigation PROPERTIES CXX_EXTENSIONS OFF)
+add_library(GameLogic STATIC
+    src/navigation/grid_clearance.cpp
+    src/systems/crowd_movement.cpp
+    src/systems/enemy_system.cpp
+    src/navigation/navigation_session.cpp)
+target_include_directories(GameLogic PUBLIC src)
+target_link_libraries(GameLogic PUBLIC Engine)
+set_target_properties(GameLogic PROPERTIES CXX_EXTENSIONS OFF)
 
 add_executable(Game src/main.cpp src/game.cpp)
-target_link_libraries(Game PRIVATE Engine GameNavigation)
+target_link_libraries(Game PRIVATE Engine GameLogic)
 if(GRIMLOCK_BUILD_EDITOR)
-    add_library(GameNavigationDebug STATIC src/navigation/navigation_debug.cpp)
-    target_link_libraries(GameNavigationDebug PUBLIC GameNavigation Editor PRIVATE DearImGui)
-    set_target_properties(GameNavigationDebug PROPERTIES CXX_EXTENSIONS OFF)
+    add_library(GameDebug STATIC src/debug/navigation_debug.cpp)
+    target_link_libraries(GameDebug PUBLIC GameLogic Editor PRIVATE DearImGui)
+    set_target_properties(GameDebug PROPERTIES CXX_EXTENSIONS OFF)
     target_link_libraries(Game PRIVATE Editor)
-    target_link_libraries(Game PRIVATE GameNavigationDebug)
+    target_link_libraries(Game PRIVATE GameDebug)
     target_compile_definitions(Game PRIVATE GRIMLOCK_WITH_EDITOR=1)
 endif()
 # Preserve the established executable/VS Code paths while exposing the Game target.
@@ -29,15 +30,15 @@ add_custom_target(GrimlockAssets
 add_dependencies(Game GrimlockAssets GrimlockShaders)
 if(MSVC)
     target_compile_options(Game PRIVATE /W4 /permissive-)
-    target_compile_options(GameNavigation PRIVATE /W4 /permissive-)
-    if(TARGET GameNavigationDebug)
-        target_compile_options(GameNavigationDebug PRIVATE /W4 /permissive-)
+    target_compile_options(GameLogic PRIVATE /W4 /permissive-)
+    if(TARGET GameDebug)
+        target_compile_options(GameDebug PRIVATE /W4 /permissive-)
     endif()
 else()
     target_compile_options(Game PRIVATE -Wall -Wextra -Wpedantic)
-    target_compile_options(GameNavigation PRIVATE -Wall -Wextra -Wpedantic)
-    if(TARGET GameNavigationDebug)
-        target_compile_options(GameNavigationDebug PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(GameLogic PRIVATE -Wall -Wextra -Wpedantic)
+    if(TARGET GameDebug)
+        target_compile_options(GameDebug PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endif()
 if(WIN32)

@@ -17,8 +17,7 @@ public:
                      SceneDocument& document,
                      const Camera& camera,
                      SDL_Window* window,
-                     bool viewportMouse,
-                     GridDebug* debug = nullptr);
+                     bool viewportMouse);
 
     [[nodiscard]] bool editing() const noexcept {
         return editing_;
@@ -30,7 +29,7 @@ public:
     }
 
 private:
-    bool visible_ = true, editing_ = false, paintWalkable_ = false, openSettings_ = false;
+    bool editing_ = false, paintWalkable_ = false, openSettings_ = false;
     int dimensions_[2]{16, 16};
     double cellSize_ = 1;
     glm::dvec3 origin_{0};

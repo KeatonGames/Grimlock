@@ -235,6 +235,9 @@ void Editor::initializeRenderer() {
 }
 
 void Editor::shutdown() noexcept {
+    if (gridDebug_) {
+        gridDebug_->shutdown(engine_);
+    }
     if (!context_) {
         return;
     }
@@ -1265,7 +1268,7 @@ OverlayInput Editor::frame() {
 
 void Editor::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
-    gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_, gridDebug_);
+    gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_);
     ImGui::Render();
 }
 

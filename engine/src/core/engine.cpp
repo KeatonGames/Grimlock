@@ -518,7 +518,18 @@ struct Engine::Impl {
     std::map<std::filesystem::path, std::size_t> modelPaths;
     std::shared_ptr<const assets::ModelData> gridCubeAsset;
     std::size_t gridCubeGpuModel = 0;
+
+    std::size_t instanceIndex(InstanceId instance) const {
+        if (instance.index_ >= instances.size() || !instances[instance.index_] ||
+            instanceGenerations[instance.index_] != instance.generation_) {
+            throw std::out_of_range("Unknown or removed instance ID.");
+        }
+        return instance.index_;
+    }
+
     std::vector<std::unique_ptr<assets::ModelInstance>> instances;
+    std::vector<std::uint64_t> instanceGenerations;
+    std::vector<std::size_t> freeInstances;
     std::vector<bool> sceneInstances;
     std::vector<renderer::ModelDraw> draws, sceneDraws;
     std::unique_ptr<Scene> activeScene;
@@ -553,6 +564,14 @@ InstanceId Engine::createInstance(ModelId model, bool visibleInScenes) {
     auto instance = std::make_unique<assets::ModelInstance>(resource.asset);
     renderer::ModelDraw draw{resource.gpuModel, glm::mat4{1}};
     draw.pose = &instance->pose();
+    if (!impl_->freeInstances.empty()) {
+        const auto slot = impl_->freeInstances.back();
+        impl_->instances[slot] = std::move(instance);
+        impl_->draws[slot] = draw;
+        impl_->sceneInstances[slot] = visibleInScenes;
+        impl_->freeInstances.pop_back();
+        return InstanceId{slot, impl_->instanceGenerations[slot]};
+    }
     const auto size = impl_->instances.size() + 1;
 
     if (impl_->instances.capacity() < size) {
@@ -563,20 +582,34 @@ InstanceId Engine::createInstance(ModelId model, bool visibleInScenes) {
         impl_->draws.reserve(size * 2);
     }
 
+    if (impl_->sceneInstances.capacity() < size) {
+        impl_->sceneInstances.reserve(size * 2);
+    }
+    if (impl_->freeInstances.capacity() < size) {
+        impl_->freeInstances.reserve(size * 2);
+    }
+    if (impl_->instanceGenerations.capacity() < size) {
+        impl_->instanceGenerations.reserve(size * 2);
+    }
+
     impl_->sceneInstances.push_back(visibleInScenes);
+    impl_->instanceGenerations.push_back(1);
     impl_->instances.push_back(std::move(instance));
     impl_->draws.push_back(draw);
 
-    return InstanceId{size - 1};
+    return InstanceId{size - 1, 1};
 }
 
 void Engine::setTransform(InstanceId instance, const glm::mat4& transform) {
-    impl_->draws.at(instance.index_).transform = transform;
+    impl_->draws[impl_->instanceIndex(instance)].transform = transform;
 }
 
 void Engine::removeInstance(InstanceId instance) {
-    impl_->instances.at(instance.index_).reset();
-    impl_->draws.at(instance.index_) = {};
+    const auto index = impl_->instanceIndex(instance);
+    impl_->freeInstances.push_back(index);
+    impl_->instances[index].reset();
+    impl_->draws[index] = {};
+    ++impl_->instanceGenerations[index];
 }
 
 void Engine::setTransform(InstanceId instance, const Transform& transform) {
@@ -584,19 +617,19 @@ void Engine::setTransform(InstanceId instance, const Transform& transform) {
 }
 
 glm::mat4 Engine::transform(InstanceId instance) const {
-    return impl_->draws.at(instance.index_).transform;
+    return impl_->draws[impl_->instanceIndex(instance)].transform;
 }
 
 void Engine::setTint(InstanceId instance, const glm::vec4& color) {
-    impl_->draws.at(instance.index_).baseColor = color;
+    impl_->draws[impl_->instanceIndex(instance)].baseColor = color;
 }
 
 void Engine::setMaterialOverride(InstanceId instance, std::optional<std::size_t> material) {
-    impl_->draws.at(instance.index_).materialOverride = material;
+    impl_->draws[impl_->instanceIndex(instance)].materialOverride = material;
 }
 
 assets::ModelInstance& Engine::animation(InstanceId instance) {
-    return *impl_->instances.at(instance.index_);
+    return *impl_->instances[impl_->instanceIndex(instance)];
 }
 
 Camera& Engine::camera() noexcept {

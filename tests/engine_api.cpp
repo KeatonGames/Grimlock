@@ -66,6 +66,21 @@ int main(int argc, char** argv) {
 
         require(rejected, "invalid instance accepted");
 
+        const auto temporary = engine.createInstance(model);
+        engine.removeInstance(temporary);
+        const auto replacement = engine.createInstance(model);
+        require(replacement != temporary, "reused storage resurrected a removed handle");
+        rejected = false;
+        try {
+            engine.setTransform(temporary, glm::mat4{1});
+        } catch (const std::out_of_range&) {
+            rejected = true;
+        }
+        require(rejected, "stale handle changed a replacement instance");
+        engine.removeInstance(replacement);
+        require(&a == &engine.animation(first) && &b == &engine.animation(second),
+                "instance reuse invalidated unrelated playback references");
+
         unsigned frames = 0;
 
         while (engine.update()) {
@@ -88,7 +103,7 @@ int main(int argc, char** argv) {
         require(frames > 0, "no frames updated");
 
         std::cout << "PASS Engine API: resource reuse, metadata, independent transforms/playback, "
-                     "automatic updates, invalid IDs and RAII shutdown.\n";
+                     "automatic updates, stale handles, storage reuse and RAII shutdown.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL Engine API: " << error.what() << '\n';

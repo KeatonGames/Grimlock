@@ -55,10 +55,11 @@ public:
 private:
     friend class Engine;
 
-    explicit InstanceId(std::size_t index) : index_(index) {
+    explicit InstanceId(std::size_t index, std::uint64_t generation) : index_(index), generation_(generation) {
     }
 
     std::size_t index_ = static_cast<std::size_t>(-1);
+    std::uint64_t generation_ = 0;
 };
 
 struct ModelInfo {
@@ -82,7 +83,7 @@ public:
     [[nodiscard]] ModelInfo modelInfo(ModelId model) const;
     // Scene-visible runtime instances are independent of scene serialization and picking.
     [[nodiscard]] InstanceId createInstance(ModelId model, bool visibleInScenes = false);
-    // Invalidates this instance ID; IDs are not reused.
+    // Invalidates this handle; reused storage never makes an old handle valid again.
     void removeInstance(InstanceId instance);
     void setTransform(InstanceId instance, const glm::mat4& transform);
     void setTransform(InstanceId instance, const Transform& transform);

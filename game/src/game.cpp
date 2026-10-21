@@ -16,7 +16,9 @@ Game::Game(const std::filesystem::path& path, const std::filesystem::path& envir
         engine_.setScene(engine_.loadScene(path.empty() ? "assets/scenes/demo.json" : path));
         engine_.setCameraNavigationEnabled();
         engine_.setObjectSelectionEnabled();
-        navigation_.spawn(engine_);
+        if (engine_.scene()->navigationGrid()) {
+            (void)navigation_.spawn(engine_);
+        }
 
         return;
     }
