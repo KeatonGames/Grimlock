@@ -19,10 +19,10 @@ public:
     EnemySystem(const EnemySystem&) = delete;
     EnemySystem& operator=(const EnemySystem&) = delete;
 
-    [[nodiscard]] std::size_t spawn(const Grid* walls, SpawnArea area, std::size_t count);
+    [[nodiscard]] std::size_t spawn(const NavMesh& navigation, SpawnArea area, std::size_t count);
     [[nodiscard]] bool remove(EnemyId id) noexcept;
     void clear() noexcept;
-    void update(const Grid* walls, std::optional<glm::dvec2> destination, double delta);
+    void update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta);
     void setSpeed(double speed);
 
     [[nodiscard]] const EnemyDefinition& definition() const noexcept {

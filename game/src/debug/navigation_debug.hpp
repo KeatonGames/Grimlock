@@ -19,11 +19,16 @@ public:
         return session_;
     }
 
+    [[nodiscard]] std::span<const std::array<glm::vec3, 3>> triangles() const noexcept override {
+        return showNavMesh_ ? session_.navigation().debugTriangles() : std::span<const std::array<glm::vec3, 3>>{};
+    }
+
 private:
     NavigationSession session_;
     int count_ = 100;
     std::size_t lastSpawned_ = 0;
     std::string error_;
+    bool showNavMesh_ = false;
 };
 
 } // namespace grimlock::game

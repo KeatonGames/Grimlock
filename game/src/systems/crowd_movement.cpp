@@ -1,7 +1,5 @@
 #include "systems/crowd_movement.hpp"
 
-#include "navigation/grid_clearance.hpp"
-
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -16,11 +14,6 @@ namespace {
 
 glm::dvec2 horizontal(glm::dvec3 value) {
     return {value.x, value.z};
-}
-
-glm::dvec3 movePastWalls(const Grid* walls, glm::dvec3 position, glm::dvec2 displacement, double radius) {
-    return walls ? slideAlongWalls(*walls, position, displacement, radius)
-                 : position + glm::dvec3{displacement.x, 0, displacement.y};
 }
 
 double contactFraction(glm::dvec2 offset, glm::dvec2 displacement, double distance) {
@@ -88,7 +81,7 @@ void EnemyNeighbors::relocate(std::size_t index, glm::dvec3 before, glm::dvec3 a
     insert(index, after);
 }
 
-void CrowdMovement::update(const Grid* walls,
+void CrowdMovement::update(const NavMesh& navigation,
                            std::optional<glm::dvec2> destination,
                            std::span<Enemy> enemies,
                            double delta,
@@ -121,29 +114,29 @@ void CrowdMovement::update(const Grid* walls,
     delta = std::min({delta, 0.25, limit * 64});
     do {
         const double dt = std::min(delta, limit);
-        step(walls, destination, enemies, dt, maximumRadius, despawnOnArrival);
+        step(navigation, destination, enemies, dt, maximumRadius, despawnOnArrival);
         delta -= dt;
         ++metrics_.substeps;
     } while (delta > 1e-10);
 }
 
-void CrowdMovement::step(const Grid* walls,
+void CrowdMovement::step(const NavMesh& navigation,
                          std::optional<glm::dvec2> destination,
                          std::span<Enemy> enemies,
                          double delta,
                          double maximumRadius,
                          bool despawnOnArrival) {
     neighbors_.build(enemies, maximumRadius * 2, glm::dvec3{0});
-    resolveOverlaps(walls, enemies, maximumRadius);
-    remaining_.resize(enemies.size());
+    resolveOverlaps(navigation, enemies, maximumRadius);
+    remaining_.assign(enemies.size(), std::numeric_limits<double>::max());
     for (std::size_t index = 0; index < enemies.size(); ++index) {
         auto& enemy = enemies[index];
         enemy.desiredVelocity = {0, 0};
         if (!enemy.active || !enemy.alive) {
             continue;
         }
-        remaining_[index] = destination ? glm::length(*destination - horizontal(enemy.position)) : 0;
-        if (walls && !segmentWalkable(*walls, enemy.position, enemy.position, enemy.radius)) {
+        enemy.repathDelay = std::max(0.0, enemy.repathDelay - delta);
+        if (!navigation.contains(enemy.position) || enemy.radius > navigation.configuration().agentRadius + 1e-6) {
             enemy.movement = MovementStatus::blocked;
             enemy.velocity = {0, 0};
             continue;
@@ -151,18 +144,50 @@ void CrowdMovement::step(const Grid* walls,
         if (!destination) {
             enemy.movement = MovementStatus::idle;
             enemy.velocity = {0, 0};
+            enemy.requestedDestination.reset();
+            enemy.path.valid = false;
             continue;
         }
-        const auto offset = *destination - horizontal(enemy.position);
-        const double distance = glm::length(offset);
-        if (distance <= std::max(1e-4, enemy.radius)) {
+        const bool changed = enemy.requestedDestination != destination || enemy.path.revision != navigation.revision();
+        if (changed || (enemy.retryPath && enemy.repathDelay <= 0)) {
+            const glm::dvec3 goal{destination->x, enemy.position.y, destination->y};
+            const bool found = navigation.findPath(enemy.position, goal, enemy.path);
+            enemy.requestedDestination = destination;
+            enemy.retryPath = false;
+            enemy.repathDelay = 1;
+            enemy.stuckTime = 0;
+            if (!found) {
+                enemy.velocity = {0, 0};
+            }
+        }
+        double remaining = 0;
+        const auto target = navigation.steering(enemy.position, enemy.path, &remaining);
+        if (!target) {
+            // A failed search waits for a destination/mesh change. A displaced
+            // corridor requests a bounded retry, rather than searching every frame.
+            enemy.retryPath = enemy.retryPath || !enemy.path.polygons.empty();
+            enemy.movement = MovementStatus::blocked;
+            enemy.velocity = {0, 0};
+            continue;
+        }
+        remaining_[index] = remaining;
+        if (remaining <= std::max(1e-4, enemy.radius)) {
             enemy.movement = MovementStatus::arrived;
             enemy.velocity = {0, 0};
             enemy.active = !despawnOnArrival;
             continue;
         }
+        const auto offset = horizontal(*target - enemy.position);
+        const double distance = glm::length(offset);
+        if (distance < 1e-6) {
+            enemy.retryPath = true;
+            enemy.path.valid = false;
+            enemy.movement = MovementStatus::blocked;
+            enemy.velocity = {0, 0};
+            continue;
+        }
         enemy.movement = MovementStatus::idle;
-        const double speed = std::min(enemy.speed, std::sqrt(2 * enemy.deceleration * distance));
+        const double speed = std::min(enemy.speed, std::sqrt(2 * enemy.deceleration * remaining));
         enemy.desiredVelocity = offset * (speed / distance);
     }
 
@@ -182,7 +207,7 @@ void CrowdMovement::step(const Grid* walls,
             desired *= enemy.speed / speed;
         }
         // Preview wall sliding to start turning or braking before physical contact.
-        desired = horizontal(movePastWalls(walls, enemy.position, desired * 0.2, enemy.radius) - enemy.position) / 0.2;
+        desired = horizontal(navigation.move(enemy.position, desired * 0.2) - enemy.position) / 0.2;
         enemy.desiredVelocity = desired;
         const auto change = desired - enemy.velocity;
         const double difference = glm::length(change);
@@ -190,10 +215,16 @@ void CrowdMovement::step(const Grid* walls,
         const double acceleration = braking ? enemy.deceleration : enemy.acceleration;
         enemy.velocity += difference > 0 ? change * std::min(1.0, acceleration * delta / difference) : glm::dvec2{0};
         const auto before = enemy.position;
-        enemy.position = move(walls, index, enemies, enemy.velocity * delta, maximumRadius);
+        enemy.position = move(navigation, index, enemies, enemy.velocity * delta, maximumRadius);
         const auto displacement = horizontal(enemy.position - before);
         if (delta > 0) {
             enemy.velocity = displacement / delta;
+        }
+        const double traveled = glm::length(displacement);
+        enemy.stuckTime = enemy.speed > 0 && traveled < enemy.speed * delta * 0.02 ? enemy.stuckTime + delta : 0;
+        if (enemy.stuckTime > 2 && enemy.repathDelay <= 0) {
+            enemy.retryPath = true;
+            enemy.stuckTime = 0;
         }
         enemy.movement = glm::length(enemy.velocity) > 1e-4 ? MovementStatus::moving : MovementStatus::idle;
         if (enemy.movement == MovementStatus::moving) {
@@ -231,7 +262,7 @@ glm::dvec2 CrowdMovement::separation(std::size_t index,
     return force;
 }
 
-glm::dvec3 CrowdMovement::move(const Grid* walls,
+glm::dvec3 CrowdMovement::move(const NavMesh& navigation,
                                std::size_t index,
                                std::span<const Enemy> enemies,
                                glm::dvec2 displacement,
@@ -240,7 +271,7 @@ glm::dvec3 CrowdMovement::move(const Grid* walls,
     auto position = enemy.position;
     const double skin = std::max(1e-8, enemy.radius * 1e-5);
     for (int contact = 0; contact < 4 && glm::dot(displacement, displacement) > 1e-22; ++contact) {
-        displacement = horizontal(movePastWalls(walls, position, displacement, enemy.radius) - position);
+        displacement = horizontal(navigation.move(position, displacement) - position);
         double fraction = 1;
         std::optional<std::size_t> neighbor;
         neighbors_.visit(position,
@@ -258,7 +289,7 @@ glm::dvec3 CrowdMovement::move(const Grid* walls,
                                  neighbor = other;
                              }
                          });
-        position += glm::dvec3{displacement.x, 0, displacement.y} * fraction;
+        position = navigation.move(position, displacement * fraction);
         if (!neighbor) {
             break;
         }
@@ -271,13 +302,13 @@ glm::dvec3 CrowdMovement::move(const Grid* walls,
     return position;
 }
 
-void CrowdMovement::resolveOverlaps(const Grid* walls, std::span<Enemy> enemies, double maximumRadius) {
+void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> enemies, double maximumRadius) {
     for (int iteration = 0; iteration < 3; ++iteration) {
         bool corrected = false;
         for (std::size_t index = 0; index < enemies.size(); ++index) {
             auto& enemy = enemies[index];
-            if (!enemy.active || !enemy.alive ||
-                walls && !segmentWalkable(*walls, enemy.position, enemy.position, enemy.radius)) {
+            if (!enemy.active || !enemy.alive || !navigation.contains(enemy.position) ||
+                enemy.radius > navigation.configuration().agentRadius + 1e-6) {
                 continue;
             }
             glm::dvec2 correction{0};
@@ -301,7 +332,7 @@ void CrowdMovement::resolveOverlaps(const Grid* walls, std::span<Enemy> enemies,
             }
             correction *= std::min(1.0, enemy.radius * 0.5 / distance);
             const auto before = enemy.position;
-            enemy.position = movePastWalls(walls, enemy.position, correction, enemy.radius);
+            enemy.position = navigation.move(enemy.position, correction);
             neighbors_.relocate(index, before, enemy.position);
             corrected = corrected || enemy.position != before;
         }

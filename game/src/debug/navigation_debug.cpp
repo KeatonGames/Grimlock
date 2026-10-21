@@ -61,6 +61,19 @@ void NavigationDebug::menu(Engine& engine) {
     ImGui::Text("Frame: %.2f ms (%.0f FPS)",
                 1000.0F / std::max(1.0F, ImGui::GetIO().Framerate),
                 ImGui::GetIO().Framerate);
+    ImGui::Separator();
+    ImGui::TextUnformatted("NavMesh");
+    ImGui::Checkbox("Show NavMesh", &showNavMesh_);
+    if (ImGui::Button("Rebuild NavMesh")) {
+        session_.rebuild(engine);
+    }
+    const auto& navigation = session_.navigation();
+    const auto& stats = navigation.statistics();
+    ImGui::TextWrapped("Status: %s", navigation.status().c_str());
+    ImGui::Text("Polygons: %zu | Build: %.2f ms | Paths: %llu",
+                stats.polygons,
+                stats.buildMilliseconds,
+                static_cast<unsigned long long>(stats.pathQueries));
     ImGui::TextDisabled("Chicken asset has no clips: rest pose is supported.");
     if (!error_.empty()) {
         ImGui::TextWrapped("%s", error_.c_str());

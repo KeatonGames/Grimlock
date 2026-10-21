@@ -12,6 +12,7 @@ public:
     [[nodiscard]] std::size_t spawn(Engine& engine, std::size_t count = 100);
     void reset(Engine& engine);
     void shutdown() noexcept;
+    void rebuild(Engine& engine);
 
     void setDestination(std::optional<glm::dvec2> destination);
 
@@ -27,6 +28,10 @@ public:
         return spawnArea_;
     }
 
+    [[nodiscard]] const NavMesh& navigation() const noexcept {
+        return navigation_;
+    }
+
 private:
     Engine* engine_ = nullptr;
     const Scene* scene_ = nullptr;
@@ -35,6 +40,9 @@ private:
     std::optional<glm::dvec2> destination_;
     std::unique_ptr<EnemySystem> enemies_;
     SpawnArea spawnArea_;
+    NavMesh navigation_;
+    std::optional<std::uint64_t> geometryRevision_;
+    void buildNavigation();
 };
 
 } // namespace grimlock::game

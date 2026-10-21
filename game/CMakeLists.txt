@@ -1,10 +1,11 @@
 add_library(GameLogic STATIC
-    src/navigation/grid_clearance.cpp
+    src/navigation/navigation_geometry.cpp
+    src/navigation/nav_mesh.cpp
     src/systems/crowd_movement.cpp
     src/systems/enemy_system.cpp
     src/navigation/navigation_session.cpp)
 target_include_directories(GameLogic PUBLIC src)
-target_link_libraries(GameLogic PUBLIC Engine)
+target_link_libraries(GameLogic PUBLIC Engine PRIVATE RecastNavigation::Recast RecastNavigation::Detour)
 set_target_properties(GameLogic PROPERTIES CXX_EXTENSIONS OFF)
 
 add_executable(Game src/main.cpp src/game.cpp)

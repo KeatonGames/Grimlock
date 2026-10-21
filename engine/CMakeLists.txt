@@ -8,6 +8,7 @@ add_library(Engine STATIC
     src/animation/animation.cpp
     src/scene/scene.cpp
     src/scene/grid.cpp
+    src/scene/terrain.cpp
     src/scene/picking.cpp
     src/scene/scene_serializer.cpp
     src/platform/window.cpp

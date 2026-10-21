@@ -1269,6 +1269,7 @@ OverlayInput Editor::frame() {
 void Editor::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
     gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_);
+    drawDebugGeometry(camera, native_.window, gridDebug_);
     ImGui::Render();
 }
 

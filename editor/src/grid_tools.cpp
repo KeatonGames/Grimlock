@@ -14,19 +14,16 @@ namespace grimlock::editor {
 namespace {
 
 // Clip in Vulkan homogeneous coordinates before perspective division, including the near plane.
-int projectCell(const glm::dmat4& matrix,
-                const GridConfiguration& c,
-                GridCell cell,
-                ImVec2 offset,
-                ImVec2 size,
-                std::array<ImVec2, 12>& points) {
-    const double x = c.origin.x + cell.x * c.cellSize, z = c.origin.z + cell.z * c.cellSize;
+int projectPolygon(const glm::dmat4& matrix,
+                   std::span<const glm::dvec3> vertices,
+                   ImVec2 offset,
+                   ImVec2 size,
+                   std::array<ImVec2, 12>& points) {
     std::array<glm::dvec4, 12> polygon{}, clipped{};
-    polygon[0] = matrix * glm::dvec4{x, c.origin.y, z, 1};
-    polygon[1] = matrix * glm::dvec4{x + c.cellSize, c.origin.y, z, 1};
-    polygon[2] = matrix * glm::dvec4{x + c.cellSize, c.origin.y, z + c.cellSize, 1};
-    polygon[3] = matrix * glm::dvec4{x, c.origin.y, z + c.cellSize, 1};
-    int count = 4;
+    int count = static_cast<int>(vertices.size());
+    for (int i = 0; i < count; ++i) {
+        polygon[i] = matrix * glm::dvec4{vertices[i], 1};
+    }
 
     const auto distance = [](glm::dvec4 p, int plane) {
         switch (plane) {
@@ -103,6 +100,20 @@ int projectCell(const glm::dmat4& matrix,
     return count;
 }
 
+int projectCell(const glm::dmat4& matrix,
+                const GridConfiguration& c,
+                GridCell cell,
+                ImVec2 offset,
+                ImVec2 size,
+                std::array<ImVec2, 12>& points) {
+    const double x = c.origin.x + cell.x * c.cellSize, z = c.origin.z + cell.z * c.cellSize;
+    const std::array<glm::dvec3, 4> vertices{{{x, c.origin.y, z},
+                                              {x + c.cellSize, c.origin.y, z},
+                                              {x + c.cellSize, c.origin.y, z + c.cellSize},
+                                              {x, c.origin.y, z + c.cellSize}}};
+    return projectPolygon(matrix, vertices, offset, size, points);
+}
+
 void paintLine(SceneDocument& document, GridCell from, GridCell to, bool walkable) {
     int x = static_cast<int>(from.x), z = static_cast<int>(from.z), endX = static_cast<int>(to.x),
         endZ = static_cast<int>(to.z);
@@ -131,6 +142,31 @@ void paintLine(SceneDocument& document, GridCell from, GridCell to, bool walkabl
 }
 
 } // namespace
+
+void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug* debug) {
+    if (!debug || debug->triangles().empty()) {
+        return;
+    }
+    glm::ivec2 drawable{};
+    SDL_GetWindowSizeInPixels(window, &drawable.x, &drawable.y);
+    if (drawable.x <= 0 || drawable.y <= 0) {
+        return;
+    }
+    const auto matrix =
+        glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
+    auto* viewport = ImGui::GetMainViewport();
+    auto* draw = ImGui::GetBackgroundDrawList(viewport);
+    std::array<ImVec2, 12> points{};
+    for (const auto& triangle : debug->triangles()) {
+        const std::array<glm::dvec3, 3> vertices{
+            {glm::dvec3{triangle[0]}, glm::dvec3{triangle[1]}, glm::dvec3{triangle[2]}}};
+        const int count = projectPolygon(matrix, vertices, viewport->Pos, viewport->Size, points);
+        if (count) {
+            draw->AddConvexPolyFilled(points.data(), count, IM_COL32(20, 170, 180, 55));
+            draw->AddPolyline(points.data(), count, IM_COL32(30, 200, 220, 170), ImDrawFlags_Closed, 1.0F);
+        }
+    }
+}
 
 void GridTools::menu(Engine& engine, GridDebug* debug) {
     const auto& scene = *engine.scene();

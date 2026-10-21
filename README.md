@@ -157,46 +157,19 @@ Cell `(x,z)` spans `[origin.x + x*s, origin.x + (x+1)*s)` and the equivalent Z i
 
 `grid.hpp` provides allocation-free coordinate/neighbor queries and a revision counter that advances only on changes. The optional scene `navigation_grid` stores `width`, `height`, `cell_size`, `origin: [x,y,z]` and sparse `blocked: [[x,z], ...]`; omitted cells are walkable. Existing scenes without it still load. Game scene data owns configuration and authored obstacles; Engine supplies generic storage, serialization and editor infrastructure.
 
-### Chicken enemies and free movement
+### Chicken enemies and NavMesh navigation
 
-Open the chicken test scene:
+Open `assets/scenes/chickens.json` with `Grimlock.exe --editor`. Use **Navigation > Spawn Chickens**, **Destination X/Z**, **Movement Speed**, and **Clear Chickens**. Standalone Game mode spawns 100 chickens automatically on terrain scenes. Destinations remain continuous world coordinates.
 
-```powershell
-.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/chickens.json
-```
+Recast Navigation 1.6.0 builds a shared NavMesh from the same world-space cube geometry used by the renderer. Detour finds and caches polygon corridors per enemy, then funnel processing guides continuous movement around walls. Existing physical radii, separation, smoothed facing, model sharing and animation handling are preserved. Floor boundaries and walls constrain movement; there is no unbounded fallback when navigation geometry is absent.
 
-Use **Navigation > Spawn Chickens** (default count 100), **Clear Chickens**, **Movement Speed**, and **Spawn Area (world X/Z)**. **Destination X/Z** accepts continuous world coordinates, including negative/fractional positions and positions outside the terrain. The initial destination is near the far corner of the scene. For a clear route on the spawn side of the walls, try `(-9.37, -3.29)`. Enemy count, arrival count, update time, neighbor checks and frame time/FPS remain in the same menu. Grid scenes spawn 100 chickens automatically in standalone Game mode. In the editor, spawning also works without a grid.
+**Show NavMesh** enables an optional cyan debug overlay; it is hidden by default. **Rebuild NavMesh** rebuilds explicitly. Wall edits also rebuild automatically on the next movement update and invalidate cached paths. Grid lines remain visible only during **Edit Walkability**. Existing terrain/scene serialization is unchanged, and runtime chickens are not saved or selectable.
 
-Enemies steer directly toward the destination using normalized X/Z vectors, acceleration/deceleration, delta-time integration and smoothed facing. Their existing Y position is preserved. They never query grid directions, cell centers, successors or reachability. Changing the destination affects the next update without any navigation rebuild. Movement stops within the physical radius of the world destination; the shared definition's existing `despawnOnArrival` option controls removal (enabled by default).
-
-There is no pathfinder. Wall faces and rounded corners retain the swept-circle collision and wall-sliding checks. If the direct route is blocked, an enemy can stop against the wall; it will not calculate a route around it. Wall edits affect collisions immediately. Painting a wall under an enemy stops it until clearance returns. Only actual blocked cells are obstacles: the terrain rectangle is not an invisible boundary, and the grid's size/origin/cell size do not guide movement. Authored GLB props remain separate from wall collision.
-
-Each shared `EnemyDefinition` supplies its physical `radius`, speed, acceleration/deceleration, health data and animation configuration. Instances copy their type's radius; the crowd solver supports different radii using each pair's summed footprints. Radius has no ImGui slider. Set it in the type definition instead. Visual size uses the independent `visualHeight` (0.36 world units by default); the chicken radius defaults to 0.22. No additional enemy types or collision shapes are implemented.
-
-The existing spatial hash, local separation, contact sliding and bounded overlap recovery remain in `game/src/systems/`. Runtime data stays in `game/src/entities/`. The scene movement session and grid wall queries remain in `game/src/navigation/`; Game's editor controls stay in `game/src/debug/`. Engine and Editor have no enemy movement behavior. Updates retain bounded substeps: at most 0.25 seconds and 64 substeps after a stalled frame, discarding excess elapsed time.
-
-All chickens share the cached `models/chicken.glb` mesh/material/texture/rig resources, with independent transforms and playback state. This asset has no animation clips and uses its rest pose. Animated configurations still select a requested movement clip or walk/run fallback, pause/resume with movement and retain independent playback. Runtime instances do not participate in picking or scene JSON, and clearing/replacing the scene releases their poses while retaining the shared Engine model cache.
-
-The grid's existing JSON format, generated cube geometry and wall-painting tools are preserved. Grid lines, cell fills and hover highlights appear only during **Edit Walkability**. Destination, enemies and development controls remain session-only.
-
-`Terrain.Clearance` verifies true circle footprints, corners, tangency, wall sliding, live wall changes and world movement beyond terrain bounds. `Enemies.Crowd` checks direct arbitrary-angle routes, arrival, braking, 15/30/60/144 FPS consistency, independence from empty grid configuration, wall blocking/removal, mixed radii, overlap recovery, frame spikes and crowds of 100/500. `Enemies.Runtime` exercises edit-only overlays, spawn/clear, world destinations, predefined radii independent of visual scale, model sharing/lifetimes, 100/500 rendered chickens, grid-free movement and animations. Existing camera, picking, terrain serialization, renderer and editor regression checks remain enabled.
-
-Verification: complete Debug and Release builds passed, and all 19 CTest checks passed in each configuration. Runtime checks ran with Vulkan validation and synchronization validation enabled, with no validation errors reported.
-
-Changed files for this task:
-
-| Change | Files |
-| --- | --- |
-| Removed | Old field algorithm and waypoint agent sources/headers, obsolete field scenario and algorithm tests |
-| Updated | `game/src/entities/enemy.hpp`, `game/src/systems/{crowd_movement,enemy_system}.{hpp,cpp}` |
-| Updated | `game/src/navigation/{navigation_session,grid_clearance}.{hpp,cpp}`, `game/src/debug/navigation_debug.{hpp,cpp}`, `game/src/game.cpp`, `game/CMakeLists.txt` |
-| Updated | `editor/include/grimlock/grid_debug.hpp`, `editor/src/grid_tools.{hpp,cpp}`, `editor/src/editor.cpp` |
-| Updated | `tests/enemy_crowd.cpp`, `tests/editor_runtime.cpp`, `tests/CMakeLists.txt`, `README.md` |
-| Replaced/renamed | Field tests became `tests/grid_clearance.cpp`; field runtime checks became `tests/enemy_runtime.cpp` |
+See [NavMesh navigation](docs/navigation.md) for architecture, geometry inputs, configuration, query limits, controls, tests, performance and the changed-file list. The chicken model has no animation clips and uses its rest pose; animated enemy configurations retain independent playback.
 
 ## Current Limitations
 
-- Enemies move directly toward one world destination with local separation and wall contact handling. There is no obstacle routing, height sampling, automatic collision with GLB props or physics. Blocked routes and oversized circles may stop against walls. Tight spawn areas can fit fewer enemies than requested; type radii should cover their fixed visual model footprint.
+- Navigation currently builds one small debug-terrain NavMesh. Decorative GLB props do not contribute obstacles automatically. There is no physics, tile streaming, off-mesh traversal or DetourCrowd. Shared mesh clearance must cover the largest supported physical radius; oversized agents are rejected. Tight spawn areas can fit fewer enemies than requested.
 - No animation blending, state machines, timelines, keyframe editing or retargeting.
 - No multi-selection, undo/redo, transform gizmos, material editor or asset hot reload. Editor layouts are session-only.
 - Reparenting that requires shear is rejected rather than changing the model's appearance.

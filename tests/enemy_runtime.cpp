@@ -1,10 +1,11 @@
 #include "debug/navigation_debug.hpp"
 #include "editor.hpp"
-#include "navigation/grid_clearance.hpp"
+#include "navigation/nav_mesh.hpp"
 
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <chrono>
+#include <grimlock/terrain.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <iostream>
@@ -90,15 +91,18 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
     definition.model = "models/blackrat.glb";
     definition.movementAnimation = "idle_A1";
     const auto& c = grid.configuration();
+    game::NavMesh navigation;
+    require(navigation.build(game::navigationGeometry(terrainBoxes(grid))), navigation.status().c_str());
     definition.radius = 0.2;
     const glm::dvec2 destination{c.origin.x + c.width - 0.37, c.origin.z + c.height - 0.29};
     std::shared_ptr<const assets::ModelData> resource;
     long baselineOwners = 0;
     {
         game::EnemySystem system{engine, definition};
-        require(system.spawn(&grid,
+        require(system.spawn(navigation,
                              {{c.origin.x + c.cellSize, c.origin.z + c.cellSize},
-                              {c.origin.x + c.cellSize * 4, c.origin.z + c.cellSize * 4}},
+                              {c.origin.x + c.cellSize * 4, c.origin.z + c.cellSize * 4},
+                              c.origin.y},
                              3) == 3,
                 "animated enemy spawn failed");
         const auto enemies = system.enemies();
@@ -112,13 +116,13 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
         const auto time = a.time();
         for (int frame = 0; frame < 20; ++frame) {
             require(engine.update([&](double) {
-                system.update(&grid, destination, 1.0 / 60);
+                system.update(navigation, destination, 1.0 / 60);
             }),
                     "animated enemy frame failed");
         }
         require(a.playing() && b.playing() && a.time() != time, "movement animation did not advance");
         system.setSpeed(0);
-        system.update(&grid, destination, 0.25);
+        system.update(navigation, destination, 0.25);
         require(a.paused() && b.paused(), "stationary enemies kept playing their movement animation");
         const auto stopped = a.time();
         tick(engine, 3);
@@ -128,7 +132,7 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
         require(system.enemies().size() == 2 && system.enemies()[0].id == firstId && system.enemies()[1].id == lastId,
                 "packed removal changed surviving enemy IDs");
         system.setSpeed(1);
-        system.update(&grid, destination, 1.0 / 60);
+        system.update(navigation, destination, 1.0 / 60);
         require(a.playing(), "moving enemy animation did not resume");
     }
     require(resource.use_count() == baselineOwners, "enemy system destruction retained animation instances");
@@ -168,6 +172,16 @@ int main(int argc, char** argv) {
         navigationControl(engine, id, "Edit Walkability");
         require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
                 "leaving edit mode kept the grid visible");
+        require(debug.session().navigation().ready(), "scene did not build navigation geometry");
+        const auto revision = debug.session().navigation().revision();
+        navigationControl(engine, id, "Show NavMesh");
+        require(!ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
+                "NavMesh overlay not drawn");
+        navigationControl(engine, id, "Rebuild NavMesh");
+        require(debug.session().navigation().revision() > revision, "explicit rebuild did not replace navigation data");
+        navigationControl(engine, id, "Show NavMesh");
+        require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
+                "NavMesh overlay stayed visible");
         std::cout << "Checking 100 chicken spawn..." << std::endl;
         navigationControl(engine, id, "Spawn Chickens");
         require(debug.session().enemies()->enemies().size() == 100 && scene->objects().size() == objectCount &&
@@ -201,7 +215,7 @@ int main(int argc, char** argv) {
             movementMilliseconds += debug.session().enemies()->metrics().updateMilliseconds;
             sceneAnimationAdvanced = sceneAnimationAdvanced || scene->animation(4).time() != animationTime;
             for (const auto& agent : debug.session().enemies()->enemies()) {
-                require(game::segmentWalkable(*grid, agent.position, agent.position, agent.radius),
+                require(debug.session().navigation().contains(agent.position),
                         "runtime agent entered a blocked cell or wall");
             }
         }
@@ -215,13 +229,15 @@ int main(int argc, char** argv) {
         std::cout << "Checking live wall and destination edits..." << std::endl;
         const auto occupied = *grid->worldToCell(debug.session().enemies()->enemies()[0].position);
         editor.document().setGridWalkable(occupied, false);
+        const auto oldRevision = debug.session().navigation().revision();
         const auto stoppedPosition = debug.session().enemies()->enemies()[0].position;
         require(engine.update([&](double) {
             debug.update(engine, 0.1);
         }),
                 "edited wall frame failed");
         require(debug.session().enemies()->enemies()[0].movement == game::MovementStatus::blocked &&
-                    debug.session().enemies()->enemies()[0].position == stoppedPosition,
+                    debug.session().enemies()->enemies()[0].position == stoppedPosition &&
+                    debug.session().navigation().revision() != oldRevision,
                 "painted wall did not stop the overlapping enemy");
         editor.document().setGridWalkable(occupied, true);
         const glm::dvec2 worldDestination{grid->configuration().origin.x + 2.37,
@@ -279,7 +295,12 @@ int main(int argc, char** argv) {
         largerDefinition.radius = 0.35;
         {
             game::EnemySystem larger{engine, largerDefinition};
-            require(larger.spawn(grid, debug.session().spawnArea(), 2) == 2, "larger definition spawn failed");
+            game::NavMesh navigation;
+            auto config = navigation.configuration();
+            config.agentRadius = 0.35F;
+            require(navigation.build(game::navigationGeometry(terrainBoxes(*grid)), config),
+                    navigation.status().c_str());
+            require(larger.spawn(navigation, debug.session().spawnArea(), 2) == 2, "larger definition spawn failed");
             const auto largeTransform = engine.transform(*larger.enemies()[0].instance);
             const double largeSpacing = glm::length(larger.enemies()[0].position - larger.enemies()[1].position);
             require(larger.enemies()[0].radius == 0.35 && glm::mat3{smallTransform} == glm::mat3{largeTransform} &&
@@ -289,7 +310,8 @@ int main(int argc, char** argv) {
         require(sharedAsset.use_count() == baselineOwners, "alternate definition retained model instances");
         std::cout << "Checking 500 rendered chickens..." << std::endl;
         const auto& configuration = grid->configuration();
-        debug.session().setDestination(glm::dvec2{configuration.origin.x + 40.37, configuration.origin.z + 40.29});
+        debug.session().setDestination(glm::dvec2{configuration.origin.x + configuration.width - 0.63,
+                                                  configuration.origin.z + configuration.height - 0.71});
         require(debug.session().spawn(engine, 500) == 500, "large chicken crowd did not spawn");
         require(sharedAsset.use_count() == baselineOwners + 500, "large crowd duplicated or retained model resources");
         movementMilliseconds = 0;
@@ -304,8 +326,7 @@ int main(int argc, char** argv) {
             frameTimes.push_back(
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
             for (const auto& enemy : system.enemies()) {
-                require(game::segmentWalkable(*grid, enemy.position, enemy.position, enemy.radius),
-                        "rendered crowd entered a wall");
+                require(debug.session().navigation().contains(enemy.position), "rendered crowd entered a wall");
             }
         }
         std::sort(frameTimes.begin(), frameTimes.end());
@@ -322,15 +343,12 @@ int main(int argc, char** argv) {
         require(debug.session().enemies()->enemies().empty(), "scene replacement kept stale runtime agents");
         std::cout << "Checking animated configuration and enemy lifecycle..." << std::endl;
         checkAnimatedEnemies(engine, *engine.scene()->navigationGrid());
-        std::cout << "Checking free movement without terrain..." << std::endl;
+        std::cout << "Checking missing navigation geometry..." << std::endl;
         editor.document().open(game / "assets/scenes/demo.json");
         debug.update(engine, 0);
-        require(!engine.scene()->navigationGrid() && debug.session().spawn(engine, 3) == 3,
-                "enemy spawning still required a grid");
-        debug.session().setDestination(glm::dvec2{24.37, -17.29});
-        const auto freePosition = debug.session().enemies()->enemies()[0].position;
-        debug.update(engine, 0.25);
-        require(debug.session().enemies()->enemies()[0].position != freePosition, "grid-free enemies did not move");
+        require(!engine.scene()->navigationGrid() && !debug.session().navigation().ready() &&
+                    debug.session().spawn(engine, 3) == 0,
+                "missing geometry allowed unbounded navigation");
         debug.session().reset(engine);
         std::cout << "PASS enemy controls, edit-only overlay, world destinations, predefined radii, resources and "
                      "animations.\n";

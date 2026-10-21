@@ -91,6 +91,7 @@ FetchContent_Declare(nlohmann_json
     URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 FetchContent_MakeAvailable(SDL3 glm tinyobjloader simdjson fastgltf stb mikktspace nlohmann_json)
+include(${CMAKE_CURRENT_LIST_DIR}/Recast.cmake)
 add_library(mikktspace STATIC "${mikktspace_SOURCE_DIR}/mikktspace.c")
 target_include_directories(mikktspace SYSTEM PUBLIC "${mikktspace_SOURCE_DIR}")
 add_library(stb_image INTERFACE)

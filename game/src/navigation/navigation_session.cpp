@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <grimlock/terrain.hpp>
 #include <stdexcept>
 
 namespace grimlock::game {
@@ -22,6 +23,7 @@ void NavigationSession::synchronize(Engine& engine) {
         enemies_->clear();
         scene_ = scene;
         grid_ = grid;
+        geometryRevision_.reset();
         if (replaced) {
             destination_ = glm::dvec2{4, 4};
         }
@@ -30,7 +32,8 @@ void NavigationSession::synchronize(Engine& engine) {
             const auto& c = grid->configuration();
             const double s = c.cellSize;
             spawnArea_ = {{c.origin.x + s * 0.5, c.origin.z + s * 0.5},
-                          {c.origin.x + std::max(1U, c.width / 3) * s - s * 0.5, c.origin.z + c.height * s - s * 0.5}};
+                          {c.origin.x + std::max(1U, c.width / 3) * s - s * 0.5, c.origin.z + c.height * s - s * 0.5},
+                          c.origin.y};
             if (replaced) {
                 destination_ = glm::dvec2{c.origin.x + (c.width - 0.5) * s, c.origin.z + (c.height - 0.5) * s};
             }
@@ -38,16 +41,39 @@ void NavigationSession::synchronize(Engine& engine) {
             spawnArea_ = {{-4, -4}, {4, 4}};
         }
     }
+    if (grid && geometryRevision_ != grid->revision()) {
+        buildNavigation();
+    } else if (!grid && (replaced || navigation_.ready())) {
+        navigation_.reset();
+        geometryRevision_.reset();
+    }
+}
+
+void NavigationSession::buildNavigation() {
+    if (!grid_) {
+        navigation_.reset();
+        return;
+    }
+    NavMeshConfiguration configuration;
+    configuration.agentRadius = static_cast<float>(enemies_->definition().radius);
+    const auto boxes = terrainBoxes(*grid_);
+    navigation_.build(navigationGeometry(boxes), configuration);
+    geometryRevision_ = grid_->revision();
+}
+
+void NavigationSession::rebuild(Engine& engine) {
+    synchronize(engine);
+    buildNavigation();
 }
 
 void NavigationSession::update(Engine& engine, double delta) {
     synchronize(engine);
-    enemies_->update(grid_, destination_, delta);
+    enemies_->update(navigation_, destination_, delta);
 }
 
 std::size_t NavigationSession::spawn(Engine& engine, std::size_t count) {
     synchronize(engine);
-    return enemies_->spawn(grid_, spawnArea_, count);
+    return enemies_->spawn(navigation_, spawnArea_, count);
 }
 
 void NavigationSession::reset(Engine& engine) {
@@ -62,6 +88,8 @@ void NavigationSession::shutdown() noexcept {
     grid_ = nullptr;
     configuration_.reset();
     destination_.reset();
+    navigation_.reset();
+    geometryRevision_.reset();
 }
 
 void NavigationSession::setDestination(std::optional<glm::dvec2> destination) {

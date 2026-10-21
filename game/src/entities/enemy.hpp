@@ -1,5 +1,7 @@
 #pragma once
 
+#include "navigation/nav_mesh.hpp"
+
 #include <grimlock/engine.hpp>
 #include <optional>
 #include <string>
@@ -32,7 +34,7 @@ struct EnemyDefinition {
 struct Enemy {
     EnemyId id = 0;
     std::optional<InstanceId> instance;
-    glm::dvec3 position{0}; // Foot position; horizontal movement preserves Y.
+    glm::dvec3 position{0}; // Foot position on the navigable surface.
     glm::dvec2 velocity{0};
     glm::dvec2 desiredVelocity{0};
     double speed = 1.5, radius = 0.22, yaw = 0;
@@ -40,10 +42,15 @@ struct Enemy {
     float health = 100;
     MovementStatus movement = MovementStatus::idle;
     bool active = true, alive = true, animationMoving = false;
+    NavigationPath path;
+    std::optional<glm::dvec2> requestedDestination;
+    double repathDelay = 0, stuckTime = 0;
+    bool retryPath = false;
 };
 
 struct SpawnArea {
     glm::dvec2 minimum{0}, maximum{1}; // World X/Z rectangle, including its boundary.
+    double height = 0;                 // Height hint when projecting onto a navigable surface.
 };
 
 } // namespace grimlock::game

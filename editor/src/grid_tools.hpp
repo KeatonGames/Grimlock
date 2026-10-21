@@ -8,6 +8,8 @@ namespace grimlock::editor {
 
 class GridDebug;
 
+void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug* debug);
+
 // Session-only debug tools; authored data stays in the real Scene/SceneDocument.
 class GridTools final {
 public:

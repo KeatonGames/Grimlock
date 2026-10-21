@@ -1,7 +1,5 @@
 #include "systems/enemy_system.hpp"
 
-#include "navigation/grid_clearance.hpp"
-
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -74,13 +72,18 @@ void EnemySystem::loadModel() {
     model_ = model;
 }
 
-std::size_t EnemySystem::spawn(const Grid* walls, SpawnArea area, std::size_t count) {
+std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::size_t count) {
     if (count > maximumEnemies || !std::isfinite(area.minimum.x) || !std::isfinite(area.minimum.y) ||
         !std::isfinite(area.maximum.x) || !std::isfinite(area.maximum.y) || area.minimum.x > area.maximum.x ||
-        area.minimum.y > area.maximum.y) {
+        area.minimum.y > area.maximum.y || !std::isfinite(area.height)) {
         throw std::invalid_argument("Invalid chicken count or spawn rectangle.");
     }
-    const double height = walls ? walls->configuration().origin.y : 0;
+    if (!navigation.ready()) {
+        return 0;
+    }
+    if (definition_.radius > navigation.configuration().agentRadius + 1e-6) {
+        throw std::invalid_argument("Rebuild the NavMesh for at least this enemy's physical radius.");
+    }
     const double padding = definition_.radius * 0.15;
     const double spacing = definition_.radius * 2 + padding;
     if (area.minimum.x + spacing <= area.minimum.x || area.minimum.y + spacing <= area.minimum.y) {
@@ -93,10 +96,11 @@ std::size_t EnemySystem::spawn(const Grid* walls, SpawnArea area, std::size_t co
 
     for (double z = area.minimum.y; z <= area.maximum.y && enemies_.size() < limit; z += spacing) {
         for (double x = area.minimum.x; x <= area.maximum.x && enemies_.size() < limit; x += spacing) {
-            const glm::dvec3 position{x, height, z};
-            if (walls && !segmentWalkable(*walls, position, position, definition_.radius)) {
+            const auto surface = navigation.project({x, area.height, z}, 0.03);
+            if (!surface || !navigation.contains({x, area.height, z}, 0.03)) {
                 continue;
             }
+            const glm::dvec3 position = surface->position;
             bool occupied = false;
             spawnNeighbors_.visit(position, spacing, [&](std::size_t index) {
                 const auto offset = enemies_[index].position - position;
@@ -116,9 +120,9 @@ std::size_t EnemySystem::spawn(const Grid* walls, SpawnArea area, std::size_t co
             enemy.deceleration = definition_.deceleration;
             enemy.health = definition_.maximumHealth;
             enemy.instance = engine_.createInstance(*model_, true);
-            enemies_.push_back(enemy);
+            enemies_.push_back(std::move(enemy));
             spawnNeighbors_.insert(enemies_.size() - 1, position);
-            auto& playback = engine_.animation(*enemy.instance);
+            auto& playback = engine_.animation(*enemies_.back().instance);
             playback.setSpeed(definition_.animationSpeed);
             if (movementClip_) {
                 playback.play(*movementClip_);
@@ -153,9 +157,9 @@ void EnemySystem::updateModel(Enemy& enemy) {
     enemy.animationMoving = moving;
 }
 
-void EnemySystem::update(const Grid* walls, std::optional<glm::dvec2> destination, double delta) {
+void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta) {
     const auto start = std::chrono::steady_clock::now();
-    movement_.update(walls, destination, enemies_, delta, definition_.despawnOnArrival);
+    movement_.update(navigation, destination, enemies_, delta, definition_.despawnOnArrival);
     metrics_.crowd = movement_.metrics();
     for (std::size_t index = 0; index < enemies_.size();) {
         auto& enemy = enemies_[index];

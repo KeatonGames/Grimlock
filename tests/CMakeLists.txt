@@ -1,10 +1,10 @@
 # A real Engine consumer: only its public headers and link interface are available.
-add_executable(GridClearanceChecks grid_clearance.cpp)
-target_link_libraries(GridClearanceChecks PRIVATE GameLogic)
-add_test(NAME Terrain.Clearance COMMAND GridClearanceChecks)
+add_executable(NavMeshChecks nav_mesh.cpp)
+target_link_libraries(NavMeshChecks PRIVATE GameLogic)
+add_test(NAME Navigation.NavMesh COMMAND NavMeshChecks)
 add_executable(EnemyCrowdChecks enemy_crowd.cpp)
 target_link_libraries(EnemyCrowdChecks PRIVATE GameLogic)
-add_test(NAME Enemies.Crowd COMMAND EnemyCrowdChecks)
+add_test(NAME Enemies.Crowd COMMAND EnemyCrowdChecks "${PROJECT_SOURCE_DIR}/game/assets/scenes/chickens.json")
 
 add_executable(EngineApiChecks engine_api.cpp)
 target_link_libraries(EngineApiChecks PRIVATE Engine)

@@ -55,7 +55,7 @@ struct CrowdMetrics {
 
 class CrowdMovement final {
 public:
-    void update(const Grid* walls,
+    void update(const NavMesh& navigation,
                 std::optional<glm::dvec2> destination,
                 std::span<Enemy> enemies,
                 double delta,
@@ -70,13 +70,13 @@ private:
                                         std::span<const Enemy> enemies,
                                         double maximumRadius,
                                         double padding);
-    [[nodiscard]] glm::dvec3 move(const Grid* walls,
+    [[nodiscard]] glm::dvec3 move(const NavMesh& navigation,
                                   std::size_t index,
                                   std::span<const Enemy> enemies,
                                   glm::dvec2 displacement,
                                   double maximumRadius);
-    void resolveOverlaps(const Grid* walls, std::span<Enemy> enemies, double maximumRadius);
-    void step(const Grid* walls,
+    void resolveOverlaps(const NavMesh& navigation, std::span<Enemy> enemies, double maximumRadius);
+    void step(const NavMesh& navigation,
               std::optional<glm::dvec2> destination,
               std::span<Enemy> enemies,
               double delta,
