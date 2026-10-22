@@ -1,5 +1,6 @@
 #pragma once
 
+#include "entities/enemy_definition.hpp"
 #include "navigation/nav_mesh.hpp"
 
 #include <grimlock/engine.hpp>
@@ -17,35 +18,39 @@ enum class MovementStatus {
     blocked
 };
 
-struct EnemyDefinition {
-    std::filesystem::path model = "models/chicken.glb";
-    double speed = 1.5;
-    double radius = 0.22;
-    double acceleration = 8;
-    double deceleration = 12;
-    float visualHeight = 0.36F; // World-space model height, independent of collision radius.
-    float maximumHealth = 100;
-    std::string movementAnimation = "walk";
-    float animationSpeed = 1;
-    double forwardYaw = 0;
-    bool despawnOnArrival = true;
+enum class EnemyState {
+    idle,
+    moving,
+    reached,
+    blocked
 };
+
+[[nodiscard]] const char* enemyStateName(EnemyState state) noexcept;
 
 struct Enemy {
     EnemyId id = 0;
+    EnemyTypeId type = 0;
+    const NavMesh* navigation = nullptr; // Borrowed; the owning session outlives all its enemies.
     std::optional<InstanceId> instance;
     glm::dvec3 position{0}; // Foot position on the navigable surface.
     glm::dvec2 velocity{0};
     glm::dvec2 desiredVelocity{0};
-    double speed = 1.5, radius = 0.22, yaw = 0;
+    double speed = 1.5, radius = 0.195, yaw = 0;
     double acceleration = 8, deceleration = 12;
     float health = 100;
     MovementStatus movement = MovementStatus::idle;
+    EnemyState state = EnemyState::idle;
+    std::optional<glm::dvec2> destination;
+    double stoppingDistance = 0; // Zero uses the physical radius.
+    double retryInterval = 1, stuckTimeout = 2;
+    double remainingDistance = 0;
     bool active = true, alive = true, animationMoving = false;
+    bool despawnOnArrival = false;
     NavigationPath path;
     std::optional<glm::dvec2> requestedDestination;
     double repathDelay = 0, stuckTime = 0;
     bool retryPath = false;
+    bool destinationAssigned = false;
 };
 
 struct SpawnArea {

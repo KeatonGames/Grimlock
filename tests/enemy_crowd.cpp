@@ -29,9 +29,10 @@ std::vector<Enemy> makeEnemies(std::size_t count) {
     enemies.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {
         Enemy enemy;
+        enemy.despawnOnArrival = true; // Keep the exit clear while measuring crowd throughput.
         enemy.id = i + 1;
         enemy.position = {1 + static_cast<double>(i % 20) * 0.55, 0, 1 + static_cast<double>(i / 20) * 0.55};
-        enemy.radius = i % 2 ? 0.22 : 0.18;
+        enemy.radius = i % 2 ? EnemyDefinition{}.radius : 0.18;
         enemies.push_back(std::move(enemy));
     }
     return enemies;
@@ -42,7 +43,8 @@ void checkClearance(const NavMesh& navigation, std::span<const Enemy> enemies) {
         if (!enemies[i].active) {
             continue;
         }
-        require(navigation.contains(enemies[i].position), "separation pushed an enemy outside NavMesh");
+        const auto& surface = enemies[i].navigation ? *enemies[i].navigation : navigation;
+        require(surface.contains(enemies[i].position), "separation pushed an enemy outside NavMesh");
         require(std::isfinite(enemies[i].yaw), "invalid orientation");
         for (std::size_t j = i + 1; j < enemies.size(); ++j) {
             if (enemies[j].active) {
@@ -106,8 +108,8 @@ void checkEditsAndInvalidQueries() {
         movement.update(navigation, glm::dvec2{25, 5}, enemies, 1.0 / 60);
     }
     require(enemies[0].movement == MovementStatus::blocked && enemies[0].position.x == 1 &&
-                navigation.statistics().pathQueries == 1,
-            "unreachable route moved or repeated searches");
+                navigation.statistics().pathQueries >= 2 && navigation.statistics().pathQueries <= 4,
+            "unreachable route moved or retried excessively");
     require(navigation.build(openFloor()), "wall removal rebuild failed");
     movement.update(navigation, glm::dvec2{25, 5}, enemies, 0.25);
     require(enemies[0].position.x > 1 && enemies[0].path.revision == navigation.revision(),
@@ -180,21 +182,75 @@ void checkRecoveryAndSpikes() {
     checkClearance(navigation, enemies);
 }
 
+void checkCompactSpacing() {
+    NavMesh navigation;
+    NavMeshConfiguration config;
+    config.agentRadius = static_cast<float>(EnemyDefinition{}.radius);
+    require(navigation.build(openFloor(), config), "compact floor build failed");
+    auto enemies = makeEnemies(2);
+    for (auto& enemy : enemies) {
+        enemy.radius = EnemyDefinition{}.radius;
+        enemy.position = {0, 0, (enemy.id - 1) * 0.398};
+    }
+    CrowdMovement movement;
+    for (int frame = 0; frame < 300; ++frame) {
+        movement.update(navigation, glm::dvec2{25, 0.199}, enemies, 1.0 / 60);
+        checkClearance(navigation, enemies);
+        require(glm::length(enemies[0].position - enemies[1].position) < 0.405,
+                "comfort separation spread a compact group unnecessarily");
+    }
+}
+
+void checkMixedNavigation() {
+    NavigationGeometry geometry;
+    geometry.addBox({0, -0.2F, 0}, {10, 0, 8}, true);
+    geometry.addBox({4, 0, 0}, {5, 2, 3.6F}, false);
+    geometry.addBox({4, 0, 4.4F}, {5, 2, 8}, false);
+    NavMesh small, large;
+    NavMeshConfiguration config;
+    config.agentRadius = 0.195F;
+    require(small.build(geometry, config), small.status().c_str());
+    config.agentRadius = 0.55F;
+    config.agentHeight = 1;
+    require(large.build(geometry, config), large.status().c_str());
+    auto enemies = makeEnemies(2);
+    enemies[0].radius = 0.195;
+    enemies[0].position = {2, 0, 4};
+    enemies[0].navigation = &small;
+    enemies[1].radius = 0.55;
+    enemies[1].position = {2, 0, 6};
+    enemies[1].navigation = &large;
+    CrowdMovement movement;
+    for (int frame = 0; frame < 600; ++frame) {
+        movement.update(small, glm::dvec2{8, 4}, enemies, 1.0 / 60);
+        checkClearance(small, enemies);
+    }
+    require(!enemies[0].active && enemies[1].movement == MovementStatus::blocked && enemies[1].position.x == 2,
+            "mixed radii did not use their own valid navigation clearance");
+    require(small.statistics().pathQueries == 1 && large.statistics().pathQueries <= 11,
+            "mixed navigation searched every frame");
+}
+
 void checkChickenMap(const std::filesystem::path& scenePath) {
     constexpr std::size_t count = 100;
     const auto scene = Scene::load(scenePath);
     const auto& grid = *scene->navigationGrid();
     NavMesh navigation;
-    require(navigation.build(navigationGeometry(terrainBoxes(grid))), navigation.status().c_str());
+    NavMeshConfiguration configuration;
+    configuration.agentRadius = static_cast<float>(EnemyDefinition{}.radius);
+    configuration.agentHeight = static_cast<float>(EnemyDefinition{}.height);
+    require(navigation.build(navigationGeometry(terrainBoxes(grid)), configuration), navigation.status().c_str());
     const auto& c = grid.configuration();
     std::vector<Enemy> enemies;
-    for (double z = c.origin.z + 0.5; z < c.origin.z + c.height - 0.5 && enemies.size() < count; z += 0.473) {
-        for (double x = c.origin.x + 0.5; x < c.origin.x + 9.5 && enemies.size() < count; x += 0.473) {
+    const double spacing = EnemyDefinition{}.radius * 2.02;
+    for (double z = c.origin.z + 0.5; z < c.origin.z + c.height - 0.5 && enemies.size() < count; z += spacing) {
+        for (double x = c.origin.x + 0.5; x < c.origin.x + 9.5 && enemies.size() < count; x += spacing) {
             const auto surface = navigation.project({x, c.origin.y, z}, 0.03);
             if (!surface || !navigation.contains({x, c.origin.y, z}, 0.03)) {
                 continue;
             }
             Enemy enemy;
+            enemy.despawnOnArrival = true;
             enemy.id = enemies.size() + 1;
             enemy.position = surface->position;
             enemies.push_back(std::move(enemy));
@@ -230,6 +286,8 @@ int main(int argc, char** argv) {
         checkDirectMovement();
         checkEditsAndInvalidQueries();
         checkRecoveryAndSpikes();
+        checkCompactSpacing();
+        checkMixedNavigation();
         checkCrowd(100, false);
         checkCrowd(100, true);
         checkCrowd(500, false);

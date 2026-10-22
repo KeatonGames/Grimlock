@@ -613,6 +613,7 @@ std::vector<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws
                                           glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
                                           glm::vec4{normal[2], 0.0F},
                                           draw.baseColor};
+            const auto nodeData = deformation_->appendNode(pose.joints[node.node], pose.weights[node.node]);
             for (const auto mesh : node.meshes) {
                 const auto& material = model.materials->at(draw.materialOverride.value_or(model.meshMaterials[mesh]));
                 const float depth = -(view * transform * glm::vec4{model.meshCenters[mesh], 1.0F}).z;
@@ -622,10 +623,8 @@ std::vector<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws
                 }
 
                 const auto& geometry = model.meshes[mesh];
-                const auto deformation = deformation_->append(pose.joints[node.node],
-                                                              pose.weights[node.node],
-                                                              geometry.morphVertexCount,
-                                                              geometry.morphTargetCount);
+                const auto deformation =
+                    deformation_->append(nodeData, geometry.morphVertexCount, geometry.morphTargetCount);
                 primitives.push_back(
                     {&model, mesh, constants, &material, determinant < 0.0F, depth, primitives.size(), deformation});
             }
@@ -633,6 +632,10 @@ std::vector<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws
     }
 
     return primitives;
+}
+
+void VulkanRenderer::validateFrameSize(DeformationFrameSize size) const {
+    deformation_->validateFrameSize(size);
 }
 
 void VulkanRenderer::sortPrimitiveDraws(std::span<PrimitiveDraw> primitives) {

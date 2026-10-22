@@ -60,16 +60,14 @@ public:
                 std::span<Enemy> enemies,
                 double delta,
                 bool despawnOnArrival = true);
+    void update(const NavMesh& navigation, std::span<Enemy> enemies, double delta, bool despawnOnArrival = true);
 
     [[nodiscard]] const CrowdMetrics& metrics() const noexcept {
         return metrics_;
     }
 
 private:
-    [[nodiscard]] glm::dvec2 separation(std::size_t index,
-                                        std::span<const Enemy> enemies,
-                                        double maximumRadius,
-                                        double padding);
+    [[nodiscard]] glm::dvec2 separation(std::size_t index, std::span<const Enemy> enemies, double maximumRadius);
     [[nodiscard]] glm::dvec3 move(const NavMesh& navigation,
                                   std::size_t index,
                                   std::span<const Enemy> enemies,
@@ -77,7 +75,6 @@ private:
                                   double maximumRadius);
     void resolveOverlaps(const NavMesh& navigation, std::span<Enemy> enemies, double maximumRadius);
     void step(const NavMesh& navigation,
-              std::optional<glm::dvec2> destination,
               std::span<Enemy> enemies,
               double delta,
               double maximumRadius,
@@ -86,6 +83,7 @@ private:
     std::vector<double> remaining_;
     CrowdMetrics metrics_;
     std::uint64_t order_ = 0;
+    std::optional<glm::dvec2> sharedDestination_;
 };
 
 } // namespace grimlock::game

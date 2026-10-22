@@ -147,6 +147,78 @@ void checkValidFrames(SDL_Window* window) {
     renderFrame(renderer, camera, {});
 }
 
+void checkDeformationGrowth(SDL_Window* window) {
+    VulkanRenderer renderer{window};
+    auto source = std::make_shared<assets::ModelData>(makeModel(true));
+    source->skins[0].joints.assign(235, 1);
+    source->skins[0].inverseBindMatrices.assign(235, glm::mat4{1});
+    const auto model = renderer.uploadModel(*source);
+    assets::ModelInstance instance{source};
+    const auto camera = testCamera();
+    std::vector<ModelDraw> draws;
+    draws.reserve(1000);
+    for (int i = 0; i < 1000; ++i) {
+        const glm::vec3 position{(i % 32) * 0.1F - 1.6F, (i / 32) * 0.1F - 1.6F, 0};
+        draws.push_back(
+            {.model = model,
+             .transform = glm::translate(glm::mat4{1}, position) * glm::scale(glm::mat4{1}, glm::vec3{0.03F}),
+             .pose = &instance.pose()});
+    }
+    renderFrame(renderer, camera, std::span{draws}.first(1));
+    // 5,000 primitive records and 235,000 joint matrices exceed both old arenas.
+    renderFrame(renderer, camera, draws);
+    renderFrame(renderer, camera, draws);
+    renderFrame(renderer, camera, {});
+    renderFrame(renderer, camera, std::span{draws}.first(1));
+    const std::array released{model};
+    renderer.releaseModels(released);
+    draws[0].model = renderer.uploadModel(*source);
+    renderFrame(renderer, camera, std::span{draws}.first(1));
+}
+
+void checkDeformationArena(SDL_Window* window) {
+    VulkanContext context{window};
+    Deformation deformation{context};
+    Buffer morphs{context,
+                  16,
+                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+    const auto set = deformation.meshSet(morphs.handle(), morphs.size());
+    const auto removed = deformation.meshSet(morphs.handle(), morphs.size());
+    const std::array released{removed};
+    deformation.releaseMeshSets(released);
+    const std::vector<glm::mat4> joints(70000, glm::mat4{1});
+    const std::vector<float> weights(70000, 0.5F);
+    deformation.begin();
+    const auto node = deformation.appendNode(joints, weights);
+    for (int draw = 0; draw < 5000; ++draw) {
+        (void)deformation.append(node, 1, static_cast<std::uint32_t>(weights.size()));
+    }
+    require(deformation.size().draws == 5000 && deformation.size().joints == 70000 &&
+                deformation.size().weights == 70000,
+            "node deformation was duplicated for each primitive");
+    deformation.upload(); // All three buffers grow; only the live set may be rebound.
+    deformation.begin();
+    require(deformation.size().draws == 0 && deformation.size().joints == 0 && deformation.size().weights == 0,
+            "frame begin retained deformation data");
+    const auto empty = deformation.appendNode({}, {});
+    (void)deformation.append(empty, 0, 0);
+    deformation.upload();
+    for (const auto invalid : {DeformationFrameSize{std::numeric_limits<std::size_t>::max(), 0, 0},
+                               DeformationFrameSize{0, std::numeric_limits<std::size_t>::max(), 0},
+                               DeformationFrameSize{0, 0, std::numeric_limits<std::size_t>::max()}}) {
+        bool rejected = false;
+        try {
+            deformation.validateFrameSize(invalid);
+        } catch (const std::length_error&) {
+            rejected = true;
+        }
+        require(rejected, "device deformation limits were ignored");
+    }
+    const std::array remaining{set};
+    deformation.releaseMeshSets(remaining);
+}
+
 void checkGridFrames(SDL_Window* window, const std::filesystem::path& cubePath) {
     VulkanRenderer renderer{window};
     const auto cube = renderer.uploadModel(assets::loadModel(cubePath));
@@ -260,7 +332,7 @@ void checkValidation(SDL_Window* window) {
         [](auto&, auto& pose, auto&) {
             pose.weights[0].clear();
         },
-        "Deformation frame exceeds 4096 draws/65536 joint matrices/65536 morph weights, or morph count mismatch.");
+        "Instance morph weights do not match primitive morph targets.");
 }
 
 } // namespace
@@ -270,6 +342,8 @@ int main(int argc, char** argv) {
         require(argc == 2, "expected the shared cube model path");
         platform::Window window{"Renderer frame checks", 320, 240};
         checkValidFrames(window.native());
+        checkDeformationGrowth(window.native());
+        checkDeformationArena(window.native());
         checkGridFrames(window.native(), argv[1]);
         checkValidation(window.native());
         std::cout

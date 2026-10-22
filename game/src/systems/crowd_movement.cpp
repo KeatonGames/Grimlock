@@ -1,5 +1,7 @@
 #include "systems/crowd_movement.hpp"
 
+#include "systems/enemy_ai.hpp"
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -14,6 +16,10 @@ namespace {
 
 glm::dvec2 horizontal(glm::dvec3 value) {
     return {value.x, value.z};
+}
+
+const NavMesh& navigationFor(const Enemy& enemy, const NavMesh& fallback) {
+    return enemy.navigation ? *enemy.navigation : fallback;
 }
 
 double contactFraction(glm::dvec2 offset, glm::dvec2 displacement, double distance) {
@@ -86,11 +92,21 @@ void CrowdMovement::update(const NavMesh& navigation,
                            std::span<Enemy> enemies,
                            double delta,
                            bool despawnOnArrival) {
-    if (!std::isfinite(delta) || delta < 0) {
-        throw std::invalid_argument("Crowd delta must be finite and nonnegative.");
-    }
     if (destination && (!std::isfinite(destination->x) || !std::isfinite(destination->y))) {
         throw std::invalid_argument("Enemy destination must contain finite world X/Z coordinates.");
+    }
+    for (auto& enemy : enemies) {
+        if (!enemy.destinationAssigned || sharedDestination_ != destination) {
+            EnemyAi::setDestination(enemy, destination);
+        }
+    }
+    sharedDestination_ = destination;
+    update(navigation, enemies, delta, despawnOnArrival);
+}
+
+void CrowdMovement::update(const NavMesh& navigation, std::span<Enemy> enemies, double delta, bool despawnOnArrival) {
+    if (!std::isfinite(delta) || delta < 0) {
+        throw std::invalid_argument("Crowd delta must be finite and nonnegative.");
     }
     metrics_ = {};
     if (enemies.empty()) {
@@ -102,7 +118,10 @@ void CrowdMovement::update(const NavMesh& navigation,
             !std::isfinite(enemy.acceleration) || enemy.acceleration <= 0 || !std::isfinite(enemy.deceleration) ||
             enemy.deceleration <= 0 || !std::isfinite(enemy.position.x) || !std::isfinite(enemy.position.y) ||
             !std::isfinite(enemy.position.z) || !std::isfinite(enemy.velocity.x) || !std::isfinite(enemy.velocity.y) ||
-            !std::isfinite(enemy.yaw)) {
+            !std::isfinite(enemy.yaw) || !std::isfinite(enemy.stoppingDistance) || enemy.stoppingDistance < 0 ||
+            !std::isfinite(enemy.retryInterval) || enemy.retryInterval <= 0 || !std::isfinite(enemy.stuckTimeout) ||
+            enemy.stuckTimeout <= 0 ||
+            (enemy.destination && (!std::isfinite(enemy.destination->x) || !std::isfinite(enemy.destination->y)))) {
             throw std::invalid_argument("Enemy movement parameters and state must be finite and valid.");
         }
         minimumRadius = std::min(minimumRadius, enemy.radius);
@@ -114,14 +133,13 @@ void CrowdMovement::update(const NavMesh& navigation,
     delta = std::min({delta, 0.25, limit * 64});
     do {
         const double dt = std::min(delta, limit);
-        step(navigation, destination, enemies, dt, maximumRadius, despawnOnArrival);
+        step(navigation, enemies, dt, maximumRadius, despawnOnArrival);
         delta -= dt;
         ++metrics_.substeps;
     } while (delta > 1e-10);
 }
 
 void CrowdMovement::step(const NavMesh& navigation,
-                         std::optional<glm::dvec2> destination,
                          std::span<Enemy> enemies,
                          double delta,
                          double maximumRadius,
@@ -135,79 +153,28 @@ void CrowdMovement::step(const NavMesh& navigation,
         if (!enemy.active || !enemy.alive) {
             continue;
         }
-        enemy.repathDelay = std::max(0.0, enemy.repathDelay - delta);
-        if (!navigation.contains(enemy.position) || enemy.radius > navigation.configuration().agentRadius + 1e-6) {
-            enemy.movement = MovementStatus::blocked;
-            enemy.velocity = {0, 0};
-            continue;
-        }
-        if (!destination) {
-            enemy.movement = MovementStatus::idle;
-            enemy.velocity = {0, 0};
-            enemy.requestedDestination.reset();
-            enemy.path.valid = false;
-            continue;
-        }
-        const bool changed = enemy.requestedDestination != destination || enemy.path.revision != navigation.revision();
-        if (changed || (enemy.retryPath && enemy.repathDelay <= 0)) {
-            const glm::dvec3 goal{destination->x, enemy.position.y, destination->y};
-            const bool found = navigation.findPath(enemy.position, goal, enemy.path);
-            enemy.requestedDestination = destination;
-            enemy.retryPath = false;
-            enemy.repathDelay = 1;
-            enemy.stuckTime = 0;
-            if (!found) {
-                enemy.velocity = {0, 0};
-            }
-        }
-        double remaining = 0;
-        const auto target = navigation.steering(enemy.position, enemy.path, &remaining);
-        if (!target) {
-            // A failed search waits for a destination/mesh change. A displaced
-            // corridor requests a bounded retry, rather than searching every frame.
-            enemy.retryPath = enemy.retryPath || !enemy.path.polygons.empty();
-            enemy.movement = MovementStatus::blocked;
-            enemy.velocity = {0, 0};
-            continue;
-        }
-        remaining_[index] = remaining;
-        if (remaining <= std::max(1e-4, enemy.radius)) {
-            enemy.movement = MovementStatus::arrived;
-            enemy.velocity = {0, 0};
-            enemy.active = !despawnOnArrival;
-            continue;
-        }
-        const auto offset = horizontal(*target - enemy.position);
-        const double distance = glm::length(offset);
-        if (distance < 1e-6) {
-            enemy.retryPath = true;
-            enemy.path.valid = false;
-            enemy.movement = MovementStatus::blocked;
-            enemy.velocity = {0, 0};
-            continue;
-        }
-        enemy.movement = MovementStatus::idle;
-        const double speed = std::min(enemy.speed, std::sqrt(2 * enemy.deceleration * remaining));
-        enemy.desiredVelocity = offset * (speed / distance);
+        EnemyAi::prepare(enemy, navigationFor(enemy, navigation), delta, despawnOnArrival);
+        remaining_[index] = enemy.remainingDistance;
     }
 
     for (std::size_t order = 0; order < enemies.size(); ++order) {
         const auto index = static_cast<std::size_t>((order + order_) % enemies.size());
         auto& enemy = enemies[index];
-        if (!destination || !enemy.active || !enemy.alive || enemy.movement == MovementStatus::blocked ||
+        if (!enemy.destination || !enemy.active || !enemy.alive || enemy.movement == MovementStatus::blocked ||
             enemy.movement == MovementStatus::arrived) {
             continue;
         }
         auto desired = enemy.desiredVelocity;
         if (enemy.speed > 0) {
-            desired += separation(index, enemies, maximumRadius, enemy.radius * 0.025) * enemy.speed * 1.4;
+            desired += separation(index, enemies, maximumRadius) * enemy.speed * 1.4;
         }
         const double speed = glm::length(desired);
         if (speed > enemy.speed && speed > 0) {
             desired *= enemy.speed / speed;
         }
         // Preview wall sliding to start turning or braking before physical contact.
-        desired = horizontal(navigation.move(enemy.position, desired * 0.2) - enemy.position) / 0.2;
+        desired =
+            horizontal(navigationFor(enemy, navigation).move(enemy.position, desired * 0.2) - enemy.position) / 0.2;
         enemy.desiredVelocity = desired;
         const auto change = desired - enemy.velocity;
         const double difference = glm::length(change);
@@ -221,28 +188,24 @@ void CrowdMovement::step(const NavMesh& navigation,
             enemy.velocity = displacement / delta;
         }
         const double traveled = glm::length(displacement);
-        enemy.stuckTime = enemy.speed > 0 && traveled < enemy.speed * delta * 0.02 ? enemy.stuckTime + delta : 0;
-        if (enemy.stuckTime > 2 && enemy.repathDelay <= 0) {
-            enemy.retryPath = true;
-            enemy.stuckTime = 0;
-        }
         enemy.movement = glm::length(enemy.velocity) > 1e-4 ? MovementStatus::moving : MovementStatus::idle;
         if (enemy.movement == MovementStatus::moving) {
             const double facing = std::atan2(enemy.velocity.x, enemy.velocity.y);
             enemy.yaw += std::remainder(facing - enemy.yaw, 2 * std::numbers::pi) * -std::expm1(-10 * delta);
         }
+        EnemyAi::observeMovement(enemy, traveled, delta);
         neighbors_.relocate(index, before, enemy.position);
     }
+    // Surface clipping and float precision can leave tiny contact penetrations.
+    // Resolve them in the same substep instead of carrying them into the next frame.
+    resolveOverlaps(navigation, enemies, maximumRadius);
     ++order_;
 }
 
-glm::dvec2 CrowdMovement::separation(std::size_t index,
-                                     std::span<const Enemy> enemies,
-                                     double maximumRadius,
-                                     double padding) {
+glm::dvec2 CrowdMovement::separation(std::size_t index, std::span<const Enemy> enemies, double maximumRadius) {
     const auto& enemy = enemies[index];
     glm::dvec2 force{0};
-    const double range = (enemy.radius + maximumRadius + padding) * 1.5;
+    const double range = (enemy.radius + maximumRadius) * 1.02;
     neighbors_.visit(enemy.position, range, [&](std::size_t otherIndex) {
         if (index == otherIndex || !enemies[otherIndex].active || !enemies[otherIndex].alive) {
             return;
@@ -250,9 +213,10 @@ glm::dvec2 CrowdMovement::separation(std::size_t index,
         ++metrics_.neighborChecks;
         const auto away = horizontal(enemy.position - enemies[otherIndex].position);
         const double distance = glm::length(away);
-        const double comfort = (enemy.radius + enemies[otherIndex].radius + padding) * 1.5;
+        const double comfort = (enemy.radius + enemies[otherIndex].radius) * 1.02;
         if (distance > 1e-10 && distance < comfort) {
-            const double weight = (comfort - distance) / comfort;
+            const double footprint = enemy.radius + enemies[otherIndex].radius;
+            const double weight = std::clamp((comfort - distance) / (comfort - footprint), 0.0, 1.0);
             const bool yield =
                 remaining_[otherIndex] < remaining_[index] - 1e-6 ||
                 (std::abs(remaining_[otherIndex] - remaining_[index]) <= 1e-6 && enemies[otherIndex].id < enemy.id);
@@ -268,10 +232,11 @@ glm::dvec3 CrowdMovement::move(const NavMesh& navigation,
                                glm::dvec2 displacement,
                                double maximumRadius) {
     const auto& enemy = enemies[index];
+    const auto& surface = navigationFor(enemy, navigation);
     auto position = enemy.position;
     const double skin = std::max(1e-8, enemy.radius * 1e-5);
     for (int contact = 0; contact < 4 && glm::dot(displacement, displacement) > 1e-22; ++contact) {
-        displacement = horizontal(navigation.move(position, displacement) - position);
+        displacement = horizontal(surface.move(position, displacement) - position);
         double fraction = 1;
         std::optional<std::size_t> neighbor;
         neighbors_.visit(position,
@@ -289,7 +254,7 @@ glm::dvec3 CrowdMovement::move(const NavMesh& navigation,
                                  neighbor = other;
                              }
                          });
-        position = navigation.move(position, displacement * fraction);
+        position = surface.move(position, displacement * fraction);
         if (!neighbor) {
             break;
         }
@@ -307,8 +272,9 @@ void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> 
         bool corrected = false;
         for (std::size_t index = 0; index < enemies.size(); ++index) {
             auto& enemy = enemies[index];
-            if (!enemy.active || !enemy.alive || !navigation.contains(enemy.position) ||
-                enemy.radius > navigation.configuration().agentRadius + 1e-6) {
+            const auto& surface = navigationFor(enemy, navigation);
+            if (!enemy.active || !enemy.alive || !surface.contains(enemy.position) ||
+                enemy.radius > surface.configuration().agentRadius + 1e-6) {
                 continue;
             }
             glm::dvec2 correction{0};
@@ -332,7 +298,7 @@ void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> 
             }
             correction *= std::min(1.0, enemy.radius * 0.5 / distance);
             const auto before = enemy.position;
-            enemy.position = navigation.move(enemy.position, correction);
+            enemy.position = surface.move(enemy.position, correction);
             neighbors_.relocate(index, before, enemy.position);
             corrected = corrected || enemy.position != before;
         }

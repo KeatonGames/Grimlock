@@ -54,9 +54,7 @@ void click(Engine& engine, SDL_WindowID window, glm::vec2 point) {
     tick(engine);
 }
 
-void navigationControl(Engine& engine, SDL_WindowID window, const char* label) {
-    std::cout << "Control: " << label << std::endl;
-    click(engine, window, {130, 11});
+void popupControl(Engine& engine, SDL_WindowID window, const char* label) {
     auto& popups = ImGui::GetCurrentContext()->OpenPopupStack;
     require(!popups.empty() && popups.back().Window, "Navigation menu missing");
     const auto* popup = popups.back().Window;
@@ -78,6 +76,15 @@ void navigationControl(Engine& engine, SDL_WindowID window, const char* label) {
         }
     }
     require(found, label);
+}
+
+void navigationControl(Engine& engine, SDL_WindowID window, const char* label, const char* choice = nullptr) {
+    std::cout << "Control: " << label << std::endl;
+    click(engine, window, {130, 11});
+    popupControl(engine, window, label);
+    if (choice) {
+        popupControl(engine, window, choice);
+    }
     ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
     tick(engine);
     ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
@@ -134,8 +141,147 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
         system.setSpeed(1);
         system.update(navigation, destination, 1.0 / 60);
         require(a.playing(), "moving enemy animation did not resume");
+        require(system.setDestination(firstId, std::nullopt), "individual enemy lookup failed");
+        const auto* last = system.find(lastId);
+        require(last && !system.find(removedId), "stable enemy lookup survived removal incorrectly");
+        const glm::dvec2 individualGoal{last->position.x, last->position.z};
+        require(system.setDestination(lastId, individualGoal), "individual destination assignment failed");
+        system.update(navigation, destination, 1.0 / 60);
+        require(system.find(firstId)->state == game::EnemyState::idle && a.paused() &&
+                    system.find(lastId)->state == game::EnemyState::reached &&
+                    engine.animation(*system.find(lastId)->instance).paused(),
+                "independent Idle/Reached states or animation playback incorrect");
+        require(system.find(lastId)->destination == individualGoal,
+                "per-frame shared destination overwrote an individual assignment");
+        system.setSharedDestination(destination);
+        system.update(navigation, destination, 1.0 / 60);
+        require(system.find(firstId)->state == game::EnemyState::moving && a.playing(),
+                "shared retarget did not resume idle enemy animation");
     }
     require(resource.use_count() == baselineOwners, "enemy system destruction retained animation instances");
+}
+
+void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_WindowID window) {
+    auto& session = debug.session();
+    auto& system = *session.enemies();
+    session.reset(engine);
+    require(system.typeCount() == 11 && system.definition().name == "Chicken", "animal catalog/default missing");
+    require(session.spawn(engine, 2) == 2, "compact chicken spawn failed");
+    const auto chicken = system.enemies()[0];
+    const auto chickenRevision = chicken.navigation->revision();
+    const auto transform = engine.transform(*chicken.instance);
+    const double spacing = glm::length(chicken.position - system.enemies()[1].position);
+    require(spacing >= chicken.radius * 2 && spacing < chicken.radius * 2 + 0.005,
+            "chicken spawning retained excessive padding");
+
+    navigationControl(engine, window, "Animal Model", "Dog");
+    const auto dogType = session.selectedAnimal();
+    require(system.definition(dogType).model == "models/dog.glb" && system.enemies().size() == 2 &&
+                system.enemies()[0].radius == chicken.radius && system.enemies()[0].navigation == chicken.navigation &&
+                chicken.navigation->revision() == chickenRevision && engine.transform(*chicken.instance) == transform,
+            "selecting an animal modified an existing chicken");
+    const double oldSpeed = system.enemies()[0].speed;
+    system.setSpawnSpeed(0.8, 0);
+    require(system.enemies()[0].speed == oldSpeed, "spawn speed edited an existing enemy");
+    navigationControl(engine, window, "Spawn Animals");
+    require(system.enemies().size() > 2 && system.enemies()[2].type == dogType &&
+                system.enemies()[2].radius == system.definition(dogType).radius &&
+                engine.animation(*system.enemies()[2].instance).asset() != engine.animation(*chicken.instance).asset(),
+            "model dropdown did not affect spawned model and physical settings");
+    for (std::size_t i = 0; i < system.enemies().size(); ++i) {
+        for (std::size_t j = i + 1; j < system.enemies().size(); ++j) {
+            require(glm::length(system.enemies()[i].position - system.enemies()[j].position) + 1e-5 >=
+                        system.enemies()[i].radius + system.enemies()[j].radius,
+                    "mixed spawn footprints overlapped");
+        }
+    }
+    session.reset(engine);
+    navigationControl(engine, window, "Animal Model", "Black Rat");
+    require(session.spawn(engine, 2) == 2, "selected animated animal did not spawn");
+    const auto first = *system.enemies()[0].instance;
+    auto& playback = engine.animation(first);
+    require(!playback.restPose() && playback.model().animations[playback.clip()].name.find("walk") != std::string::npos,
+            "automatic movement animation did not prefer a walking loop");
+    for (int frame = 0; frame < 30; ++frame) {
+        require(engine.update([&](double) {
+            session.update(engine, 1.0 / 60);
+        }),
+                "selected animal render failed");
+    }
+    require(playback.playing(), "selected animal movement animation did not resume");
+    session.reset(engine);
+
+    std::cout << "Checking every configured animal asset..." << std::endl;
+    session.setDestination(std::nullopt);
+    for (game::EnemyTypeId type = 0; type < system.typeCount(); ++type) {
+        session.selectAnimal(engine, type);
+        require(session.spawn(engine, 2) == 2, "configured animal did not spawn");
+        const auto& a = system.enemies()[system.enemies().size() - 2];
+        const auto& b = system.enemies().back();
+        require(a.type == type && b.type == type && a.navigation == b.navigation &&
+                    engine.animation(*a.instance).asset() == engine.animation(*b.instance).asset(),
+                "animal type/model resources were not shared");
+        const auto info = engine.modelInfo(engine.loadModel(engine.assetRoot() / system.definition(type).model));
+        const auto size =
+            (info.maximum - info.minimum) * (system.definition(type).visualHeight / (info.maximum.y - info.minimum.y));
+        std::cout << system.definition(type).name << " visual bounds " << size.x << ',' << size.y << ',' << size.z
+                  << "; physical radius " << system.definition(type).radius << '\n';
+        require(system.definition(type).radius >= glm::length(glm::dvec2{size.x, size.z}) * 0.5,
+                "configured footprint does not cover the animal's framed XZ dimensions");
+        require(engine.update([&](double) {
+            session.update(engine, 1.0 / 60);
+        }),
+                "animal asset render failed");
+    }
+    const auto oldRevision = chicken.navigation->revision();
+    session.rebuild(engine);
+    require(chicken.navigation->revision() > oldRevision, "mixed navigation rebuild missed chicken profile");
+    for (const auto& enemy : system.enemies()) {
+        require(enemy.navigation->ready(), "mixed rebuild lost a navigation profile");
+    }
+    session.reset(engine);
+    session.selectAnimal(engine, 0);
+    system.setSpawnSpeed(1.5, 0);
+}
+
+void checkAnimalBatches(Engine& engine, game::NavigationDebug& debug, SDL_WindowID window) {
+    auto& session = debug.session();
+    auto& system = *session.enemies();
+    session.reset(engine);
+    session.setDestination(std::nullopt);
+    navigationControl(engine, window, "Animal Model", "Black Rat");
+    require(session.spawn(engine, 100) == 100, "default rat batch did not fit");
+    require(engine.update([&](double) {
+        session.update(engine, 1.0 / 60);
+    }),
+            "100-rat frame failed");
+    require(session.spawn(engine, 200) == 200, "larger rat batch did not fit");
+    const auto asset = engine.animation(*system.enemies()[0].instance).asset();
+    for (const auto& enemy : system.enemies()) {
+        require(engine.animation(*enemy.instance).asset() == asset, "rat batch duplicated model resources");
+    }
+    for (int frame = 0; frame < 3; ++frame) {
+        require(engine.update([&](double) {
+            session.update(engine, 1.0 / 60);
+        }),
+                "300-rat frame failed");
+    }
+    session.reset(engine);
+    for (game::EnemyTypeId type = 0; type < system.typeCount(); ++type) {
+        if (system.definition(type).model == "models/bunny2.glb") {
+            session.selectAnimal(engine, type);
+            break;
+        }
+    }
+    require(session.spawn(engine, 200) == 200, "large multi-primitive animal batch did not fit");
+    for (int frame = 0; frame < 3; ++frame) {
+        require(engine.update([&](double) {
+            session.update(engine, 1.0 / 60);
+        }),
+                "200-bunny frame failed");
+    }
+    session.reset(engine);
+    session.selectAnimal(engine, 0);
 }
 
 } // namespace
@@ -183,10 +329,15 @@ int main(int argc, char** argv) {
         require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
                 "NavMesh overlay stayed visible");
         std::cout << "Checking 100 chicken spawn..." << std::endl;
-        navigationControl(engine, id, "Spawn Chickens");
+        navigationControl(engine, id, "Spawn Animals");
         require(debug.session().enemies()->enemies().size() == 100 && scene->objects().size() == objectCount &&
                     !editor.document().dirty(),
                 "spawn failed or added serialized/dirty scene objects");
+        navigationControl(engine, id, "Inspect Enemy", "Clear Enemy Destination");
+        debug.update(engine, 0);
+        require(debug.session().enemies()->enemies()[0].state == game::EnemyState::idle,
+                "enemy inspector did not clear the selected destination");
+        debug.session().setDestination(debug.session().destination());
         const auto animationTime = scene->animation(4).time();
         const auto firstId = debug.session().enemies()->enemies()[0].id;
         const auto firstHandle = *debug.session().enemies()->enemies()[0].instance;
@@ -236,6 +387,7 @@ int main(int argc, char** argv) {
         }),
                 "edited wall frame failed");
         require(debug.session().enemies()->enemies()[0].movement == game::MovementStatus::blocked &&
+                    debug.session().enemies()->enemies()[0].state == game::EnemyState::blocked &&
                     debug.session().enemies()->enemies()[0].position == stoppedPosition &&
                     debug.session().navigation().revision() != oldRevision,
                 "painted wall did not stop the overlapping enemy");
@@ -251,7 +403,7 @@ int main(int argc, char** argv) {
         engine.saveScene(output);
         require(Scene::load(output)->objects().size() == objectCount, "test agents leaked into scene serialization");
         std::cout << "Checking test agent reset..." << std::endl;
-        navigationControl(engine, id, "Clear Chickens");
+        navigationControl(engine, id, "Clear Animals");
         require(debug.session().enemies()->enemies().empty(), "reset left active runtime instances");
         require(sharedAsset.use_count() == baselineOwners, "clearing enemies retained model instance ownership");
         bool invalidated = false;
@@ -334,6 +486,7 @@ int main(int argc, char** argv) {
                   << frameTimes[60] << " ms; p95 " << frameTimes[114] << " ms.\n";
         debug.session().reset(engine);
         require(sharedAsset.use_count() == baselineOwners, "large crowd cleanup leaked instances");
+        checkAnimalBatches(engine, debug, id);
         (void)debug.session().spawn(engine);
         editor.document().open(game / "assets/scenes/navigation.json");
         require(engine.update([&](double) {
@@ -343,6 +496,7 @@ int main(int argc, char** argv) {
         require(debug.session().enemies()->enemies().empty(), "scene replacement kept stale runtime agents");
         std::cout << "Checking animated configuration and enemy lifecycle..." << std::endl;
         checkAnimatedEnemies(engine, *engine.scene()->navigationGrid());
+        checkAnimalSelection(engine, debug, id);
         std::cout << "Checking missing navigation geometry..." << std::endl;
         editor.document().open(game / "assets/scenes/demo.json");
         debug.update(engine, 0);

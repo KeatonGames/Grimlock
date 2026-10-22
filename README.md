@@ -159,18 +159,22 @@ Cell `(x,z)` spans `[origin.x + x*s, origin.x + (x+1)*s)` and the equivalent Z i
 
 ### Chicken enemies and NavMesh navigation
 
-Open `assets/scenes/chickens.json` with `Grimlock.exe --editor`. Use **Navigation > Spawn Chickens**, **Destination X/Z**, **Movement Speed**, and **Clear Chickens**. Standalone Game mode spawns 100 chickens automatically on terrain scenes. Destinations remain continuous world coordinates.
+Open `assets/scenes/chickens.json` with `Grimlock.exe --editor`. Choose **Navigation > Animal Model**, then **Spawn Animals**. Chicken is the default; all 11 configured animal GLBs are available. **Movement Speed** sets the selected type's speed for future spawns, leaving existing animals unchanged. **Destination X/Z** and **Clear Animals** operate on the whole crowd. Standalone Game mode spawns 100 chickens automatically on terrain scenes. Destinations remain continuous world coordinates.
 
-Recast Navigation 1.6.0 builds a shared NavMesh from the same world-space cube geometry used by the renderer. Detour finds and caches polygon corridors per enemy, then funnel processing guides continuous movement around walls. Existing physical radii, separation, smoothed facing, model sharing and animation handling are preserved. Floor boundaries and walls constrain movement; there is no unbounded fallback when navigation geometry is absent.
+Recast Navigation 1.6.0 builds shared NavMesh profiles from the same world-space cube geometry used by the renderer, caching each requested physical radius/headroom pair. Small animals retain narrow routes when larger animals are added. Detour caches polygon corridors per enemy, then funnel processing guides continuous movement around walls. Physical circles, separation, smoothed facing, model sharing and animation handling remain active. Floor boundaries and walls constrain movement; there is no unbounded fallback when navigation geometry is absent.
 
 **Show NavMesh** enables an optional cyan debug overlay; it is hidden by default. **Rebuild NavMesh** rebuilds explicitly. Wall edits also rebuild automatically on the next movement update and invalidate cached paths. Grid lines remain visible only during **Edit Walkability**. Existing terrain/scene serialization is unchanged, and runtime chickens are not saved or selectable.
 
-See [NavMesh navigation](docs/navigation.md) for architecture, geometry inputs, configuration, query limits, controls, tests, performance and the changed-file list. The chicken model has no animation clips and uses its rest pose; animated enemy configurations retain independent playback.
+Animal dimensions, independent visual heights, movement and animation settings live in `game/assets/config/animals.json`. Chickens use a 0.195-unit radius, approximately 4 mm of spawn padding and a short 2% soft separation band; hard circular contact checks remain active. Different animal types share one crowd solver and their model resources. Add an animal GLB to `assets/models` and a matching definition to the JSON catalog; unrelated GLB props are excluded from the selector.
+
+Enemies use a lightweight Idle/Moving/Reached/Blocked FSM with independent destinations, configurable stopping distance and bounded retries for unreachable or stuck movement. **Navigation > Inspect Enemy** shows each animal's state and lets you edit or clear its goal. **Destination X/Z** retargets all current animals and sets the default for future spawns. Reached animals stay visible by default; `despawn_on_arrival` can restore removal. Their physical footprints remain active, so a packed goal can block following animals safely.
+
+See [NavMesh navigation](docs/navigation.md) for architecture, AI settings, controls, tests and the changed-file list. The chicken model has no animation clips and uses its rest pose; animated enemy configurations retain independent playback and pause when stationary.
 
 ## Current Limitations
 
-- Navigation currently builds one small debug-terrain NavMesh. Decorative GLB props do not contribute obstacles automatically. There is no physics, tile streaming, off-mesh traversal or DetourCrowd. Shared mesh clearance must cover the largest supported physical radius; oversized agents are rejected. Tight spawn areas can fit fewer enemies than requested.
-- No animation blending, state machines, timelines, keyframe editing or retargeting.
+- Navigation currently builds small debug-terrain NavMeshes for requested animal dimensions. Decorative GLB props do not contribute obstacles automatically. There is no physics, tile streaming, off-mesh traversal or DetourCrowd. Physical radii conservatively cover each configured model's XZ footprint; large animals may not fit narrow openings. Tight spawn areas can fit fewer enemies than requested.
+- No animation blending, animation state machines, timelines, keyframe editing or retargeting.
 - No multi-selection, undo/redo, transform gizmos, material editor or asset hot reload. Editor layouts are session-only.
 - Reparenting that requires shear is rejected rather than changing the model's appearance.
 - Some supplied static skinned assets have incomplete rest-joint data and use a warned bind-pose preview. The Engine cannot reconstruct missing rig data or invent animation clips.

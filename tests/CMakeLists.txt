@@ -1,4 +1,12 @@
 # A real Engine consumer: only its public headers and link interface are available.
+add_executable(AnimalDefinitionChecks animal_definition.cpp)
+target_link_libraries(AnimalDefinitionChecks PRIVATE GameLogic nlohmann_json::nlohmann_json)
+add_test(NAME Enemies.Definitions COMMAND AnimalDefinitionChecks "${PROJECT_SOURCE_DIR}/game/assets" "${CMAKE_CURRENT_BINARY_DIR}/animal-definitions")
+
+add_executable(EnemyAiChecks enemy_ai.cpp)
+target_link_libraries(EnemyAiChecks PRIVATE GameLogic)
+add_test(NAME Enemies.Ai COMMAND EnemyAiChecks)
+
 add_executable(NavMeshChecks nav_mesh.cpp)
 target_link_libraries(NavMeshChecks PRIVATE GameLogic)
 add_test(NAME Navigation.NavMesh COMMAND NavMeshChecks)

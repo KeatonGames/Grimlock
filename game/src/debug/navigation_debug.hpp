@@ -24,7 +24,9 @@ public:
     }
 
 private:
+    void enemyInspector(EnemySystem& enemies);
     NavigationSession session_;
+    std::optional<EnemyId> inspectedEnemy_;
     int count_ = 100;
     std::size_t lastSpawned_ = 0;
     std::string error_;

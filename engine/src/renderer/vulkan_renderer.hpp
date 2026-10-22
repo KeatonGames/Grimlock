@@ -49,6 +49,7 @@ public:
     // Internal IDs remain valid until releaseModels; freed slots may be reused.
     [[nodiscard]] std::size_t uploadModel(const assets::ModelData& model);
     void releaseModels(std::span<const std::size_t> models) noexcept;
+    void validateFrameSize(DeformationFrameSize size) const;
     [[nodiscard]] bool drawFrame(const Camera& camera,
                                  std::span<const ModelDraw> draws,
                                  const Lighting& lighting = {},

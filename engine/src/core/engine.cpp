@@ -153,15 +153,13 @@ struct Engine::Impl {
             for (const auto node : pose.activeNodes) {
                 const auto meshCount = object.instance_->model().nodes[node].meshes.size();
                 primitiveDraws += meshCount;
-                jointMatrices += meshCount * pose.joints[node].size();
-                morphWeights += meshCount * pose.weights[node].size();
-
-                if (primitiveDraws > 4096 || jointMatrices > 65536 || morphWeights > 65536) {
-                    throw std::runtime_error("Scene exceeds existing frame limits: 4096 primitive "
-                                             "draws, 65536 joint matrices or morph weights.");
+                if (meshCount > 0) {
+                    jointMatrices += pose.joints[node].size();
+                    morphWeights += pose.weights[node].size();
                 }
             }
         }
+        renderer.validateFrameSize({primitiveDraws, jointMatrices, morphWeights});
     }
 
     void prepare(Scene& scene) {

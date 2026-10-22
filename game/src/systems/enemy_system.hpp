@@ -10,7 +10,7 @@ struct EnemyMetrics {
     std::uint64_t arrived = 0;
 };
 
-// Owns the chicken instances. Engine must outlive this system.
+// Owns mixed animal instances and shared type configurations. Engine must outlive this system.
 class EnemySystem final {
 public:
     static constexpr std::size_t maximumEnemies = 1000;
@@ -19,14 +19,27 @@ public:
     EnemySystem(const EnemySystem&) = delete;
     EnemySystem& operator=(const EnemySystem&) = delete;
 
-    [[nodiscard]] std::size_t spawn(const NavMesh& navigation, SpawnArea area, std::size_t count);
+    [[nodiscard]] EnemyTypeId addDefinition(EnemyDefinition definition);
+    [[nodiscard]] std::size_t spawn(const NavMesh& navigation, SpawnArea area, std::size_t count, EnemyTypeId type = 0);
     [[nodiscard]] bool remove(EnemyId id) noexcept;
     void clear() noexcept;
     void update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta);
-    void setSpeed(double speed);
+    void setSpeed(double speed, EnemyTypeId type = 0);
+    void setSpawnSpeed(double speed, EnemyTypeId type);
+    void setSharedDestination(std::optional<glm::dvec2> destination);
+    [[nodiscard]] bool setDestination(EnemyId id, std::optional<glm::dvec2> destination);
+    [[nodiscard]] const Enemy* find(EnemyId id) const noexcept;
 
-    [[nodiscard]] const EnemyDefinition& definition() const noexcept {
-        return definition_;
+    [[nodiscard]] std::optional<glm::dvec2> sharedDestination() const noexcept {
+        return sharedDestination_;
+    }
+
+    [[nodiscard]] const EnemyDefinition& definition(EnemyTypeId type = 0) const {
+        return types_.at(type).definition;
+    }
+
+    [[nodiscard]] std::size_t typeCount() const noexcept {
+        return types_.size();
     }
 
     [[nodiscard]] std::span<const Enemy> enemies() const noexcept {
@@ -38,20 +51,25 @@ public:
     }
 
 private:
-    void loadModel();
+    struct AnimalType {
+        EnemyDefinition definition;
+        std::optional<ModelId> model;
+        ModelInfo info;
+        std::optional<std::size_t> movementClip;
+    };
+
+    void loadModel(EnemyTypeId type);
     void updateModel(Enemy& enemy);
     void removeAt(std::size_t index) noexcept;
 
     Engine& engine_;
-    EnemyDefinition definition_;
+    std::vector<AnimalType> types_;
     std::vector<Enemy> enemies_;
     EnemyId nextId_ = 1;
-    std::optional<ModelId> model_;
-    ModelInfo modelInfo_;
-    std::optional<std::size_t> movementClip_;
     CrowdMovement movement_;
     EnemyNeighbors spawnNeighbors_;
     EnemyMetrics metrics_;
+    std::optional<glm::dvec2> sharedDestination_;
 };
 
 } // namespace grimlock::game
