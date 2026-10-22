@@ -4,6 +4,11 @@
 
 namespace grimlock::game {
 
+enum class PlacementMode {
+    gameplay,
+    authoring
+};
+
 // World-space construction policy; no grid coordinates, rendering or navigation bakes.
 class PlacementSystem final {
 public:

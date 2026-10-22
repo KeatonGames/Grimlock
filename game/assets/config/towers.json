@@ -1,6 +1,6 @@
 [
-  {"id":"basic", "name":"Basic tower", "model":"models/cube.obj",
+  {"id":"basic", "name":"Basic tower", "model":"models/cube.obj", "construction_cost":30,
     "half_extent":[0.45,0.75,0.45], "visual_scale":[0.45,0.75,0.45], "tint":[0.32,0.48,0.72,1]},
-  {"id":"wide", "name":"Wide tower", "model":"models/cube.obj",
+  {"id":"wide", "name":"Wide tower", "model":"models/cube.obj", "construction_cost":50,
     "half_extent":[0.7,0.6,0.4], "visual_scale":[0.6,0.6,0.3], "tint":[0.65,0.42,0.24,1]}
 ]

@@ -25,6 +25,7 @@ struct WaveGroup {
 struct WaveDefinition {
     std::string name;
     std::vector<WaveGroup> groups;
+    std::uint64_t goldReward = 0;
 };
 
 struct LevelDefinition {
@@ -35,10 +36,12 @@ struct LevelDefinition {
     std::uint64_t damagePerArrival = 1;
     std::vector<LevelSpawn> spawns;
     std::vector<WaveDefinition> waves;
+    std::uint64_t startingGold = 0;
 };
 
 // Scene paths are relative to the asset root; spawn/objective coordinates are world X/Z.
 [[nodiscard]] LevelDefinition loadLevelDefinition(const std::filesystem::path& path);
 void validateLevelDefinition(const LevelDefinition& definition);
+void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinition& definition);
 
 } // namespace grimlock::game

@@ -2,7 +2,10 @@
 
 ## Project Overview
 
-Grimlock is a C++20 Engine/Game project using SDL3 and Vulkan. Engine owns loading, scenes, animation, input and rendering. Game supplies the demo assets and entry point; an optional Dear ImGui scene editor runs in the same executable.
+Grimlock is a C++20 tower defense project using SDL3 and Vulkan. **Grimlock Game** and
+**Grimlock Editor** are separate applications sharing Engine and GameLogic. Game
+loads handcrafted levels and provides its own HUD; Editor supplies scene authoring
+and development tools. Game does not link Editor or GameDebug.
 
 ## Features
 
@@ -34,12 +37,13 @@ engine/
   src/                      Core, platform, input, camera, assets, scene,
                             animation and renderer implementations
   shaders/                  Slang shader sources
-editor/                     Inspector, hierarchy and scene editing commands
+editor/                     Inspector, hierarchy, scene/level editing and gameplay debug tools
 game/
   src/entities/             Enemy IDs, shared definitions and runtime data
   src/systems/              Enemy lifecycle, transforms, animation and local crowd steering
   src/navigation/           Wall clearance utilities and scene movement session
-  src/debug/                Game navigation/enemy ImGui controls
+  src/runtime/              Independent playable level state and player placement
+  src/ui/                   Player HUD without Editor dependencies
   src/{main.cpp,game.*}     Executable launcher and Game application
   assets/{models,scenes}/   Source models, scenes and Game navigation configuration
 tests/                      CPU and Vulkan/editor runtime checks
@@ -65,11 +69,11 @@ git lfs pull
 cmake --preset debug -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON
 cmake --build --preset debug --parallel 4
 
-# Demo Game
+# Play First Watch
 .\out\build\debug\Debug\Grimlock.exe
 
 # Scene editor
-.\out\build\debug\Debug\Grimlock.exe --editor
+.\out\build\debug\Debug\GrimlockEditor.exe
 ```
 
 For Release:
@@ -77,10 +81,14 @@ For Release:
 ```powershell
 cmake --preset release -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON
 cmake --build --preset release --parallel 4
-.\out\build\release\Release\Grimlock.exe --editor
+.\out\build\release\Release\Grimlock.exe
+.\out\build\release\Release\GrimlockEditor.exe
 ```
 
-The executable target is `Game`; its output name is `Grimlock`. Editor support defaults to ON and can be excluded with `-DGRIMLOCK_BUILD_EDITOR=OFF`. Launching without `--editor` does not create editor panels.
+Targets `Game` and `Editor` produce `Grimlock` and `GrimlockEditor`. Build either with
+`cmake --build --preset debug --target Game` or `--target Editor`. Editor defaults
+to ON; configure with `-DGRIMLOCK_BUILD_EDITOR=OFF` for a Game-only build. The HUD
+still works in that build. Both applications use the same staged asset directory.
 
 CMake compiles shaders automatically and stages assets beside each executable. GLB files must contain actual model data, not Git LFS pointer text.
 
@@ -95,19 +103,33 @@ Runtime tests require a working Vulkan display and the supplied assets.
 
 ## Usage
 
-### Loading scenes and models
+### Playing levels and authoring scenes
 
-The default scene is `game/assets/scenes/demo.json`, staged as `assets/scenes/demo.json`. Command-line paths are absolute or executable-relative, not relative to the terminal's working directory:
+Game defaults to `assets/levels/first_watch.json`; Editor defaults to
+`assets/scenes/debug.json`. Paths are absolute or executable-relative:
 
 ```powershell
-.\out\build\debug\Debug\Grimlock.exe --editor
-.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/demo.json
-.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/navigation.json
-.\out\build\debug\Debug\Grimlock.exe assets/models/blackrat.glb
+.\out\build\debug\Debug\Grimlock.exe assets/levels/first_watch.json
+.\out\build\debug\Debug\GrimlockEditor.exe assets/scenes/demo.json
+.\out\build\debug\Debug\GrimlockEditor.exe --level assets/levels/first_watch.json
 .\out\build\debug\Debug\Grimlock.exe --help
 ```
 
-Editor mode without a scene opens the navigation debug lab. Explicit JSON paths still open their chosen scene; add models through the hierarchy. Standalone OBJ/GLB/glTF preview uses Game mode and starts the first clip if available.
+In Game, use the HUD to select towers, place them in build zones, and start waves.
+Gold, health, phases and victory/defeat are shown without editor panels. Restart
+reloads the authored level and resets runtime state; Game never writes level files.
+An absolute level path under `game/assets/levels` uses that source asset tree, so
+source edits can be played directly without rebuilding the asset staging target.
+The old `--editor` switch and model-viewer Game launcher are replaced by the separate
+Editor application. Add and inspect OBJ/GLB/glTF assets through Editor's hierarchy.
+
+In Editor, `--level` opens the scene plus its level definition. **Navigation > Level
+> Level Definition** edits world spawn regions, objective, existing wave groups,
+timing, rewards and starting gold. Choose a source path in **Level File** and click
+**Save Level Definition**. Save scene edits separately through File > Save Scene.
+**Apply and Restart Preview** tests draft settings without writing them. Build zones
+and towers remain free authoring tools. Game reads those same JSON files. See
+[runtime and editor separation](docs/runtime.md) for ownership and verification.
 
 ### Camera and selection
 
@@ -162,7 +184,7 @@ Cell `(x,z)` spans `[origin.x + x*s, origin.x + (x+1)*s)` and the equivalent Z i
 
 ### Chicken enemies and NavMesh navigation
 
-Open `assets/scenes/chickens.json` with `Grimlock.exe --editor`. Choose **Navigation > Animal Model**, then **Spawn Animals**. Chicken is the default; all 11 configured animal GLBs are available. **Movement Speed** sets the selected type's speed for future spawns, leaving existing animals unchanged. **Destination X/Z** and **Clear Animals** operate on the whole crowd. Standalone Game mode spawns 100 chickens automatically on terrain scenes. Destinations remain continuous world coordinates.
+Open `assets/scenes/chickens.json` with `GrimlockEditor.exe`. Choose **Navigation > Animal Model**, then **Spawn Animals**. Chicken is the default; all 11 configured animal GLBs are available. **Movement Speed** sets the selected type's speed for future spawns, leaving existing animals unchanged. **Destination X/Z** and **Clear Animals** operate on the whole crowd. Editor test controls spawn animals on demand. Destinations remain continuous world coordinates.
 
 Recast Navigation 1.6.0 builds shared NavMesh profiles from the same world-space cube geometry used by the renderer, caching each requested physical radius/headroom pair. Small animals retain narrow routes when larger animals are added. Detour caches polygon corridors per enemy, then funnel processing guides continuous movement around walls. Physical circles, separation, smoothed facing, model sharing and animation handling remain active. Floor boundaries and walls constrain movement; there is no unbounded fallback when navigation geometry is absent.
 
@@ -196,6 +218,15 @@ use exact animal counts, spawn areas and timing. Arrivals damage the objective a
 disappear; surviving the final wave wins, and zero objective health loses.
 **Restart Level** restores the authored scene and gameplay state. See
 [levels and wave authoring](docs/levels.md) for configuration and prototype limits.
+
+### Gold and construction costs
+
+The **Level** gameplay panel shows gold and tower affordability. Select a type and
+click **Build Tower** during preparation; successful construction spends its cost.
+Each completed wave grants its explicitly configured reward once. Restart resets
+gold. The separate **Navigation > Towers** tools remain free editor authoring tools.
+Configure `starting_gold` and each wave's `gold_reward` in level JSON, and
+`construction_cost` in the tower catalog. See [economy](docs/economy.md).
 
 ## Current Limitations
 

@@ -10,6 +10,7 @@ struct TowerDefinition {
     glm::dvec3 halfExtent{0.45, 0.75, 0.45};
     glm::dvec3 visualScale{0.45, 0.75, 0.45};
     glm::vec4 tint{0.32F, 0.48F, 0.72F, 1};
+    std::uint64_t constructionCost = 0;
     [[nodiscard]] Tower instance() const;
 };
 

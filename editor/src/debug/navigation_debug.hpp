@@ -14,6 +14,7 @@ public:
     void panel(Engine& engine) override;
     [[nodiscard]] std::optional<std::filesystem::path> takeSceneRequest() override;
     void sceneOpened(Engine& engine, const std::filesystem::path& path) override;
+    void requestLevelLoad(Engine& engine, const std::filesystem::path& path);
     bool viewport(Engine& engine, const editor::ViewportInput& input) override;
 
     [[nodiscard]] bool capturesSelection() const noexcept override {
@@ -50,10 +51,14 @@ private:
     void enemyInspector(EnemySystem& enemies);
     void towerMenu(Engine& engine);
     void buildZoneMenu(Engine& engine);
+    void constructionControls(Engine& engine);
     void levelMenu(Engine& engine);
+    void levelDefinitionMenu(Engine& engine);
     void requestLevel(Engine& engine, LevelDefinition definition);
     LevelSession level_;
     std::optional<LevelDefinition> pendingLevel_;
+    std::optional<LevelDefinition> levelDraft_;
+    std::string levelSavePath_;
     std::optional<std::filesystem::path> requestedScene_;
     NavigationSession session_;
     std::optional<EnemyId> inspectedEnemy_;
@@ -62,6 +67,7 @@ private:
     std::string error_;
     bool showNavMesh_ = false;
     bool placingTower_ = false, showPreview_ = false, sceneChanged_ = false;
+    bool gameplayPlacement_ = false;
     const Scene* placementScene_ = nullptr;
     std::string towerType_ = "basic";
     float towerYaw_ = 0;

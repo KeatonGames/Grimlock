@@ -1,19 +1,20 @@
 #pragma once
 
 #include "grimlock/engine.hpp"
-#include "navigation/navigation_session.hpp"
+#include "runtime/level_runtime.hpp"
+#include "ui/game_hud.hpp"
 
 namespace grimlock::game {
 
 class Game final {
 public:
-    explicit Game(const std::filesystem::path& modelPath = {}, const std::filesystem::path& environmentFolder = {});
+    explicit Game(const std::filesystem::path& level = {}, const std::filesystem::path& environment = {});
     void run();
 
 private:
-    InstanceId loadExample(const std::filesystem::path& path);
     Engine engine_;
-    NavigationSession navigation_;
+    LevelRuntime runtime_;
+    std::unique_ptr<GameHud> hud_;
 };
 
 } // namespace grimlock::game

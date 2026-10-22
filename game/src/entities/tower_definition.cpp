@@ -33,6 +33,13 @@ std::vector<TowerDefinition> loadTowerDefinitions(const std::filesystem::path& a
         definition.id = entry.at("id").get<std::string>();
         definition.name = entry.at("name").get<std::string>();
         definition.model = entry.at("model").get<std::string>();
+        if (entry.contains("construction_cost")) {
+            const auto& cost = entry.at("construction_cost");
+            if (!cost.is_number_integer() || (!cost.is_number_unsigned() && cost.get<std::int64_t>() < 0)) {
+                throw std::invalid_argument("Tower construction cost must be a nonnegative integer.");
+            }
+            definition.constructionCost = cost.get<std::uint64_t>();
+        }
         const auto extent = entry.at("half_extent").get<std::array<double, 3>>();
         const auto scale = entry.at("visual_scale").get<std::array<double, 3>>();
         const auto tint = entry.at("tint").get<std::array<float, 4>>();

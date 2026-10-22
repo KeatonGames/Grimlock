@@ -4,13 +4,13 @@
 #include "scene_document.hpp"
 
 #include <functional>
-#include <grimlock/render_overlay.hpp>
+#include <grimlock/imgui_overlay.hpp>
 
 struct ImGuiContext;
 
 namespace grimlock::editor {
 
-class Editor final : public RenderOverlay {
+class Editor final : public ui::ImGuiOverlay {
 public:
     explicit Editor(Engine& engine, const std::filesystem::path& initialScene = {}, GridDebug* gridDebug = nullptr);
     ~Editor() override;
@@ -21,13 +21,8 @@ public:
         return document_;
     }
 
-    void initialize(const OverlayContext& context) override;
-    void shutdown() noexcept override;
-    void processEvent(const SDL_Event& event) override;
     OverlayInput frame() override;
     void finishFrame(const Camera& camera) override;
-    void render(VkCommandBuffer command) override;
-    void targetChanged(const OverlayTarget& target) override;
     bool requestClose() override;
 
 private:
@@ -44,7 +39,8 @@ private:
         save
     };
 
-    void initializeRenderer();
+    void configureUi() override;
+    void releaseUi() noexcept override;
     void layout();
     void menu();
 
@@ -78,9 +74,7 @@ private:
     GridDebug* gridDebug_ = nullptr;
     bool viewportMouse_ = false;
 
-    OverlayContext native_{};
-    ImGuiContext* context_ = nullptr;
-    bool platformReady_ = false, rendererReady_ = false, layoutReady_ = false;
+    bool layoutReady_ = false;
 
     bool showPerformance_ = false, close_ = false, confirm_ = false;
     bool openFilePopup_ = false, openError_ = false, resumeAfterSave_ = false;

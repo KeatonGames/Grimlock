@@ -1,16 +1,21 @@
 # Handcrafted levels and waves
 
-Run `Grimlock --editor`, then choose **Navigation > Level > Load First Watch**.
+Run `GrimlockEditor`, then choose **Navigation > Level > Load First Watch**.
 Loading uses the editor's normal scene-opening and unsaved-change confirmation.
 The **Level** panel shows objective health, wave name, pending and active counts,
-and the current phase. Use **Navigation > Towers > Place Tower** during preparation,
-then **Start Wave** in the Level panel. Towers must fit inside the level's authored
+and the current phase. Select a tower and use **Build Tower** in the Level panel
+during preparation, then **Start Wave**. Towers must fit inside the level's authored
 build zones; use **Navigation > Build Zones** to edit them. See [build zones](build_zones.md).
 Each following wave requires another click.
 **Restart Level** reloads the authored scene and resets towers, enemies, health and
 wave progress. Opening another scene leaves level mode. Normal navigation debug
 tools still work outside level mode; manual animal spawning and retargeting are
 disabled during a level so they cannot alter the authored schedule.
+
+Starting gold and fixed per-wave rewards belong to this level JSON; construction
+costs belong to the tower catalog. The Level panel displays the runtime balance.
+See [economy and construction](economy.md). The separate Navigation tower tools
+remain free editor authoring controls.
 
 First Watch has two meadow spawn areas, a winding approach, and a gold objective
 marker. Its three waves contain exactly 4 chickens, then 4 chickens with 4 rats,

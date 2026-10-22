@@ -307,9 +307,9 @@ std::string NavigationSession::checkEnemyRoutes(const PlacementCandidate& candid
     return {};
 }
 
-std::string NavigationSession::checkTower(Engine& engine, const Tower& tower, bool checkRoutes) {
+std::string NavigationSession::checkTower(Engine& engine, const Tower& tower, bool checkRoutes, PlacementMode mode) {
     synchronize(engine);
-    if (!placementEnabled_) {
+    if (!placementEnabled_ && mode != PlacementMode::authoring) {
         return "Towers can only be placed during preparation.";
     }
     if (const auto zoneError = placement_.check(tower); !zoneError.empty()) {
@@ -349,8 +349,8 @@ std::string NavigationSession::checkTower(Engine& engine, const Tower& tower, bo
     return candidate_->error.empty() ? checkEnemyRoutes(*candidate_) : candidate_->error;
 }
 
-ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower) {
-    const auto error = checkTower(engine, tower);
+ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower, PlacementMode mode) {
+    const auto error = checkTower(engine, tower, true, mode);
     if (!error.empty()) {
         throw std::invalid_argument(error);
     }

@@ -1,6 +1,6 @@
 # Build zones and free placement
 
-In `Grimlock --editor`, use **Navigation > Build Zones** to create, select, rename,
+In `GrimlockEditor`, use **Navigation > Build Zones** to create, select, rename,
 delete, or edit a rectangular zone. Position and width/depth use world units;
 rotation is yaw in degrees. New zones start at the camera target's X/Z and elevation
 zero; adjust Y for elevated terrain. Zones also appear as model-less objects in the
@@ -20,9 +20,11 @@ footprint: green passes preliminary checks, red explains a rejection. There is n
 snapping. Required route checks run only on click. A green preview can still be
 rejected if it seals a required route. Camera controls remain available.
 
-Construction is allowed during preparation. Battle, victory and defeat disable
-placement in both the UI and the navigation placement API. Outside level mode,
-debug scenes act as preparation sandboxes. First Watch and the navigation debug
+Gameplay construction is allowed during preparation and pays the selected tower's
+cost through the Level panel. Battle, victory and defeat disable paid placement.
+The separate Navigation tower tools remain free editor authoring controls; see
+[economy and construction](economy.md). Outside level mode,
+debug scenes act as authoring sandboxes. First Watch and the navigation debug
 scene include authored zones. Other scenes need zones created before building;
 an empty zone list deliberately grants no construction space. Existing towers are
 not deleted when a zone changes or is removed; the new boundaries govern future
@@ -60,9 +62,8 @@ the existing mesh revisions. Removing towers restores navigation. Pure visual
 scale changes do not alter collision bounds or trigger navigation bakes.
 
 Editor only projects generic rotated boxes and quads and hosts Game's controls.
-No new renderer feature, navigation algorithm, economy, or combat behavior is added.
-This checkout does not contain tower attacks or economy; those systems are not
-introduced by this phase.
+No new renderer feature, navigation algorithm, or combat behavior is added.
+Phase 20 adds the separate Game economy described in [economy.md](economy.md).
 
 ## Checks
 

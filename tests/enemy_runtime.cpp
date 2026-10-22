@@ -100,6 +100,22 @@ void navigationControl(Engine& engine,
     click(engine, window, {700, 680});
 }
 
+void panelControl(Engine& engine, SDL_WindowID window, const char* label) {
+    auto* panel = ImGui::FindWindowByName("Level");
+    require(panel && !panel->Collapsed, "level gameplay panel missing");
+    const auto control = ImHashStr(label, 0, panel->ID);
+    for (float y = panel->InnerClipRect.Min.y + 4; y < panel->InnerClipRect.Max.y; y += 4) {
+        const glm::vec2 point{panel->DC.CursorStartPos.x + 60, y};
+        mouse(window, SDL_EVENT_MOUSE_MOTION, point);
+        tick(engine, 1);
+        if (ImGui::GetHoveredID() == control) {
+            click(engine, window, point);
+            return;
+        }
+    }
+    throw std::runtime_error(label);
+}
+
 void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
     game::EnemyDefinition definition;
     definition.model = "models/blackrat.glb";
@@ -582,17 +598,46 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     auto& level = debug.level();
     auto& session = debug.session();
     require(level.waves() && level.waves()->phase() == game::LevelPhase::preparation && level.waves()->health() == 30 &&
-                session.enemies()->enemies().empty(),
+                session.enemies()->enemies().empty() && level.economy().gold() == 100,
             "level load did not reset the scene, objective and enemies");
     game::Tower tower;
     tower.position = {-3.3, 0.75, 0};
-    const auto towerId = session.placeTower(engine, tower);
-    require(engine.scene()->contains(towerId), "preparation tower placement failed");
+    const auto failsWithoutSpending = [&](const game::Tower& candidate) {
+        const auto gold = level.economy().gold();
+        const auto towers = session.towers().towers().size();
+        bool rejected = false;
+        try {
+            (void)level.buildTower(engine, session, candidate);
+        } catch (const std::exception&) {
+            rejected = true;
+        }
+        require(rejected && level.economy().gold() == gold && session.towers().towers().size() == towers,
+                "failed construction spent gold or created a tower");
+    };
+    auto outside = tower;
+    outside.position.x = -6;
+    failsWithoutSpending(outside);
+    ImGui::SetWindowPos("Level", {900, 35});
+    ImGui::SetWindowFocus("Level");
+    tick(engine);
+    panelControl(engine, window, "Basic tower");
+    panelControl(engine, window, "Build Tower");
+    auto* native = SDL_GetWindowFromID(window);
+    click(engine, window, screenPoint(engine, native, {-3.3, 0, 0}));
+    require(session.towers().towers().size() == 1 && level.economy().gold() == 70,
+            "gameplay UI construction did not charge the configured cost");
+    failsWithoutSpending(tower);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
+    tick(engine);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
+    tick(engine);
+    std::uint64_t expectedGold = 70;
     for (int wave = 0; wave < 3; ++wave) {
         require(level.waves()->phase() == game::LevelPhase::preparation, "wave skipped preparation");
         require(session.placementEnabled(), "preparation did not restore construction");
         level.startWave(session);
         require(!session.checkTower(engine, tower, false).empty(), "battle phase allowed construction");
+        failsWithoutSpending(tower);
         for (int frame = 0; frame < 2400 && level.waves()->phase() == game::LevelPhase::battle; ++frame) {
             debug.update(engine, 1.0 / 30);
             for (const auto& enemy : session.enemies()->enemies()) {
@@ -603,6 +648,13 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
             }
         }
         require(level.waves()->phase() != game::LevelPhase::battle, "authored wave did not drain its enemies");
+        const auto reward = level.waves()->definition().waves[wave].goldReward;
+        expectedGold += reward;
+        require(level.economy().gold() == expectedGold && level.lastWaveReward() == reward,
+                "wave completion did not grant the exact fixed reward");
+        debug.update(engine, 0);
+        debug.update(engine, 0);
+        require(level.economy().gold() == expectedGold, "wave reward was granted more than once");
     }
     require(level.waves()->phase() == game::LevelPhase::victory && level.waves()->health() == 12 &&
                 session.enemies()->metrics().arrived == 18 && session.enemies()->enemies().empty(),
@@ -612,18 +664,44 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     editor.document().open(engine.assetRoot() / definition.scene);
     level.begin(engine, session, definition);
     require(session.towers().towers().empty() && session.enemies()->metrics().arrived == 0 &&
-                level.waves()->wave() == 0 && level.waves()->health() == 30,
+                level.waves()->wave() == 0 && level.waves()->health() == 30 && level.economy().gold() == 100 &&
+                !level.lastWaveReward(),
             "level restart retained towers, arrivals or progress");
+
+    auto poor = definition;
+    poor.startingGold = 29;
+    level.begin(engine, session, poor);
+    failsWithoutSpending(tower);
+    // The editor's authoring path remains free even while a gameplay level is active.
+    const auto authored = session.placeTower(engine, tower, game::PlacementMode::authoring);
+    require(level.economy().gold() == 29 && engine.scene()->contains(authored), "editor authoring spent gameplay gold");
+    require(session.removeTower(engine, authored) && level.economy().gold() == 29, "removal refunded gold");
+
+    auto exact = definition;
+    exact.startingGold = 50;
+    level.begin(engine, session, exact);
+    auto wide = session.towers().definition("wide").instance();
+    wide.position = {-3.3, wide.halfExtent.y, 0};
+    const auto purchasedWide = level.buildTower(engine, session, wide);
+    require(level.economy().gold() == 0, "exact-cost Wide tower purchase charged incorrectly");
+    failsWithoutSpending(tower);
+    require(session.removeTower(engine, purchasedWide) && level.economy().gold() == 0,
+            "removing a purchased tower refunded currency");
 
     auto fragile = definition;
     fragile.objectiveHealth = 1;
     level.begin(engine, session, fragile);
     level.startWave(session);
+    const auto battleAuthoring = session.placeTower(engine, tower, game::PlacementMode::authoring);
+    require(level.economy().gold() == fragile.startingGold && session.removeTower(engine, battleAuthoring),
+            "battle inspection prevented free editor authoring or charged currency");
     for (int frame = 0; frame < 2400 && level.waves()->phase() == game::LevelPhase::battle; ++frame) {
         debug.update(engine, 1.0 / 30);
     }
     require(level.waves()->phase() == game::LevelPhase::defeat && level.waves()->health() == 0,
             "arrival did not defeat a depleted objective");
+    require(level.economy().gold() == definition.startingGold && !level.lastWaveReward(),
+            "defeat granted a wave reward");
     const auto pending = level.waves()->pending();
     const auto active = session.enemies()->enemies().size();
     debug.update(engine, 60);

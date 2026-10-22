@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdio>
 #include <imgui.h>
+#include <imgui_stdlib.h>
 #include <utility>
 
 namespace grimlock::game {
@@ -12,9 +13,7 @@ void NavigationDebug::menu(Engine& engine) {
     session_.synchronize(engine);
     levelMenu(engine);
     buildZoneMenu(engine);
-    ImGui::BeginDisabled(level_.waves() && level_.waves()->phase() != LevelPhase::preparation);
     towerMenu(engine);
-    ImGui::EndDisabled();
     auto& enemies = *session_.enemies();
     ImGui::Separator();
     ImGui::TextUnformatted("Animals");
@@ -111,6 +110,7 @@ void NavigationDebug::menu(Engine& engine) {
 
 void NavigationDebug::towerMenu(Engine& engine) {
     if (ImGui::BeginMenu("Towers")) {
+        ImGui::TextDisabled("Editor authoring: free. Use the Level panel for paid construction.");
         const auto& towers = session_.towers();
         if (ImGui::BeginCombo("Tower Type", towers.definition(towerType_).name.c_str())) {
             for (const auto& definition : towers.definitions()) {
@@ -118,11 +118,14 @@ void NavigationDebug::towerMenu(Engine& engine) {
                     towerType_ = definition.id;
                     previewKey_.reset();
                 }
+                ImGui::SameLine();
+                ImGui::TextDisabled("%llu gold", static_cast<unsigned long long>(definition.constructionCost));
             }
             ImGui::EndCombo();
         }
         ImGui::InputFloat("Tower Rotation (degrees)", &towerYaw_, 5, 15, "%.1f");
         if (ImGui::Button("Place Tower")) {
+            gameplayPlacement_ = false;
             placingTower_ = true;
             placementScene_ = engine.scene();
             previewKey_.reset();
@@ -154,7 +157,7 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
     }
     showPreview_ = false;
     if (input.cancel || placementScene_ != engine.scene() ||
-        (level_.waves() && level_.waves()->phase() != LevelPhase::preparation)) {
+        (gameplayPlacement_ && (!level_.waves() || level_.waves()->phase() != LevelPhase::preparation))) {
         placingTower_ = false;
     }
     if (!placingTower_) {
@@ -179,12 +182,22 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
         previewKey_ = key;
         rejectedPlacement_.clear();
     }
-    const auto footprintError = session_.checkTower(engine, *tower, false);
+    auto footprintError = gameplayPlacement_ ? level_.constructionError(session_, *tower) : std::string{};
+    if (footprintError.empty()) {
+        footprintError = session_.checkTower(engine,
+                                             *tower,
+                                             false,
+                                             gameplayPlacement_ ? PlacementMode::gameplay : PlacementMode::authoring);
+    }
     previewError_ = footprintError.empty() ? rejectedPlacement_ : footprintError;
     if (input.pressRay && footprintError.empty()) {
         try {
             // Route validation belongs to the commit, not the cursor-following preview.
-            (void)session_.placeTower(engine, *tower);
+            if (gameplayPlacement_) {
+                (void)level_.buildTower(engine, session_, *tower);
+            } else {
+                (void)session_.placeTower(engine, *tower, PlacementMode::authoring);
+            }
             previewKey_.reset();
             return true;
         } catch (const std::exception& error) {
@@ -289,15 +302,115 @@ void NavigationDebug::levelMenu(Engine& engine) {
     if (ImGui::BeginMenu("Level")) {
         if (ImGui::Button("Load First Watch")) {
             try {
-                requestLevel(engine, loadLevelDefinition(engine.assetRoot() / "levels/first_watch.json"));
+                requestLevelLoad(engine, engine.assetRoot() / "levels/first_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
             }
         }
         ImGui::TextUnformatted("Handcrafted waves. Level status appears in its own panel.");
+        levelDefinitionMenu(engine);
         ImGui::EndMenu();
     }
+}
+
+void NavigationDebug::requestLevelLoad(Engine& engine, const std::filesystem::path& path) {
+    const auto resolved = path.is_absolute() ? path : engine.assetRoot().parent_path() / path;
+    auto definition = loadLevelDefinition(resolved);
+    levelDraft_ = definition;
+    const auto text = resolved.u8string();
+    levelSavePath_.assign(text.begin(), text.end());
+    requestLevel(engine, std::move(definition));
+}
+
+void NavigationDebug::levelDefinitionMenu(Engine& engine) {
+    if (!ImGui::BeginMenu("Level Definition", levelDraft_.has_value())) {
+        return;
+    }
+    auto& definition = *levelDraft_;
+    ImGui::InputText("Level Name", &definition.name);
+    auto scene = definition.scene.generic_string();
+    if (ImGui::InputText("Scene (asset relative)", &scene)) {
+        definition.scene = scene;
+    }
+    ImGui::InputScalar("Starting Gold", ImGuiDataType_U64, &definition.startingGold);
+    ImGui::InputScalarN("Objective X/Z", ImGuiDataType_Double, &definition.objectivePosition.x, 2);
+    ImGui::InputScalar("Objective Health", ImGuiDataType_U64, &definition.objectiveHealth);
+    ImGui::InputScalar("Arrival Damage", ImGuiDataType_U64, &definition.damagePerArrival);
+    for (std::size_t i = 0; i < definition.spawns.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::TreeNode("Spawn", "%s", definition.spawns[i].name.c_str())) {
+            auto& spawn = definition.spawns[i];
+            ImGui::InputText("Name", &spawn.name);
+            ImGui::InputScalarN("Minimum X/Z", ImGuiDataType_Double, &spawn.area.minimum.x, 2);
+            ImGui::InputScalarN("Maximum X/Z", ImGuiDataType_Double, &spawn.area.maximum.x, 2);
+            ImGui::InputDouble("Elevation", &spawn.area.height);
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    for (std::size_t i = 0; i < definition.waves.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::TreeNode("Wave", "%s", definition.waves[i].name.c_str())) {
+            auto& wave = definition.waves[i];
+            ImGui::InputText("Name", &wave.name);
+            ImGui::InputScalar("Reward", ImGuiDataType_U64, &wave.goldReward);
+            for (std::size_t groupIndex = 0; groupIndex < wave.groups.size(); ++groupIndex) {
+                ImGui::PushID(static_cast<int>(groupIndex));
+                auto& group = wave.groups[groupIndex];
+                ImGui::Separator();
+                if (ImGui::BeginCombo("Animal", group.enemy.c_str())) {
+                    for (EnemyTypeId type = 0; type < session_.enemies()->typeCount(); ++type) {
+                        const auto& name = session_.enemies()->definition(type).name;
+                        if (ImGui::Selectable(name.c_str(), name == group.enemy)) {
+                            group.enemy = name;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::BeginCombo("Spawn", definition.spawns[group.spawn].name.c_str())) {
+                    for (std::size_t spawn = 0; spawn < definition.spawns.size(); ++spawn) {
+                        if (ImGui::Selectable(definition.spawns[spawn].name.c_str(), spawn == group.spawn)) {
+                            group.spawn = spawn;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                std::uint64_t count = group.count, batch = group.batchSize;
+                if (ImGui::InputScalar("Count", ImGuiDataType_U64, &count)) {
+                    group.count = static_cast<std::size_t>(std::clamp<std::uint64_t>(count, 1, 1000));
+                }
+                if (ImGui::InputScalar("Batch Size", ImGuiDataType_U64, &batch)) {
+                    group.batchSize = static_cast<std::size_t>(std::clamp<std::uint64_t>(batch, 1, group.count));
+                }
+                ImGui::InputDouble("Start (seconds)", &group.start);
+                ImGui::InputDouble("Interval (seconds)", &group.interval);
+                ImGui::PopID();
+            }
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    ImGui::InputText("Level File", &levelSavePath_);
+    if (ImGui::Button("Save Level Definition")) {
+        try {
+            saveLevelDefinition(std::filesystem::path{std::u8string{levelSavePath_.begin(), levelSavePath_.end()}},
+                                definition);
+            error_.clear();
+        } catch (const std::exception& error) {
+            error_ = error.what();
+        }
+    }
+    if (ImGui::Button("Apply and Restart Preview")) {
+        try {
+            validateLevelDefinition(definition);
+            requestLevel(engine, definition);
+        } catch (const std::exception& error) {
+            error_ = error.what();
+        }
+    }
+    ImGui::TextWrapped("%s", error_.c_str());
+    ImGui::EndMenu();
 }
 
 void NavigationDebug::panel(Engine& engine) {
@@ -317,9 +430,13 @@ void NavigationDebug::panel(Engine& engine) {
         const auto index = std::min(waves->wave(), definition.waves.size() - 1);
         ImGui::Text("Wave %zu / %zu: %s", index + 1, definition.waves.size(), definition.waves[index].name.c_str());
         ImGui::Text("Pending: %zu | Active: %zu", waves->pending(), session_.enemies()->enemies().size());
+        ImGui::Text("Gold: %llu", static_cast<unsigned long long>(level_.economy().gold()));
+        if (const auto reward = level_.lastWaveReward()) {
+            ImGui::Text("Last wave reward: +%llu gold", static_cast<unsigned long long>(*reward));
+        }
         ImGui::TextDisabled("Gold marker: objective | Teal markers: spawn areas");
+        constructionControls(engine);
         if (waves->phase() == LevelPhase::preparation) {
-            ImGui::TextUnformatted("Prepare towers using Navigation > Towers.");
             if (ImGui::Button("Start Wave")) {
                 placingTower_ = showPreview_ = false;
                 level_.startWave(session_);
@@ -330,6 +447,36 @@ void NavigationDebug::panel(Engine& engine) {
         }
     }
     ImGui::End();
+}
+
+void NavigationDebug::constructionControls(Engine& engine) {
+    ImGui::SeparatorText("Construction");
+    for (const auto& definition : session_.towers().definitions()) {
+        if (ImGui::Selectable(definition.name.c_str(), definition.id == towerType_, 0, ImVec2{130, 0})) {
+            towerType_ = definition.id;
+            previewKey_.reset();
+        }
+        ImGui::SameLine();
+        ImGui::Text("%llu gold | %s",
+                    static_cast<unsigned long long>(definition.constructionCost),
+                    level_.economy().canAfford(definition.constructionCost) ? "Affordable" : "Insufficient gold");
+    }
+    const auto tower = session_.towers().definition(towerType_).instance();
+    const auto error = level_.constructionError(session_, tower);
+    ImGui::BeginDisabled(!error.empty());
+    if (ImGui::Button("Build Tower")) {
+        gameplayPlacement_ = placingTower_ = true;
+        placementScene_ = engine.scene();
+        previewKey_.reset();
+        rejectedPlacement_.clear();
+    }
+    ImGui::EndDisabled();
+    if (!error.empty()) {
+        ImGui::TextWrapped("%s", error.c_str());
+    }
+    if (gameplayPlacement_ && placingTower_) {
+        ImGui::TextUnformatted("Left-click to build | Escape cancels");
+    }
 }
 
 void NavigationDebug::buildZoneMenu(Engine& engine) {

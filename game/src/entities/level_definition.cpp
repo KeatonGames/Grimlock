@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <set>
 #include <stdexcept>
@@ -28,6 +29,13 @@ bool finite(glm::dvec2 value) {
     return std::isfinite(value.x) && std::isfinite(value.y);
 }
 
+std::uint64_t gold(const nlohmann::json& value) {
+    if (!value.is_number_integer() || (!value.is_number_unsigned() && value.get<std::int64_t>() < 0)) {
+        throw std::invalid_argument("Gold amounts must be nonnegative integers.");
+    }
+    return value.get<std::uint64_t>();
+}
+
 } // namespace
 
 void validateLevelDefinition(const LevelDefinition& definition) {
@@ -50,7 +58,12 @@ void validateLevelDefinition(const LevelDefinition& definition) {
             throw std::invalid_argument("Level spawn names must be unique and rectangles finite and ordered.");
         }
     }
+    auto maximumGold = definition.startingGold;
     for (const auto& wave : definition.waves) {
+        if (wave.goldReward > std::numeric_limits<std::uint64_t>::max() - maximumGold) {
+            throw std::invalid_argument("Starting gold and wave rewards exceed the supported gold balance.");
+        }
+        maximumGold += wave.goldReward;
         if (wave.name.empty() || wave.groups.empty()) {
             throw std::invalid_argument("Every wave requires a name and explicit groups.");
         }
@@ -79,6 +92,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     LevelDefinition result;
     result.name = document.at("name").get<std::string>();
     result.scene = document.at("scene").get<std::string>();
+    result.startingGold = document.contains("starting_gold") ? gold(document.at("starting_gold")) : 0;
     const auto& objective = document.at("objective");
     result.objectivePosition = point(objective.at("position"));
     result.objectiveHealth = positiveInteger(objective.at("health"));
@@ -90,6 +104,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     }
     for (const auto& entry : document.at("waves")) {
         WaveDefinition wave{entry.at("name").get<std::string>(), {}};
+        wave.goldReward = entry.contains("gold_reward") ? gold(entry.at("gold_reward")) : 0;
         for (const auto& value : entry.at("groups")) {
             const auto spawnName = value.at("spawn").get<std::string>();
             std::size_t spawn = 0;
@@ -107,6 +122,46 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     }
     validateLevelDefinition(result);
     return result;
+}
+
+void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinition& definition) {
+    validateLevelDefinition(definition);
+    nlohmann::json document{{"version", 1},
+                            {"name", definition.name},
+                            {"scene", definition.scene.generic_string()},
+                            {"starting_gold", definition.startingGold},
+                            {"objective",
+                             {{"position", {definition.objectivePosition.x, definition.objectivePosition.y}},
+                              {"health", definition.objectiveHealth},
+                              {"damage_per_arrival", definition.damagePerArrival}}},
+                            {"spawns", nlohmann::json::array()},
+                            {"waves", nlohmann::json::array()}};
+    for (const auto& spawn : definition.spawns) {
+        document["spawns"].push_back({{"name", spawn.name},
+                                      {"minimum", {spawn.area.minimum.x, spawn.area.minimum.y}},
+                                      {"maximum", {spawn.area.maximum.x, spawn.area.maximum.y}},
+                                      {"height", spawn.area.height}});
+    }
+    for (const auto& wave : definition.waves) {
+        nlohmann::json entry{{"name", wave.name},
+                             {"gold_reward", wave.goldReward},
+                             {"groups", nlohmann::json::array()}};
+        for (const auto& group : wave.groups) {
+            entry["groups"].push_back({{"enemy", group.enemy},
+                                       {"spawn", definition.spawns[group.spawn].name},
+                                       {"count", group.count},
+                                       {"batch_size", group.batchSize},
+                                       {"start", group.start},
+                                       {"interval", group.interval}});
+        }
+        document["waves"].push_back(std::move(entry));
+    }
+    std::ofstream file{path};
+    file << document.dump(2) << '\n';
+    file.close();
+    if (!file) {
+        throw std::runtime_error("Cannot save level definition: " + path.string());
+    }
 }
 
 } // namespace grimlock::game

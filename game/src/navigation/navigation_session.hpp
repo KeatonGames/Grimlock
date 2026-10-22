@@ -45,8 +45,11 @@ public:
         return placement_;
     }
 
-    [[nodiscard]] std::string checkTower(Engine& engine, const Tower& tower, bool checkRoutes = true);
-    [[nodiscard]] ObjectId placeTower(Engine& engine, const Tower& tower);
+    [[nodiscard]] std::string checkTower(Engine& engine,
+                                         const Tower& tower,
+                                         bool checkRoutes = true,
+                                         PlacementMode mode = PlacementMode::gameplay);
+    [[nodiscard]] ObjectId placeTower(Engine& engine, const Tower& tower, PlacementMode mode = PlacementMode::gameplay);
     [[nodiscard]] bool removeTower(Engine& engine, ObjectId object);
 
     void cancelPlacement() noexcept {

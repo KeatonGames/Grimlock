@@ -5,6 +5,7 @@
 #include <array>
 #include <cmath>
 #include <grimlock/grid_debug.hpp>
+#include <grimlock/imgui_overlay.hpp>
 #include <grimlock/ray.hpp>
 #include <imgui.h>
 #include <stdexcept>
@@ -13,92 +14,7 @@ namespace grimlock::editor {
 
 namespace {
 
-// Clip in Vulkan homogeneous coordinates before perspective division, including the near plane.
-int projectPolygon(const glm::dmat4& matrix,
-                   std::span<const glm::dvec3> vertices,
-                   ImVec2 offset,
-                   ImVec2 size,
-                   std::array<ImVec2, 12>& points) {
-    std::array<glm::dvec4, 12> polygon{}, clipped{};
-    int count = static_cast<int>(vertices.size());
-    for (int i = 0; i < count; ++i) {
-        polygon[i] = matrix * glm::dvec4{vertices[i], 1};
-    }
-
-    const auto distance = [](glm::dvec4 p, int plane) {
-        switch (plane) {
-        case 0:
-            return p.w + p.x;
-        case 1:
-            return p.w - p.x;
-        case 2:
-            return p.w + p.y;
-        case 3:
-            return p.w - p.y;
-        case 4:
-            return p.z;
-        default:
-            return p.w - p.z;
-        }
-    };
-
-    for (int plane = 0; plane < 6 && count; ++plane) {
-        int output = 0;
-        auto previous = polygon[count - 1];
-        double before = distance(previous, plane);
-
-        for (int i = 0; i < count; ++i) {
-            const auto current = polygon[i];
-            const double after = distance(current, plane);
-
-            if ((before >= 0) != (after >= 0)) {
-                clipped[output++] = previous + (current - previous) * (before / (before - after));
-            }
-
-            if (after >= 0) {
-                clipped[output++] = current;
-            }
-
-            previous = current;
-            before = after;
-        }
-
-        polygon = clipped;
-        count = output;
-    }
-
-    if (count < 3) {
-        return 0;
-    }
-
-    for (int i = 0; i < count; ++i) {
-        const auto p = polygon[i];
-
-        if (!std::isfinite(p.w) || p.w <= 0) {
-            return 0;
-        }
-
-        points[i] = {offset.x + static_cast<float>((p.x / p.w + 1) * 0.5) * size.x,
-                     offset.y + static_cast<float>((p.y / p.w + 1) * 0.5) * size.y};
-    }
-
-    float area = 0;
-
-    for (int i = 0; i < count; ++i) {
-        const auto a = points[i], b = points[(i + 1) % count];
-        area += a.x * b.y - b.x * a.y;
-    }
-
-    if (!std::isfinite(area) || std::abs(area) < 0.1F) {
-        return 0;
-    }
-
-    if (area < 0) {
-        std::reverse(points.begin(), points.begin() + count);
-    }
-
-    return count;
-}
+using ui::projectPolygon;
 
 int projectCell(const glm::dmat4& matrix,
                 const GridConfiguration& c,

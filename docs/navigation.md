@@ -7,11 +7,11 @@ Phase 14 uses the official [Recast Navigation 1.6.0 release](https://github.com/
 ```powershell
 cmake --preset debug -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON
 cmake --build --preset debug --parallel 4
-.\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/chickens.json
+.\out\build\debug\Debug\GrimlockEditor.exe assets/scenes/chickens.json
 ctest --test-dir out/build/debug -C Debug --output-on-failure
 ```
 
-In **Navigation**, choose **Animal Model**, click **Spawn Animals** (default count 100), set **Destination X/Z**, or adjust **Movement Speed** and **Spawn Area (world X/Z)**. Chicken is selected initially. Model and speed changes apply only to future spawns; existing animals keep their definition, radius, scale, speed, animation and navigation profile. **Clear Animals** releases all runtime animals. Standalone Game mode automatically spawns 100 chickens on terrain scenes. Spawn positions and destinations are projected onto the NavMesh without snapping to grid centers. Spawns that have no navigable surface or insufficient separation are skipped. Scenes without navigation geometry continue rendering/editing normally but cannot spawn navigating chickens.
+In **Navigation**, choose **Animal Model**, click **Spawn Animals** (default count 100), set **Destination X/Z**, or adjust **Movement Speed** and **Spawn Area (world X/Z)**. Chicken is selected initially. Model and speed changes apply only to future spawns; existing animals keep their definition, radius, scale, speed, animation and navigation profile. **Clear Animals** releases all runtime animals. Standalone Game mode loads a handcrafted level and spawns only its explicitly scheduled waves. Spawn positions and destinations are projected onto the NavMesh without snapping to grid centers. Spawns that have no navigable surface or insufficient separation are skipped. Scenes without navigation geometry continue rendering/editing normally but cannot spawn navigating chickens.
 
 **Show NavMesh** displays translucent cyan polygons using the existing ImGui overlay. It is off by default, independent of wall editing, and captures no viewport input. Like the grid overlay, it is a debug projection without depth occlusion. **Rebuild NavMesh** explicitly replaces navigation data. Status, polygon count, build time and complete-path query count are shown next to the existing enemy CPU/frame statistics. Grid lines and cell highlights appear only during **Edit Walkability**. Cube floors and walls remain visible normally. Runtime enemies and navigation settings are not serialized; the existing scene/grid JSON format is unchanged.
 

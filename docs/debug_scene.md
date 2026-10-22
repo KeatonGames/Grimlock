@@ -1,6 +1,6 @@
 # Navigation debug lab
 
-Run `Grimlock.exe --editor` to open `assets/scenes/debug.json` by default. The older demo, navigation and chicken scenes remain available through File > Open or an explicit command-line scene path.
+Run `GrimlockEditor.exe` to open `assets/scenes/debug.json` by default. The older demo, navigation and chicken scenes remain available through File > Open or an explicit command-line scene path.
 
 For an immediate movement demo without editor panels, run `Grimlock.exe assets/scenes/debug.json`; Game mode automatically spawns its usual 100 chickens.
 
