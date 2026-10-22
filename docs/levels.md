@@ -21,8 +21,9 @@ First Watch has two meadow spawn areas, a winding approach, and a gold objective
 marker. Its three waves contain exactly 4 chickens, then 4 chickens with 4 rats,
 then 2 bunnies followed by 4 chickens. The objective starts with 30 health and loses
 one health per arrival. This initial test is deliberately survivable without
-combat: all 18 arrivals leave 12 health. Towers redirect navigation; they do not
-attack. A level with fewer health points demonstrates defeat using the same rules.
+combat: all 18 arrivals leave 12 health. Built towers redirect navigation and attack
+during Battle; defeated animals do not damage the objective. See [combat](combat.md).
+A level with fewer health points demonstrates defeat using the same arrival rules.
 
 ## Authoring
 

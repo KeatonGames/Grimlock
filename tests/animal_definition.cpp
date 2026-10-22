@@ -93,11 +93,18 @@ int main(int argc, char** argv) {
         document[0]["stopping_distance"] = 0.45;
         document[0]["retry_interval"] = 1.5;
         document[0]["stuck_timeout"] = 3.0;
+        document[0]["maximum_health"] = 140;
         save(document);
         const auto configured = loadAnimalDefinitions(fixture).front();
         require(configured.stoppingDistance == 0.45 && configured.retryInterval == 1.5 &&
-                    configured.stuckTimeout == 3.0 && configured.despawnOnArrival,
+                    configured.stuckTimeout == 3.0 && configured.maximumHealth == 140 && configured.despawnOnArrival,
                 "AI configuration or despawn-on-arrival default incorrect");
+        document[0]["maximum_health"] = 0;
+        save(document);
+        rejects([&] {
+            (void)loadAnimalDefinitions(fixture);
+        });
+        document[0]["maximum_health"] = 140;
         document[0]["despawn_on_arrival"] = false;
         save(document);
         require(!loadAnimalDefinitions(fixture).front().despawnOnArrival, "arrival retention override ignored");

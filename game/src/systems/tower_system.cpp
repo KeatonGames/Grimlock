@@ -47,6 +47,18 @@ TerrainBox Tower::bounds() const {
     return {glm::vec3{position}, glm::vec3{extent}, false};
 }
 
+std::optional<ObjectId> TowerSystem::pick(const Ray& ray) const {
+    std::optional<ObjectId> selected;
+    double closest = ray.maximum;
+    for (const auto& tower : towers_) {
+        if (const auto hit = intersect(ray, tower.bounds()); hit && *hit <= closest) {
+            selected = tower.object;
+            closest = *hit;
+        }
+    }
+    return selected;
+}
+
 void TowerSystem::clear() noexcept {
     scene_ = nullptr;
     towers_.clear();

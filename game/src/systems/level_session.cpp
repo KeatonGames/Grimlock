@@ -1,5 +1,7 @@
 #include "systems/level_session.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace grimlock::game {
@@ -31,7 +33,9 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
         }
     }
     WaveSystem prepared{std::move(definition)};
+    combat_.reset();
     navigation.reset(engine);
+    combat_.emplace(engine);
     navigation.setSpawnRoutes(std::move(routes));
     navigation.spawnArea() = prepared.definition().spawns.front().area;
     navigation.setDestination(prepared.definition().objectivePosition);
@@ -45,6 +49,7 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
 }
 
 void LevelSession::stop(NavigationSession& navigation) {
+    combat_.reset();
     waves_.reset();
     economy_.reset();
     lastWaveReward_.reset();
@@ -63,6 +68,9 @@ void LevelSession::startWave(NavigationSession& navigation) {
 }
 
 void LevelSession::update(Engine& engine, NavigationSession& navigation, double delta) {
+    if (!std::isfinite(delta) || delta < 0) {
+        throw std::invalid_argument("Level delta must be finite and nonnegative.");
+    }
     if (!waves_) {
         navigation.update(engine, delta);
         return;
@@ -75,9 +83,20 @@ void LevelSession::update(Engine& engine, NavigationSession& navigation, double 
     if (waves_->phase() != LevelPhase::battle) {
         navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
         navigation.synchronize(engine);
+        navigation.enemies()->updateEffects(delta);
         return;
     }
+    // Advance movement, attacks and the authored schedule together on slow frames.
+    do {
+        const double step = std::min(delta, 1.0 / 30);
+        updateBattle(engine, navigation, step);
+        delta -= step;
+    } while (delta > 1e-10 && waves_->phase() == LevelPhase::battle);
+}
+
+void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, double delta) {
     navigation.update(engine, delta);
+    combat_->update(navigation.towers(), *navigation.enemies(), delta);
     const auto arrived = navigation.enemies()->metrics().arrived;
     const auto newArrivals = arrived >= arrivals_ ? arrived - arrivals_ : 0;
     arrivals_ = arrived;
@@ -102,6 +121,9 @@ void LevelSession::update(Engine& engine, NavigationSession& navigation, double 
         lastWaveReward_ = reward;
     }
     navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
+    if (waves_->phase() != LevelPhase::battle) {
+        combat_->clearProjectiles();
+    }
 }
 
 std::string LevelSession::constructionError(const NavigationSession& navigation, const Tower& tower) const {

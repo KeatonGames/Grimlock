@@ -37,7 +37,8 @@ struct Enemy {
     glm::dvec2 desiredVelocity{0};
     double speed = 1.5, radius = 0.195, yaw = 0;
     double acceleration = 8, deceleration = 12;
-    float health = 100;
+    float maximumHealth = 100, health = 100;
+    double hitFlashRemaining = 0;
     MovementStatus movement = MovementStatus::idle;
     EnemyState state = EnemyState::idle;
     std::optional<glm::dvec2> destination;

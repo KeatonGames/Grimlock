@@ -8,6 +8,7 @@ struct EnemyMetrics {
     double updateMilliseconds = 0;
     CrowdMetrics crowd;
     std::uint64_t arrived = 0;
+    std::uint64_t defeated = 0;
 };
 
 // Owns mixed animal instances and shared type configurations. Engine must outlive this system.
@@ -24,6 +25,13 @@ public:
     [[nodiscard]] bool remove(EnemyId id) noexcept;
     void clear() noexcept;
     void update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta);
+    [[nodiscard]] bool applyDamage(EnemyId id, float damage);
+    void updateEffects(double delta);
+
+    [[nodiscard]] std::size_t deathEffectCount() const noexcept {
+        return deaths_.size();
+    }
+
     void setSpeed(double speed, EnemyTypeId type = 0);
     void setSpawnSpeed(double speed, EnemyTypeId type);
     void setSharedDestination(std::optional<glm::dvec2> destination);
@@ -56,6 +64,12 @@ private:
         std::optional<ModelId> model;
         ModelInfo info;
         std::optional<std::size_t> movementClip;
+        std::optional<std::size_t> deathClip;
+    };
+
+    struct DeathEffect {
+        InstanceId instance;
+        double remaining;
     };
 
     void loadModel(EnemyTypeId type);
@@ -65,6 +79,7 @@ private:
     Engine& engine_;
     std::vector<AnimalType> types_;
     std::vector<Enemy> enemies_;
+    std::vector<DeathEffect> deaths_;
     EnemyId nextId_ = 1;
     CrowdMovement movement_;
     EnemyNeighbors spawnNeighbors_;

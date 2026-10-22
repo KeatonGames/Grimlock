@@ -2,11 +2,12 @@
 
 `Game` produces **Grimlock**. It launches First Watch by default, or accepts a
 handcrafted level JSON path. Its compact HUD shows gold, health, wave, phase,
-construction costs, completion rewards, and restart. Tower buttons enter paid
-placement during preparation; left-click confirms and Escape cancels. Build zone
+construction costs, combat statistics, completion rewards, and restart. Tower
+buttons enter paid placement during preparation; left-click confirms and Escape cancels. Build zone
 boundaries appear only while placing. Start Wave begins the authored schedule.
 Victory and defeat have dedicated result cards. Mouse camera controls are unchanged;
-there is no scene selection, hierarchy, Inspector, debug menu, grid painting or docking.
+clicking a placed tower shows its range and statistics. There is no general scene
+selection, hierarchy, Inspector, debug menu, grid painting or docking.
 
 `Editor` produces **GrimlockEditor**. It retains the existing docked editor and
 navigation, build-zone, tower, animal and preview controls. Its tower tools remain
@@ -35,9 +36,8 @@ hierarchy/model browser to inspect imported models.
   polygon projection. Editor keeps its theme and docking layout; Game supplies its
   own theme and HUD. Engine's core target still does not link Dear ImGui.
 
-This checkout has no tower attack/projectile system. The application split does
-not invent those mechanics; existing movement, navigation, economy and wave
-systems are updated through the same LevelSession used by editor previews.
+Tower combat and projectiles run during Battle through the same LevelSession used
+by editor previews. See [combat configuration and ownership](combat.md).
 
 ## Editing and persistence
 

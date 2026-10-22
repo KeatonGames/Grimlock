@@ -19,6 +19,19 @@ bool validSpeed(double speed) {
     return std::isfinite(speed) && speed >= 0 && speed <= 20;
 }
 
+std::optional<std::size_t> deathClip(const std::vector<std::string>& names) {
+    for (std::size_t index = 0; index < names.size(); ++index) {
+        auto name = names[index];
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        if (name.find("death") != std::string::npos || name.find("die") != std::string::npos) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<std::size_t> movementClip(const std::vector<std::string>& names, const std::string& requested) {
     for (std::size_t index = 0; index < names.size(); ++index) {
         if (names[index] == requested) {
@@ -49,7 +62,7 @@ EnemySystem::EnemySystem(Engine& engine, EnemyDefinition definition) : engine_(e
 EnemyTypeId EnemySystem::addDefinition(EnemyDefinition definition) {
     validateEnemyDefinition(definition);
     const auto type = types_.size();
-    types_.push_back({std::move(definition), {}, {}, {}});
+    types_.push_back({std::move(definition), {}, {}, {}, {}});
     return type;
 }
 
@@ -69,6 +82,7 @@ void EnemySystem::loadModel(EnemyTypeId type) {
         throw std::runtime_error("Enemy model needs finite, nonempty framing bounds.");
     }
     animal.movementClip = movementClip(info.animationNames, definition.movementAnimation);
+    animal.deathClip = deathClip(info.animationNames);
     animal.info = std::move(info);
     animal.model = model;
 }
@@ -134,7 +148,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             enemy.retryInterval = definition.retryInterval;
             enemy.stuckTimeout = definition.stuckTimeout;
             EnemyAi::setDestination(enemy, sharedDestination_);
-            enemy.health = definition.maximumHealth;
+            enemy.maximumHealth = enemy.health = definition.maximumHealth;
             enemy.instance = engine_.createInstance(*animal.model, true);
             enemies_.push_back(std::move(enemy));
             spawnNeighbors_.insert(enemies_.size() - 1, position);
@@ -177,6 +191,7 @@ void EnemySystem::updateModel(Enemy& enemy) {
 
 void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta) {
     const auto start = std::chrono::steady_clock::now();
+    updateEffects(delta);
     if (destination != sharedDestination_) {
         setSharedDestination(destination);
     }
@@ -194,6 +209,70 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
     }
     metrics_.updateMilliseconds =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+}
+
+bool EnemySystem::applyDamage(EnemyId id, float damage) {
+    if (!std::isfinite(damage) || damage < 0) {
+        throw std::invalid_argument("Enemy damage must be finite and nonnegative.");
+    }
+    for (std::size_t index = 0; index < enemies_.size(); ++index) {
+        auto& enemy = enemies_[index];
+        if (enemy.id != id || !enemy.active || !enemy.alive || damage == 0) {
+            continue;
+        }
+        enemy.health = std::max(0.0F, enemy.health - damage);
+        enemy.hitFlashRemaining = 0.12;
+        engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
+        if (enemy.health > 0) {
+            return true;
+        }
+
+        enemy.active = enemy.alive = false;
+        enemy.velocity = enemy.desiredVelocity = {0, 0};
+        enemy.path.valid = false;
+        auto& playback = engine_.animation(*enemy.instance);
+        double duration = 0.25;
+        if (const auto clip = types_[enemy.type].deathClip) {
+            playback.setSpeed(1);
+            playback.play(*clip, false);
+            const auto& animation = playback.model().animations[*clip];
+            duration = std::max(duration, static_cast<double>(animation.end - animation.start));
+        } else {
+            playback.pause();
+        }
+        // The render-only effect retains the instance; dead enemies leave navigation and targeting immediately.
+        deaths_.push_back({*enemy.instance, duration});
+        enemy.instance.reset();
+        ++metrics_.defeated;
+        removeAt(index);
+        return true;
+    }
+    return false;
+}
+
+void EnemySystem::updateEffects(double delta) {
+    if (!std::isfinite(delta) || delta < 0) {
+        throw std::invalid_argument("Enemy effects delta must be finite and nonnegative.");
+    }
+    for (auto& enemy : enemies_) {
+        if (enemy.hitFlashRemaining > 0) {
+            enemy.hitFlashRemaining = std::max(0.0, enemy.hitFlashRemaining - delta);
+            if (enemy.hitFlashRemaining == 0) {
+                engine_.setTint(*enemy.instance, glm::vec4{1});
+            }
+        }
+    }
+    for (std::size_t index = 0; index < deaths_.size();) {
+        auto& death = deaths_[index];
+        death.remaining -= delta;
+        if (death.remaining > 0) {
+            ++index;
+            continue;
+        }
+        engine_.removeInstance(death.instance);
+        death = deaths_.back();
+        deaths_.pop_back();
+    }
 }
 
 void EnemySystem::removeAt(std::size_t index) noexcept {
@@ -221,6 +300,10 @@ void EnemySystem::clear() noexcept {
     while (!enemies_.empty()) {
         removeAt(enemies_.size() - 1);
     }
+    for (const auto& death : deaths_) {
+        engine_.removeInstance(death.instance);
+    }
+    deaths_.clear();
     metrics_ = {};
 }
 

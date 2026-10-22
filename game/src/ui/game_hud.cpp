@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cmath>
+#include <glm/gtc/constants.hpp>
 #include <grimlock/input.hpp>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
@@ -129,7 +131,21 @@ void GameHud::construction() {
             ImGui::Text("%llu gold%s",
                         static_cast<unsigned long long>(definition.constructionCost),
                         affordable ? "" : " - insufficient gold");
+            ImGui::Text("Damage %.0f  |  Range %.1f  |  %.1f shots/s",
+                        definition.damage,
+                        definition.attackRange,
+                        definition.fireRate);
             ImGui::PopID();
+        }
+        if (const auto* tower = runtime_.inspectedTower()) {
+            const auto& definition = runtime_.navigation().towers().definition(tower->type);
+            ImGui::Separator();
+            ImGui::Text("Selected: %s", definition.name.c_str());
+            ImGui::Text("Damage %.0f  |  Range %.1f  |  %.1f shots/s  |  %llu gold",
+                        definition.damage,
+                        definition.attackRange,
+                        definition.fireRate,
+                        static_cast<unsigned long long>(definition.constructionCost));
         }
         if (runtime_.placing()) {
             if (ImGui::Button("Cancel Placement")) {
@@ -181,13 +197,16 @@ void GameHud::finishFrame(const Camera& camera) {
             confirm = true;
         }
     }
+    if (!runtime_.placing() && confirm) {
+        runtime_.selectTower(ray);
+    }
     runtime_.updatePlacement(engine_, ray, confirm);
     placementOverlay(camera);
     ImGui::Render();
 }
 
 void GameHud::placementOverlay(const Camera& camera) {
-    if (!runtime_.placing()) {
+    if (!runtime_.placing() && !runtime_.inspectedTower()) {
         return;
     }
     glm::ivec2 drawable{};
@@ -199,18 +218,38 @@ void GameHud::placementOverlay(const Camera& camera) {
         glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
-    const auto polygon = [&](std::span<const glm::dvec3> vertices, ImU32 color) {
+    const auto polygon = [&](std::span<const glm::dvec3> vertices, ImU32 color, bool outline = true) {
         std::array<ImVec2, 12> points;
         const auto count = ui::projectPolygon(matrix, vertices, viewport->Pos, viewport->Size, points);
         if (count) {
             draw->AddConvexPolyFilled(points.data(), count, color);
-            draw->AddPolyline(points.data(), count, color | IM_COL32(0, 0, 0, 150), ImDrawFlags_Closed, 1.0F);
+            if (outline) {
+                draw->AddPolyline(points.data(), count, color | IM_COL32(0, 0, 0, 150), ImDrawFlags_Closed, 1.0F);
+            }
         }
     };
-    for (const auto& zone : runtime_.navigation().placement().zones()) {
-        const auto corners = zone.corners();
-        const std::array<glm::dvec3, 4> vertices{corners[0], corners[1], corners[2], corners[3]};
-        polygon(vertices, IM_COL32(35, 130, 90, 35));
+    if (runtime_.placing()) {
+        for (const auto& zone : runtime_.navigation().placement().zones()) {
+            const auto corners = zone.corners();
+            const std::array<glm::dvec3, 4> vertices{corners[0], corners[1], corners[2], corners[3]};
+            polygon(vertices, IM_COL32(35, 130, 90, 35));
+        }
+    }
+    const auto* rangeTower = runtime_.preview() ? &*runtime_.preview() : runtime_.inspectedTower();
+    if (rangeTower) {
+        const auto range = runtime_.navigation().towers().definition(rangeTower->type).attackRange;
+        const auto center = rangeTower->position - glm::dvec3{0, rangeTower->halfExtent.y - 0.025, 0};
+        constexpr int segments = 80;
+        for (int index = 0; index < segments; ++index) {
+            const double a = glm::two_pi<double>() * index / segments;
+            const double b = glm::two_pi<double>() * (index + 1) / segments;
+            const glm::dvec3 first{std::cos(a), 0, std::sin(a)}, second{std::cos(b), 0, std::sin(b)};
+            const std::array<glm::dvec3, 4> vertices{center + first * range,
+                                                     center + second * range,
+                                                     center + second * (range - 0.035),
+                                                     center + first * (range - 0.035)};
+            polygon(vertices, IM_COL32(115, 205, 200, 75), false);
+        }
     }
     if (const auto& tower = runtime_.preview()) {
         std::array<glm::dvec3, 8> corners;

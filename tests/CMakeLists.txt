@@ -1,4 +1,15 @@
 # A real Engine consumer: only its public headers and link interface are available.
+add_executable(CombatRuntimeChecks combat_runtime.cpp)
+target_link_libraries(CombatRuntimeChecks PRIVATE GameLogic)
+set_target_properties(CombatRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(CombatRuntimeChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET CombatRuntimeChecks POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:CombatRuntimeChecks> VERBATIM)
+endif()
+add_test(NAME Combat.Runtime COMMAND CombatRuntimeChecks)
+set_tests_properties(Combat.Runtime PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+
 add_executable(GameRuntimeChecks game_runtime.cpp)
 target_link_libraries(GameRuntimeChecks PRIVATE GameUi SDL3::SDL3 Vulkan::Vulkan)
 set_target_properties(GameRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)

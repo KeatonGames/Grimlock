@@ -1,6 +1,7 @@
 #pragma once
 
 #include "navigation/navigation_session.hpp"
+#include "systems/combat_system.hpp"
 #include "systems/economy_system.hpp"
 #include "systems/wave_system.hpp"
 
@@ -28,7 +29,13 @@ public:
         return waves_ ? &*waves_ : nullptr;
     }
 
+    [[nodiscard]] const CombatSystem* combat() const noexcept {
+        return combat_ ? &*combat_ : nullptr;
+    }
+
 private:
+    void updateBattle(Engine& engine, NavigationSession& navigation, double delta);
+    std::optional<CombatSystem> combat_;
     std::optional<WaveSystem> waves_;
     const Scene* scene_ = nullptr;
     std::vector<EnemyTypeId> types_;

@@ -1,8 +1,12 @@
 # Tower placement
 
-Phase 19 adds required build zones, data-driven Basic/Wide tower types and a
+Placement uses required build zones, data-driven Small/Large tower types and a
 preparation-only placement gate. See [build zones and placement](build_zones.md)
 for current controls, persistence and checks.
+
+Both types now attack during level Battles. See [tower combat](combat.md) for
+statistics, projectiles, enemy health/death and gameplay range indicators.
+The existing `basic`/`wide` type IDs and physical footprints remain compatible.
 
 Open `assets/scenes/debug.json` in Editor mode, or load First Watch through the Level menu. Other terrain scenes need build zones created first. Use **Navigation > Towers > Place Tower**, then move the mouse over the terrain. Left-click places a tower; placement remains active for additional towers. Escape or **Cancel Placement** exits. Mouse pan, orbit and zoom remain available. Placement owns selection clicks and temporarily takes priority over walkability painting.
 

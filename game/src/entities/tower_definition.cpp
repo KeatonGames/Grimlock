@@ -33,6 +33,24 @@ std::vector<TowerDefinition> loadTowerDefinitions(const std::filesystem::path& a
         definition.id = entry.at("id").get<std::string>();
         definition.name = entry.at("name").get<std::string>();
         definition.model = entry.at("model").get<std::string>();
+        definition.damage = entry.value("damage", definition.damage);
+        definition.attackRange = entry.value("attack_range", definition.attackRange);
+        definition.fireRate = entry.value("fire_rate", definition.fireRate);
+        definition.projectileSpeed = entry.value("projectile_speed", definition.projectileSpeed);
+        definition.projectileRadius = entry.value("projectile_radius", definition.projectileRadius);
+        if (entry.contains("projectile_tint")) {
+            const auto color = entry.at("projectile_tint").get<std::array<float, 4>>();
+            definition.projectileTint = {color[0], color[1], color[2], color[3]};
+        }
+        if (!std::isfinite(definition.damage) || definition.damage <= 0 || !std::isfinite(definition.attackRange) ||
+            definition.attackRange <= 0 || !std::isfinite(definition.fireRate) || definition.fireRate <= 0 ||
+            definition.fireRate > 60 || !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
+            !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0 ||
+            !std::isfinite(glm::length(definition.projectileTint)) ||
+            glm::any(glm::lessThan(definition.projectileTint, glm::vec4{0})) ||
+            glm::any(glm::greaterThan(definition.projectileTint, glm::vec4{1}))) {
+            throw std::invalid_argument("Tower combat statistics must be finite and positive (fire_rate <= 60).");
+        }
         if (entry.contains("construction_cost")) {
             const auto& cost = entry.at("construction_cost");
             if (!cost.is_number_integer() || (!cost.is_number_unsigned() && cost.get<std::int64_t>() < 0)) {

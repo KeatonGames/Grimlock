@@ -78,6 +78,27 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     }
     save(levelPath, levelJson);
     save(towerPath, towerJson);
+    for (const auto* property : {"damage", "attack_range", "fire_rate", "projectile_speed", "projectile_radius"}) {
+        for (const auto& invalid : nlohmann::json::array({-1, 0, "bad", nullptr})) {
+            auto modified = towerJson;
+            modified[0][property] = invalid;
+            save(towerPath, modified);
+            rejects([&] {
+                (void)loadTowerDefinitions(fixture);
+            });
+        }
+    }
+    auto legacy = towerJson;
+    for (auto& tower : legacy) {
+        for (const auto* property :
+             {"damage", "attack_range", "fire_rate", "projectile_speed", "projectile_radius", "projectile_tint"}) {
+            tower.erase(property);
+        }
+    }
+    save(towerPath, legacy);
+    require(loadTowerDefinitions(fixture)[0].damage == TowerDefinition{}.damage,
+            "legacy towers did not receive compatible combat defaults");
+    save(towerPath, towerJson);
     require(loadLevelDefinition(levelPath).startingGold == 0 &&
                 loadLevelDefinition(levelPath).waves[0].goldReward == 0 &&
                 loadTowerDefinitions(fixture)[0].constructionCost == 0,

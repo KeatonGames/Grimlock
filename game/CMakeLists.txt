@@ -11,6 +11,8 @@ add_library(GameLogic STATIC
     src/navigation/nav_mesh.cpp
     src/systems/crowd_movement.cpp
     src/systems/enemy_ai.cpp
+    src/systems/combat_system.cpp
+    src/systems/projectile_system.cpp
     src/systems/tower_system.cpp
     src/systems/enemy_system.cpp
     src/navigation/navigation_session.cpp)

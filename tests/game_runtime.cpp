@@ -146,7 +146,7 @@ int main() {
         focus.window.windowID = id;
         require(SDL_PushEvent(&focus), SDL_GetError());
         tick(engine, runtime);
-        control(engine, runtime, id, "Build Towers", "Basic tower", "basic");
+        control(engine, runtime, id, "Build Towers", "Small Tower", "basic");
         require(runtime.placing() && runtime.navigation().towers().towers().empty() &&
                     runtime.level().economy().gold() == 120,
                 "HUD click placed a tower or charged before confirmation");
@@ -163,21 +163,41 @@ int main() {
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
         tick(engine, runtime);
         require(!runtime.placing(), "Escape did not cancel gameplay placement");
+        click(engine, runtime, id, screen(engine, window, {-3.3F, 0.75F, 0}));
+        require(runtime.inspectedTower(), "gameplay tower selection failed");
+        control(engine, runtime, id, "Build Towers", "Large Tower", "wide");
+        const auto largePoint = screen(engine, window, {0.1F, 0, 0});
+        mouse(id, SDL_EVENT_MOUSE_MOTION, largePoint);
+        tick(engine, runtime);
+        require(runtime.preview() && runtime.placementError().empty(), "Large Tower preview invalid");
+        click(engine, runtime, id, largePoint);
+        require(runtime.navigation().towers().towers().size() == 2 && runtime.level().economy().gold() == 40,
+                "Large Tower construction failed");
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
+        tick(engine, runtime);
+        ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
+        tick(engine, runtime);
         control(engine, runtime, id, "Game Status", "Start Wave");
         require(runtime.level().waves()->phase() == LevelPhase::battle, "HUD did not start the wave");
         finishBattle(engine, runtime);
         const auto* resultPanel = ImGui::FindWindowByName("Level Result");
-        require(runtime.level().waves()->phase() == LevelPhase::victory && runtime.level().waves()->health() == 28 &&
-                    runtime.level().economy().gold() == 97 && resultPanel && resultPanel->Active,
+        const auto& metrics = runtime.navigation().enemies()->metrics();
+        require(metrics.defeated > 0 && metrics.arrived + metrics.defeated == 2 &&
+                    runtime.level().combat()->shotsFired() > 0,
+                "standalone Game towers did not defeat enemies");
+        require(runtime.level().waves()->phase() == LevelPhase::victory &&
+                    runtime.level().waves()->health() == 30 - metrics.arrived &&
+                    runtime.level().economy().gold() == 47 && resultPanel && resultPanel->Active,
                 "Game victory, reward or result HUD failed");
         require(contents(levelPath) == levelBefore && contents(assetRoot / definition.scene) == sceneBefore,
                 "gameplay overwrote authored files");
         control(engine, runtime, id, "Level Result", "Play Again");
-        require(runtime.level().economy().gold() == 120 && runtime.level().waves()->health() == 30 &&
-                    runtime.navigation().towers().towers().empty() &&
-                    runtime.navigation().enemies()->enemies().empty() &&
-                    runtime.navigation().navigation().contains({-3.3, 0, 0}),
-                "game restart retained runtime state");
+        require(
+            runtime.level().economy().gold() == 120 && runtime.level().waves()->health() == 30 &&
+                runtime.navigation().towers().towers().empty() && runtime.navigation().enemies()->enemies().empty() &&
+                runtime.navigation().enemies()->deathEffectCount() == 0 &&
+                runtime.level().combat()->shotsFired() == 0 && runtime.navigation().navigation().contains({-3.3, 0, 0}),
+            "game restart retained runtime state");
         definition.objectiveHealth = 1;
         definition.startingGold = 20;
         saveLevelDefinition(levelPath, definition);

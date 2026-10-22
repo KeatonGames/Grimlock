@@ -17,6 +17,8 @@ public:
     void beginPlacement(const std::string& type);
     void cancelPlacement() noexcept;
     void updatePlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
+    void selectTower(const std::optional<Ray>& ray);
+    [[nodiscard]] const Tower* inspectedTower() const noexcept;
 
     [[nodiscard]] LevelSession& level() noexcept {
         return level_;
@@ -50,6 +52,7 @@ private:
     bool placing_ = false;
     std::optional<Tower> preview_, rejectedTower_;
     std::uint64_t rejectedRevision_ = 0;
+    std::optional<ObjectId> inspectedTower_;
 };
 
 } // namespace grimlock::game

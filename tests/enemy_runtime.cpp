@@ -549,7 +549,7 @@ void checkTowers(Engine& engine,
     require(session.removeTower(engine, secondId) && !session.removeTower(engine, secondId) &&
                 session.towers().towers().empty(),
             "tower removal retained stale IDs");
-    navigationControl(engine, windowId, "Towers", "Tower Type", "Wide tower");
+    navigationControl(engine, windowId, "Towers", "Tower Type", "Large Tower");
     click(engine, windowId, {130, 11});
     popupControl(engine, windowId, "Towers");
     popupControl(engine, windowId, "Place Tower");
@@ -620,7 +620,7 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     ImGui::SetWindowPos("Level", {900, 35});
     ImGui::SetWindowFocus("Level");
     tick(engine);
-    panelControl(engine, window, "Basic tower");
+    panelControl(engine, window, "Small Tower");
     panelControl(engine, window, "Build Tower");
     auto* native = SDL_GetWindowFromID(window);
     click(engine, window, screenPoint(engine, native, {-3.3, 0, 0}));
@@ -656,8 +656,10 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
         debug.update(engine, 0);
         require(level.economy().gold() == expectedGold, "wave reward was granted more than once");
     }
-    require(level.waves()->phase() == game::LevelPhase::victory && level.waves()->health() == 12 &&
-                session.enemies()->metrics().arrived == 18 && session.enemies()->enemies().empty(),
+    const auto& combatMetrics = session.enemies()->metrics();
+    require(level.waves()->phase() == game::LevelPhase::victory &&
+                level.waves()->health() == 30 - combatMetrics.arrived && combatMetrics.defeated > 0 &&
+                combatMetrics.arrived + combatMetrics.defeated == 18 && session.enemies()->enemies().empty(),
             "fixed level counts, arrival damage or victory incorrect");
 
     const auto definition = level.waves()->definition();

@@ -198,6 +198,12 @@ See [NavMesh navigation](docs/navigation.md) for architecture, AI settings, cont
 
 ### Tower placement
 
+Small and Large Towers automatically fire during level Battles. The Game HUD shows
+damage, range, shots/sec and cost; click a built tower to see its range. Combat stats
+are configured in `game/assets/config/towers.json`, and enemy `maximum_health` in
+`game/assets/config/animals.json`. See [combat](docs/combat.md) for ownership,
+projectile/death handling and checks.
+
 Use **Navigation > Towers > Place Tower** in a terrain scene. The transparent preview responds immediately: green means a clear footprint; red indicates an overlap or the last rejected placement. Left-click performs full route validation and places a shared cube placeholder if valid; Escape or **Cancel Placement** exits. Layouts that close the last spawn-to-destination route are rejected. Mouse camera controls remain available.
 
 Towers are selectable scene objects and persist in saved scenes. Remove one through the hierarchy/Inspector delete command or **Remove Selected Tower**. Placing/removing towers updates Recast/Detour obstacles and invalidates enemy paths safely. See [tower placement](docs/towers.md) for architecture, validation and verification details.
@@ -206,7 +212,7 @@ Towers are selectable scene objects and persist in saved scenes. Remove one thro
 
 Tower construction now requires a predefined build zone. Use **Navigation > Build
 Zones** to create/edit rectangles, and **Navigation > Towers > Tower Type** to choose
-Basic or Wide towers before placing freely inside them. First Watch and the debug
+Small or Large Towers before placing freely inside them. First Watch and the debug
 scene include zones. See [build zones and placement](docs/build_zones.md) for controls,
 collision footprints and persistence.
 

@@ -15,6 +15,7 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     auto scene = engine.loadScene(engine.assetRoot() / definition.scene);
     cancelPlacement();
     level_.stop(navigation_);
+    inspectedTower_.reset();
     navigation_.shutdown();
     engine.setScene(std::move(scene));
     level_.begin(engine, navigation_, std::move(definition));
@@ -49,8 +50,22 @@ void LevelRuntime::beginPlacement(const std::string& type) {
         throw std::invalid_argument(error);
     }
     cancelPlacement();
+    inspectedTower_.reset();
     selectedTower_ = type;
     placing_ = true;
+}
+
+void LevelRuntime::selectTower(const std::optional<Ray>& ray) {
+    inspectedTower_ = ray ? navigation_.towers().pick(*ray) : std::nullopt;
+}
+
+const Tower* LevelRuntime::inspectedTower() const noexcept {
+    for (const auto& tower : navigation_.towers().towers()) {
+        if (inspectedTower_ == tower.object) {
+            return &tower;
+        }
+    }
+    return nullptr;
 }
 
 void LevelRuntime::cancelPlacement() noexcept {

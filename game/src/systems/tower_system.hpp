@@ -11,6 +11,7 @@ namespace grimlock::game {
 
 class TowerSystem final {
 public:
+    [[nodiscard]] std::optional<ObjectId> pick(const Ray& ray) const;
     void synchronize(Engine& engine);
     void clear() noexcept;
     [[nodiscard]] ObjectId create(Engine& engine, const Tower& tower);
