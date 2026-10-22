@@ -323,6 +323,9 @@ void Editor::executePending() {
         }
 
         if (operation == Operation::newScene || operation == Operation::open) {
+            if (gridDebug_) {
+                gridDebug_->sceneOpened(engine_, operation == Operation::open ? filename : std::filesystem::path{});
+            }
             gridTools_.resetInteraction();
             renameObject_.reset();
             deleteObject_.reset();
@@ -411,6 +414,11 @@ void Editor::menu() {
     }
 
     gridTools_.menu(engine_, gridDebug_);
+    if (gridDebug_) {
+        if (const auto scene = gridDebug_->takeSceneRequest()) {
+            request(Operation::open, *scene);
+        }
+    }
     ImGui::Separator();
     ImGui::Text("%s%s", engine_.scene()->name().c_str(), document_.dirty() ? " *" : "");
 
@@ -1252,12 +1260,18 @@ OverlayInput Editor::frame() {
     ImGui::NewFrame();
     menu();
     layout();
+    if (gridDebug_) {
+        gridDebug_->panel(engine_);
+    }
     hierarchy();
     inspector();
     performance();
     dialogs();
     viewportMouse_ = !relative && !io.WantCaptureMouse;
-    const OverlayInput result{!relative && io.WantCaptureMouse, io.WantCaptureKeyboard, close_, gridTools_.editing()};
+    const OverlayInput result{!relative && io.WantCaptureMouse,
+                              io.WantCaptureKeyboard,
+                              close_,
+                              gridTools_.editing() || (gridDebug_ && gridDebug_->capturesSelection())};
 
     if (close_) {
         ImGui::Render();
@@ -1268,7 +1282,31 @@ OverlayInput Editor::frame() {
 
 void Editor::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
-    gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_);
+    if (!gridDebug_ || !gridDebug_->capturesSelection()) {
+        gridTools_.finishFrame(engine_, document_, camera, native_.window, viewportMouse_);
+    }
+    if (gridDebug_) {
+        glm::ivec2 logical{}, drawable{};
+        SDL_GetWindowSize(native_.window, &logical.x, &logical.y);
+        SDL_GetWindowSizeInPixels(native_.window, &drawable.x, &drawable.y);
+        const auto& input = engine_.input();
+        const auto busy = [&](MouseButton button) {
+            const auto& state = input.button(button);
+            return state.held || state.pressed || state.released;
+        };
+        ViewportInput tool;
+        tool.cancel = ImGui::IsKeyPressed(ImGuiKey_Escape);
+        if (viewportMouse_ && input.focused && !busy(MouseButton::right) && !busy(MouseButton::middle) &&
+            input.mouseWheel == glm::vec2{0}) {
+            tool.ray = mouseRay(camera, input.mousePosition, logical, drawable);
+            if (input.button(MouseButton::left).pressed && input.leftPressPosition) {
+                tool.pressRay = mouseRay(camera, *input.leftPressPosition, logical, drawable);
+            }
+        }
+        if (gridDebug_->viewport(engine_, tool)) {
+            document_.markChanged();
+        }
+    }
     drawDebugGeometry(camera, native_.window, gridDebug_);
     ImGui::Render();
 }

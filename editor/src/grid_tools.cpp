@@ -144,7 +144,7 @@ void paintLine(SceneDocument& document, GridCell from, GridCell to, bool walkabl
 } // namespace
 
 void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug* debug) {
-    if (!debug || debug->triangles().empty()) {
+    if (!debug || (debug->triangles().empty() && debug->boxes().empty() && debug->quads().empty())) {
         return;
     }
     glm::ivec2 drawable{};
@@ -157,6 +157,22 @@ void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
     std::array<ImVec2, 12> points{};
+    for (const auto& quad : debug->quads()) {
+        std::array<glm::dvec3, 4> vertices;
+        std::copy(quad.vertices.begin(), quad.vertices.end(), vertices.begin());
+        const int count = projectPolygon(matrix, vertices, viewport->Pos, viewport->Size, points);
+        if (count) {
+            const auto& color = quad.color;
+            draw->AddConvexPolyFilled(points.data(),
+                                      count,
+                                      ImGui::ColorConvertFloat4ToU32({color.r, color.g, color.b, color.a}));
+            draw->AddPolyline(points.data(),
+                              count,
+                              ImGui::ColorConvertFloat4ToU32({color.r, color.g, color.b, 0.55F}),
+                              ImDrawFlags_Closed,
+                              1.0F);
+        }
+    }
     for (const auto& triangle : debug->triangles()) {
         const std::array<glm::dvec3, 3> vertices{
             {glm::dvec3{triangle[0]}, glm::dvec3{triangle[1]}, glm::dvec3{triangle[2]}}};
@@ -164,6 +180,36 @@ void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug
         if (count) {
             draw->AddConvexPolyFilled(points.data(), count, IM_COL32(20, 170, 180, 55));
             draw->AddPolyline(points.data(), count, IM_COL32(30, 200, 220, 170), ImDrawFlags_Closed, 1.0F);
+        }
+    }
+    for (const auto& box : debug->boxes()) {
+        const auto a = glm::dvec3{box.minimum}, b = glm::dvec3{box.maximum};
+        std::array<glm::dvec3, 8> corners{{{a.x, a.y, a.z},
+                                           {b.x, a.y, a.z},
+                                           {b.x, a.y, b.z},
+                                           {a.x, a.y, b.z},
+                                           {a.x, b.y, a.z},
+                                           {b.x, b.y, a.z},
+                                           {b.x, b.y, b.z},
+                                           {a.x, b.y, b.z}}};
+        const auto center = (a + b) * 0.5;
+        for (auto& corner : corners) {
+            corner = center + glm::dquat{box.rotation} * (corner - center);
+        }
+        constexpr std::array<std::array<int, 4>, 6> faces{
+            {{0, 1, 2, 3}, {4, 5, 6, 7}, {0, 1, 5, 4}, {1, 2, 6, 5}, {2, 3, 7, 6}, {3, 0, 4, 7}}};
+        const auto color = ImGui::ColorConvertFloat4ToU32({box.color.r, box.color.g, box.color.b, box.color.a});
+        const auto outline = ImGui::ColorConvertFloat4ToU32({box.color.r, box.color.g, box.color.b, 0.8F});
+        for (const auto& face : faces) {
+            const std::array<glm::dvec3, 4> vertices{corners[face[0]],
+                                                     corners[face[1]],
+                                                     corners[face[2]],
+                                                     corners[face[3]]};
+            const int count = projectPolygon(matrix, vertices, viewport->Pos, viewport->Size, points);
+            if (count) {
+                draw->AddConvexPolyFilled(points.data(), count, color);
+                draw->AddPolyline(points.data(), count, outline, ImDrawFlags_Closed, 1.0F);
+            }
         }
     }
 }

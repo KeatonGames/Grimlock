@@ -28,6 +28,10 @@ public:
     void observeCamera();
     void refreshModels();
 
+    void markChanged() noexcept {
+        dirty_ = true;
+    }
+
     [[nodiscard]] bool dirty() const noexcept {
         return dirty_;
     }

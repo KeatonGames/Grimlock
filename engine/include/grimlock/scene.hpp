@@ -40,6 +40,7 @@ struct AnimationConfiguration {
 struct SceneObject {
     ObjectId id = 0;
     std::string name;
+    std::string role; // Opaque application classification; Engine does not interpret it.
     Transform local;
     std::optional<ObjectId> parent;
     std::optional<std::filesystem::path> model;
@@ -100,6 +101,7 @@ public:
     }
 
     void setName(ObjectId id, std::string name);
+    void setRole(ObjectId id, std::string role);
     void setTransform(ObjectId id, const Transform& local);
     void setParent(ObjectId id, std::optional<ObjectId> parent);
     void setEnabled(ObjectId id, bool enabled);

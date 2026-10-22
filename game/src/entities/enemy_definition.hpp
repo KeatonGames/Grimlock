@@ -24,7 +24,7 @@ struct EnemyDefinition {
     std::string movementAnimation = "walk";
     float animationSpeed = 1;
     double forwardYaw = 0;
-    bool despawnOnArrival = false;
+    bool despawnOnArrival = true;
 };
 
 void validateEnemyDefinition(const EnemyDefinition& definition);

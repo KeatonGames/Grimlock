@@ -1,4 +1,10 @@
 # A real Engine consumer: only its public headers and link interface are available.
+add_executable(PlacementChecks placement.cpp)
+target_link_libraries(PlacementChecks PRIVATE GameLogic)
+add_test(NAME Towers.BuildZones COMMAND PlacementChecks "${PROJECT_SOURCE_DIR}/game/assets" "${CMAKE_CURRENT_BINARY_DIR}/build-zones.json")
+add_executable(WaveChecks wave.cpp)
+target_link_libraries(WaveChecks PRIVATE GameLogic)
+add_test(NAME Levels.Waves COMMAND WaveChecks "${PROJECT_SOURCE_DIR}/game/assets/levels/first_watch.json")
 add_executable(AnimalDefinitionChecks animal_definition.cpp)
 target_link_libraries(AnimalDefinitionChecks PRIVATE GameLogic nlohmann_json::nlohmann_json)
 add_test(NAME Enemies.Definitions COMMAND AnimalDefinitionChecks "${PROJECT_SOURCE_DIR}/game/assets" "${CMAKE_CURRENT_BINARY_DIR}/animal-definitions")
@@ -6,6 +12,10 @@ add_test(NAME Enemies.Definitions COMMAND AnimalDefinitionChecks "${PROJECT_SOUR
 add_executable(EnemyAiChecks enemy_ai.cpp)
 target_link_libraries(EnemyAiChecks PRIVATE GameLogic)
 add_test(NAME Enemies.Ai COMMAND EnemyAiChecks)
+
+add_executable(TowerChecks tower.cpp)
+target_link_libraries(TowerChecks PRIVATE GameLogic)
+add_test(NAME Towers.Cpu COMMAND TowerChecks "${CMAKE_CURRENT_BINARY_DIR}/tower-scene.json" "${PROJECT_SOURCE_DIR}/game/assets/scenes/debug.json")
 
 add_executable(NavMeshChecks nav_mesh.cpp)
 target_link_libraries(NavMeshChecks PRIVATE GameLogic)

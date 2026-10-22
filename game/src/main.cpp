@@ -20,7 +20,8 @@ int main(const int argc, char** argv) {
             if (argument == "--help") {
                 std::cout << "Usage: Grimlock [--editor] [scene.json|model.obj|.glb|.gltf] "
                              "[--environment folder]\nNo argument: assets/scenes/demo.json. A "
-                             "supplied model starts its first clip, if any.\n"
+                             "supplied model starts its first clip, if any. --editor without a scene opens "
+                             "assets/scenes/debug.json.\n"
                              "Environment faces: px/nx/py/ny/pz/nz (.hdr, .png, .jpg). Paths are "
                              "executable-relative.\n";
                 return EXIT_SUCCESS;
@@ -51,7 +52,9 @@ int main(const int argc, char** argv) {
             }
 
             grimlock::game::NavigationDebug navigation;
-            grimlock::editor::run(path, environment, &navigation);
+            grimlock::editor::run(path.empty() ? std::filesystem::path{"assets/scenes/debug.json"} : path,
+                                  environment,
+                                  &navigation);
 
             return EXIT_SUCCESS;
 #else

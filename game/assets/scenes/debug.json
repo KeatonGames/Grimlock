@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "name": "Navigation lab | towers, crowds and recovery",
+  "navigation_grid": {
+    "width": 24,
+    "height": 18,
+    "cell_size": 1,
+    "origin": [-12, 0, -9],
+    "blocked": [
+      [10, 0],
+      [17, 0],
+      [19, 0],
+      [20, 0],
+      [21, 0],
+      [22, 0],
+      [23, 0],
+      [10, 1],
+      [17, 1],
+      [19, 1],
+      [23, 1],
+      [10, 2],
+      [13, 2],
+      [14, 2],
+      [17, 2],
+      [19, 2],
+      [23, 2],
+      [13, 3],
+      [14, 3],
+      [17, 3],
+      [19, 3],
+      [23, 3],
+      [17, 4],
+      [19, 4],
+      [20, 4],
+      [21, 4],
+      [22, 4],
+      [23, 4],
+      [17, 5],
+      [10, 7],
+      [10, 8],
+      [10, 9],
+      [10, 10],
+      [17, 10],
+      [17, 11],
+      [17, 12],
+      [10, 13],
+      [17, 13],
+      [10, 14],
+      [13, 14],
+      [14, 14],
+      [17, 14],
+      [10, 15],
+      [13, 15],
+      [14, 15],
+      [10, 16],
+      [17, 16],
+      [10, 17],
+      [17, 17]
+    ]
+  },
+  "cameras": [
+    {
+      "id": "main",
+      "position": [6, 36, 10],
+      "target": [0, 0, 0],
+      "vertical_fov_degrees": 50,
+      "far": 150
+    }
+  ],
+  "active_camera": "main",
+  "lighting": {
+    "directional": {
+      "direction": [-0.25, -1, -0.35],
+      "color": [1, 0.96, 0.9],
+      "intensity": 3
+    },
+    "environment_intensity": 1,
+    "exposure": 1
+  },
+  "objects": [
+    {"id":"100","name":"BUILD | western field","role":"grimlock.build_zone",
+      "transform":{"position":[-7,0,0],"scale":[4.5,1,8]}},
+    {"id":"101","name":"BUILD | central plaza","role":"grimlock.build_zone",
+      "transform":{"position":[1.5,0,0],"scale":[2.8,1,7.8]}},
+    {"id":"102","name":"BUILD | eastern field","role":"grimlock.build_zone",
+      "transform":{"position":[8.5,0,2.5],"scale":[2.8,1,5.5]}},
+    {
+      "id": "1",
+      "name": "SPAWN | teal staging area"
+    },
+    {
+      "id": "2",
+      "name": "GOAL | green arrival area"
+    },
+    {
+      "id": "3",
+      "name": "GATES | gold = wide; purple = narrow"
+    },
+    {
+      "id": "4",
+      "name": "TOWERS | select and delete these samples"
+    },
+    {
+      "id": "5",
+      "name": "BLOCKED TEST | isolated purple pocket"
+    },
+    {
+      "id": "6",
+      "name": "Spawn zone | default spawn rectangle",
+      "parent": "1",
+      "model": "models/cube.obj",
+      "tint": [0.06, 0.38, 0.42, 1],
+      "transform": {
+        "position": [-8, 0.006, 0],
+        "scale": [3.4, 0.006, 8.4]
+      }
+    },
+    {
+      "id": "7",
+      "name": "Destination zone | default goal at 11.5, 8.5",
+      "parent": "2",
+      "model": "models/cube.obj",
+      "tint": [0.1, 0.52, 0.18, 1],
+      "transform": {
+        "position": [10.5, 0.008, 7.5],
+        "scale": [1.4, 0.008, 1.4]
+      }
+    },
+    {
+      "id": "8",
+      "name": "Unreachable pocket | spawn at 9.5, -6.5",
+      "parent": "5",
+      "model": "models/cube.obj",
+      "tint": [0.46, 0.12, 0.48, 1],
+      "transform": {
+        "position": [9.5, 0.006, -6.5],
+        "scale": [1.35, 0.006, 1.35]
+      }
+    },
+    {
+      "id": "9",
+      "name": "Tower A | remove to open plaza",
+      "parent": "4",
+      "model": "models/cube.obj",
+      "role": "grimlock.tower",
+      "tint": [0.18, 0.4, 0.8, 1],
+      "transform": {
+        "position": [0.8, 0.75, -0.7],
+        "scale": [0.45, 0.75, 0.45]
+      }
+    },
+    {
+      "id": "10",
+      "name": "Tower B | shared cube resource",
+      "parent": "4",
+      "model": "models/cube.obj",
+      "role": "grimlock.tower",
+      "tint": [0.18, 0.4, 0.8, 1],
+      "transform": {
+        "position": [3.2, 0.75, 2.6],
+        "scale": [0.45, 0.75, 0.45]
+      }
+    },
+    {
+      "id": "11",
+      "name": "Wide entrance | 4 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.8, 0.58, 0.08, 1],
+      "transform": {
+        "position": [-1.5, 1.52, -6.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "12",
+      "name": "Wide entrance | 4 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.8, 0.58, 0.08, 1],
+      "transform": {
+        "position": [-1.5, 1.52, -1.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "13",
+      "name": "Secondary entrance | 2 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.58, 0.16, 0.65, 1],
+      "transform": {
+        "position": [-1.5, 1.52, 1.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "14",
+      "name": "Secondary entrance | 2 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.58, 0.16, 0.65, 1],
+      "transform": {
+        "position": [-1.5, 1.52, 4.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "15",
+      "name": "Wide exit | 4 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.8, 0.58, 0.08, 1],
+      "transform": {
+        "position": [5.5, 1.52, -3.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "16",
+      "name": "Wide exit | 4 cells",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.8, 0.58, 0.08, 1],
+      "transform": {
+        "position": [5.5, 1.52, 1.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "17",
+      "name": "Small-animal shortcut | 1 cell",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.58, 0.16, 0.65, 1],
+      "transform": {
+        "position": [5.5, 1.52, 5.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    },
+    {
+      "id": "18",
+      "name": "Small-animal shortcut | 1 cell",
+      "parent": "3",
+      "model": "models/cube.obj",
+      "tint": [0.58, 0.16, 0.65, 1],
+      "transform": {
+        "position": [5.5, 1.52, 7.5],
+        "scale": [0.46, 0.02, 0.46]
+      }
+    }
+  ]
+}

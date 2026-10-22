@@ -1,9 +1,15 @@
 add_library(GameLogic STATIC
     src/entities/enemy_definition.cpp
+    src/entities/level_definition.cpp
+    src/entities/tower_definition.cpp
+    src/systems/placement_system.cpp
+    src/systems/wave_system.cpp
+    src/systems/level_session.cpp
     src/navigation/navigation_geometry.cpp
     src/navigation/nav_mesh.cpp
     src/systems/crowd_movement.cpp
     src/systems/enemy_ai.cpp
+    src/systems/tower_system.cpp
     src/systems/enemy_system.cpp
     src/navigation/navigation_session.cpp)
 target_include_directories(GameLogic PUBLIC src)

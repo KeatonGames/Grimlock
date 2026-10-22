@@ -45,7 +45,7 @@ struct Enemy {
     double retryInterval = 1, stuckTimeout = 2;
     double remainingDistance = 0;
     bool active = true, alive = true, animationMoving = false;
-    bool despawnOnArrival = false;
+    bool despawnOnArrival = true;
     NavigationPath path;
     std::optional<glm::dvec2> requestedDestination;
     double repathDelay = 0, stuckTime = 0;
@@ -56,6 +56,7 @@ struct Enemy {
 struct SpawnArea {
     glm::dvec2 minimum{0}, maximum{1}; // World X/Z rectangle, including its boundary.
     double height = 0;                 // Height hint when projecting onto a navigable surface.
+    bool operator==(const SpawnArea&) const = default;
 };
 
 } // namespace grimlock::game

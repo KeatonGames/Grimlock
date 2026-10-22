@@ -274,6 +274,10 @@ void Scene::setTint(ObjectId id, const glm::vec4& tint) {
     objects_.at(id).tint = tint;
 }
 
+void Scene::setRole(ObjectId id, std::string role) {
+    objects_.at(id).role = std::move(role);
+}
+
 void Scene::setMaterialOverride(ObjectId id, std::optional<std::size_t> material) {
     auto& value = objects_.at(id);
 

@@ -49,6 +49,8 @@ public:
 
     bool build(const NavigationGeometry& geometry, NavMeshConfiguration configuration = {});
     void reset();
+    // Install a validated candidate without changing the address borrowed by enemies.
+    void replaceWith(NavMesh&& candidate) noexcept;
     [[nodiscard]] bool ready() const noexcept;
 
     [[nodiscard]] std::uint64_t revision() const noexcept {

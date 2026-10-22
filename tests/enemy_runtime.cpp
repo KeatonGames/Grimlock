@@ -78,12 +78,19 @@ void popupControl(Engine& engine, SDL_WindowID window, const char* label) {
     require(found, label);
 }
 
-void navigationControl(Engine& engine, SDL_WindowID window, const char* label, const char* choice = nullptr) {
+void navigationControl(Engine& engine,
+                       SDL_WindowID window,
+                       const char* label,
+                       const char* choice = nullptr,
+                       const char* detail = nullptr) {
     std::cout << "Control: " << label << std::endl;
     click(engine, window, {130, 11});
     popupControl(engine, window, label);
     if (choice) {
         popupControl(engine, window, choice);
+    }
+    if (detail) {
+        popupControl(engine, window, detail);
     }
     ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
     tick(engine);
@@ -97,6 +104,7 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
     game::EnemyDefinition definition;
     definition.model = "models/blackrat.glb";
     definition.movementAnimation = "idle_A1";
+    definition.despawnOnArrival = false;
     const auto& c = grid.configuration();
     game::NavMesh navigation;
     require(navigation.build(game::navigationGeometry(terrainBoxes(grid))), navigation.status().c_str());
@@ -159,6 +167,32 @@ void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
                 "shared retarget did not resume idle enemy animation");
     }
     require(resource.use_count() == baselineOwners, "enemy system destruction retained animation instances");
+
+    definition.despawnOnArrival = true;
+    game::EnemySystem system{engine, definition};
+    require(system.spawn(navigation,
+                         {{c.origin.x + c.cellSize, c.origin.z + c.cellSize},
+                          {c.origin.x + c.cellSize * 4, c.origin.z + c.cellSize * 4},
+                          c.origin.y},
+                         3) == 3,
+            "arrival cleanup spawn failed");
+    const auto handle = *system.enemies().front().instance;
+    for (const auto& enemy : system.enemies()) {
+        require(system.setDestination(enemy.id, glm::dvec2{enemy.position.x, enemy.position.z}),
+                "arrival destination assignment failed");
+    }
+    system.update(navigation, std::nullopt, 1.0 / 60);
+    require(system.enemies().empty() && system.metrics().arrived == 3 && resource.use_count() == baselineOwners,
+            "arrival did not remove packed enemies and release animation instances");
+    bool invalidated = false;
+    try {
+        (void)engine.animation(handle);
+    } catch (const std::out_of_range&) {
+        invalidated = true;
+    }
+    require(invalidated, "arrival retained a render instance");
+    system.update(navigation, std::nullopt, 1.0 / 60);
+    require(system.metrics().arrived == 3, "arrival was counted more than once");
 }
 
 void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_WindowID window) {
@@ -282,6 +316,322 @@ void checkAnimalBatches(Engine& engine, game::NavigationDebug& debug, SDL_Window
     }
     session.reset(engine);
     session.selectAnimal(engine, 0);
+}
+
+glm::vec2 screenPoint(Engine& engine, SDL_Window* window, glm::dvec3 point) {
+    glm::ivec2 logical{}, drawable{};
+    SDL_GetWindowSize(window, &logical.x, &logical.y);
+    SDL_GetWindowSizeInPixels(window, &drawable.x, &drawable.y);
+    const auto camera = engine.scene()->resolvedCamera();
+    auto clip = glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()} *
+                glm::dvec4{point, 1};
+    clip /= clip.w;
+    return {static_cast<float>((clip.x + 1) * 0.5 * logical.x), static_cast<float>((clip.y + 1) * 0.5 * logical.y)};
+}
+
+void checkTowers(Engine& engine,
+                 game::NavigationDebug& debug,
+                 editor::Editor& editor,
+                 SDL_WindowID windowId,
+                 const std::filesystem::path& output) {
+    std::cout << "Checking tower placement, route protection, persistence and removal..." << std::endl;
+    auto scene = std::make_unique<Scene>("Tower corridor");
+    scene->setNavigationGrid(GridConfiguration{12, 8, 1, {0, 0, 0}});
+    game::BuildZone buildZone;
+    buildZone.name = "Corridor construction area";
+    buildZone.position = {6, 0, 4};
+    buildZone.dimensions = {12, 8};
+    (void)game::PlacementSystem::createZone(*scene, buildZone);
+    for (std::uint32_t z = 0; z < 8; ++z) {
+        if (z < 3 || z >= 5) {
+            scene->navigationGrid()->setWalkable({5, z}, false);
+        }
+    }
+    SceneCamera camera;
+    camera.camera.position = {6, 30, 12};
+    camera.camera.target = {6, 0, 4};
+    scene->setCamera("main", camera);
+    const auto prop = scene->createObject("Ordinary prop");
+    scene->setModel(prop, "models/cube.obj");
+    Transform propTransform;
+    propTransform.position = {8, 0.5F, 6};
+    propTransform.scale = {0.4F, 0.5F, 0.4F};
+    scene->setTransform(prop, propTransform);
+    engine.setScene(std::move(scene));
+    auto& session = debug.session();
+    session.synchronize(engine);
+    const auto zoneCount = session.placement().zones().size();
+    const auto beforeZoneEdit = session.navigation().revision();
+    navigationControl(engine, windowId, "Build Zones", "Create Build Zone");
+    require(session.placement().zones().size() == zoneCount + 1 && editor.document().dirty(),
+            "build zone creation did not update the editor document");
+    const auto newZone = session.placement().zones().back().object;
+    engine.scene()->selectObject(newZone, true);
+    navigationControl(engine, windowId, "Build Zones", "Delete Build Zone");
+    require(session.placement().zones().size() == zoneCount && !engine.scene()->contains(newZone),
+            "build zone deletion retained construction space");
+    require(session.navigation().revision() == beforeZoneEdit, "zone-only editing rebuilt navigation");
+    session.selectAnimal(engine, 0);
+    session.spawnArea() = {{1, 3.3}, {2.5, 4.7}, 0};
+    session.setDestination(glm::dvec2{10.25, 4});
+    game::Tower propOverlap;
+    propOverlap.position = {8, 0.75, 6};
+    require(!session.checkTower(engine, propOverlap).empty(), "ordinary scene model overlap accepted");
+    game::Tower cached;
+    cached.position = {5.37, 0.75, 3.55};
+    require(session.checkTower(engine, cached).empty(), "unused large animal profiles prevented chicken placement");
+    game::EnemyTypeId dog = 0;
+    while (dog < session.enemies()->typeCount() && session.enemies()->definition(dog).name != "Dog") {
+        ++dog;
+    }
+    require(dog < session.enemies()->typeCount(), "dog definition missing");
+    session.selectAnimal(engine, dog);
+    require(session.spawn(engine, 1) == 1, "active profile protection scenario did not spawn");
+    const auto* dogSurface = session.enemies()->enemies()[0].navigation;
+    session.selectAnimal(engine, 0);
+    require(!session.checkTower(engine, cached).empty(), "cached placement ignored a newly occupied large profile");
+    session.reset(engine);
+    require(session.checkTower(engine, cached).empty(), "removed animals left a stale placement rejection");
+    const auto previewStart = std::chrono::steady_clock::now();
+    for (int i = 0; i < 1000; ++i) {
+        auto position = cached;
+        position.position.x += (i % 21 - 10) * 0.01;
+        require(session.checkTower(engine, position, false).empty(), "instant footprint check rejected clear terrain");
+    }
+    std::cout << "1000 tower hover checks: "
+              << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - previewStart).count()
+              << " ms; no route baking requested.\n";
+    editor.document().save(output);
+    tick(engine, 3);
+    auto* window = SDL_GetWindowFromID(windowId);
+    const auto firstPoint = screenPoint(engine, window, {5.37, 0, 3.55});
+    const auto initialRevision = session.navigation().revision();
+    const auto gridRevision = engine.scene()->navigationGrid()->revision();
+    click(engine, windowId, {130, 11});
+    popupControl(engine, windowId, "Towers");
+    popupControl(engine, windowId, "Place Tower");
+    require(debug.capturesSelection() && session.towers().towers().empty(), "Place Tower control failed");
+    mouse(windowId, SDL_EVENT_MOUSE_MOTION, firstPoint);
+    tick(engine, 1);
+    require(debug.boxes().size() == 1 && debug.boxes()[0].color.g > debug.boxes()[0].color.r &&
+                !editor.document().dirty() && session.navigation().revision() == initialRevision,
+            "valid transparent preview changed the scene or live NavMesh");
+    for (const auto position : {glm::dvec3{5.35, 0, 3.53}, glm::dvec3{5.39, 0, 3.57}, glm::dvec3{5.37, 0, 3.55}}) {
+        mouse(windowId, SDL_EVENT_MOUSE_MOTION, screenPoint(engine, window, position));
+        tick(engine, 1);
+        require(debug.boxes().size() == 1 && debug.boxes()[0].color.g > debug.boxes()[0].color.r,
+                "moving the cursor restarted a preview delay");
+    }
+    click(engine, windowId, firstPoint);
+    require(session.towers().towers().size() == 1 && editor.document().dirty(), "viewport click did not place a tower");
+    const auto first = session.towers().towers()[0];
+    require(std::abs(first.position.x - 5.37) < 0.002 && std::abs(first.position.z - 3.55) < 0.002 &&
+                session.navigation().revision() > initialRevision &&
+                engine.scene()->navigationGrid()->revision() == gridRevision,
+            "tower snapped to cells or did not update navigation");
+    require(debug.boxes().size() == 1 && debug.boxes()[0].color.r > debug.boxes()[0].color.g,
+            "overlapping preview was not red");
+    require(!dogSurface->ready(), "unused large-animal profile was eagerly rebuilt during tower placement");
+    const auto closingPoint = screenPoint(engine, window, {5.5, 0, 4.55});
+    mouse(windowId, SDL_EVENT_MOUSE_MOTION, closingPoint);
+    tick(engine, 1);
+    require(debug.boxes().size() == 1 && debug.boxes()[0].color.g > debug.boxes()[0].color.r,
+            "clear footprint did not respond immediately");
+    click(engine, windowId, closingPoint);
+    require(session.towers().towers().size() == 1 && debug.boxes().size() == 1 &&
+                debug.boxes()[0].color.r > debug.boxes()[0].color.g,
+            "click-time route validation did not reject a sealing tower");
+    const auto beforeZoom = engine.scene()->resolvedCamera();
+    SDL_Event zoom{};
+    zoom.type = SDL_EVENT_MOUSE_WHEEL;
+    zoom.wheel.windowID = windowId;
+    zoom.wheel.y = 1;
+    require(SDL_PushEvent(&zoom), SDL_GetError());
+    tick(engine);
+    const auto afterZoom = engine.scene()->resolvedCamera();
+    require(glm::length(afterZoom.position - afterZoom.target) < glm::length(beforeZoom.position - beforeZoom.target) &&
+                debug.capturesSelection() && session.towers().towers().size() == 1,
+            "placement mode captured camera input or placed a tower during zoom");
+    engine.scene()->setResolvedCamera(beforeZoom);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
+    tick(engine);
+    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
+    tick(engine);
+    require(!debug.capturesSelection() && debug.boxes().empty(), "Escape did not cancel placement");
+    session.selectAnimal(engine, dog);
+    require(dogSurface->ready() && !dogSurface->contains({first.position.x, 0, first.position.z}),
+            "on-demand profile rebuild did not include existing towers");
+    session.selectAnimal(engine, 0);
+
+    game::Tower closing;
+    closing.position = {5.5, 0.75, 4.55};
+    const auto beforeRejected = session.navigation().revision();
+    require(!session.checkTower(engine, closing).empty() && session.navigation().revision() == beforeRejected,
+            "last-route placement was accepted or mutated live navigation");
+    bool rejected = false;
+    try {
+        (void)session.placeTower(engine, closing);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected && session.towers().towers().size() == 1, "invalid placement created a scene object");
+    require(!session.checkTower(engine, first).empty(), "tower overlap accepted");
+    game::Tower wall;
+    wall.position = {5.5, 0.75, 1.5};
+    require(!session.checkTower(engine, wall).empty(), "wall overlap accepted");
+
+    require(session.spawn(engine, 6) == 6, "tower scenario enemy spawn failed");
+    session.update(engine, 0);
+    const auto* surface = session.enemies()->enemies()[0].navigation;
+    const auto oldPathRevision = session.enemies()->enemies()[0].path.revision;
+    game::Tower second;
+    second.position = {8.2, 0.75, 2.3};
+    const auto secondId = session.placeTower(engine, second);
+    require(session.enemies()->enemies()[0].navigation == surface && surface->revision() != oldPathRevision,
+            "installing a tower invalidated a borrowed mesh address");
+    require(engine.scene()->animation(first.object).asset() == engine.scene()->animation(secondId).asset(),
+            "tower instances did not share the cube model");
+    session.update(engine, 1.0 / 60);
+    require(session.enemies()->enemies()[0].path.revision == surface->revision(), "enemy kept stale tower corridors");
+    bool passed = false, reached = false;
+    for (int frame = 0; frame < 600; ++frame) {
+        require(engine.update([&](double) {
+            session.update(engine, 1.0 / 60);
+        }),
+                "tower movement frame failed");
+        for (const auto& enemy : session.enemies()->enemies()) {
+            require(enemy.navigation->contains(enemy.position), "animal entered a tower obstacle");
+            passed = passed || enemy.position.x > 6.5;
+        }
+        reached = reached || session.enemies()->metrics().arrived > 0;
+    }
+    require(passed && reached, "animals failed to navigate around towers and reach their goal");
+    engine.clearSelection();
+    click(engine, windowId, screenPoint(engine, window, first.position));
+    require(engine.selectedObject() == first.object, "normal scene picking did not select the tower");
+    editor.document().rename(first.object, "Renamed tower");
+    editor.document().save(output);
+    const auto saved = Scene::load(output);
+    require(saved->object(first.object).role == "grimlock.tower", "tower identification depended on its name");
+    const auto beforeRemoval = session.navigation().revision();
+    editor.document().remove(first.object);
+    session.update(engine, 0);
+    require(session.towers().towers().size() == 1 && session.navigation().revision() != beforeRemoval &&
+                session.navigation().contains({first.position.x, 0, first.position.z}),
+            "editor deletion did not restore navigation");
+    const auto afterRemoval = session.navigation().revision();
+    session.update(engine, 0);
+    require(session.navigation().revision() == afterRemoval, "unchanged towers rebuilt navigation every frame");
+    editor.document().open(output);
+    session.update(engine, 0);
+    require(session.towers().towers().size() == 2 && session.enemies()->enemies().empty() &&
+                !session.navigation().contains({first.position.x, 0, first.position.z}),
+            "loading a scene did not restore tower obstacles or clear old agents");
+    engine.scene()->selectObject(first.object);
+    navigationControl(engine, windowId, "Towers", "Remove Selected Tower");
+    require(session.towers().towers().size() == 1 && editor.document().dirty(), "tower removal control failed");
+    require(session.removeTower(engine, secondId) && !session.removeTower(engine, secondId) &&
+                session.towers().towers().empty(),
+            "tower removal retained stale IDs");
+    navigationControl(engine, windowId, "Towers", "Tower Type", "Wide tower");
+    click(engine, windowId, {130, 11});
+    popupControl(engine, windowId, "Towers");
+    popupControl(engine, windowId, "Place Tower");
+    const auto widePoint = screenPoint(engine, window, {8.3, 0, 2.3});
+    mouse(windowId, SDL_EVENT_MOUSE_MOTION, widePoint);
+    tick(engine, 1);
+    require(!debug.boxes().empty() && debug.boxes()[0].color.g > debug.boxes()[0].color.r,
+            "selected wide tower preview was not immediately valid");
+    click(engine, windowId, widePoint);
+    require(session.towers().towers().size() == 1, "selected tower type did not place through the viewport");
+    const auto wide = session.towers().towers().back();
+    require(wide.type == "wide" && wide.halfExtent == session.towers().definition("wide").halfExtent,
+            "tower selection did not use its configured footprint");
+    game::Tower basic;
+    basic.position = {7.8, 0.75, 4.1};
+    const auto basicId = session.placeTower(engine, basic);
+    require(engine.scene()->animation(wide.object).asset() == engine.scene()->animation(basicId).asset(),
+            "tower types duplicated shared model resources");
+    auto editedVisual = engine.scene()->object(wide.object).local;
+    editedVisual.rotation = glm::angleAxis(0.3F, glm::vec3{0, 1, 0});
+    engine.scene()->setTransform(wide.object, editedVisual);
+    session.synchronize(engine);
+    editedVisual.scale *= 0.5F;
+    engine.scene()->setTransform(wide.object, editedVisual);
+    const auto physicalRevision = session.navigation().revision();
+    session.synchronize(engine);
+    require(session.towers().towers().front().halfExtent == wide.halfExtent &&
+                session.navigation().revision() == physicalRevision,
+            "visual scaling changed physical bounds or rebuilt navigation");
+    editor.document().save(output);
+    editor.document().open(output);
+    session.synchronize(engine);
+    require(session.placement().zones().size() == zoneCount && session.towers().towers().size() == 2 &&
+                session.towers().towers().front().type == "wide" &&
+                session.towers().towers().front().halfExtent == wide.halfExtent &&
+                glm::length(session.towers().towers().front().rotation - glm::dquat{editedVisual.rotation}) < 1e-5 &&
+                !session.navigation().contains({wide.position.x, 0, wide.position.z}),
+            "loading lost zones, tower types, footprints or navigation obstacles");
+}
+
+void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& editor, SDL_WindowID window) {
+    std::cout << "Checking handcrafted level loading and waves..." << std::endl;
+    // Save the preceding editor test so the normal unsaved-change dialog does not intercept this load.
+    editor.document().save(editor.document().path());
+    navigationControl(engine, window, "Level", "Load First Watch");
+    auto& level = debug.level();
+    auto& session = debug.session();
+    require(level.waves() && level.waves()->phase() == game::LevelPhase::preparation && level.waves()->health() == 30 &&
+                session.enemies()->enemies().empty(),
+            "level load did not reset the scene, objective and enemies");
+    game::Tower tower;
+    tower.position = {-3.3, 0.75, 0};
+    const auto towerId = session.placeTower(engine, tower);
+    require(engine.scene()->contains(towerId), "preparation tower placement failed");
+    for (int wave = 0; wave < 3; ++wave) {
+        require(level.waves()->phase() == game::LevelPhase::preparation, "wave skipped preparation");
+        require(session.placementEnabled(), "preparation did not restore construction");
+        level.startWave(session);
+        require(!session.checkTower(engine, tower, false).empty(), "battle phase allowed construction");
+        for (int frame = 0; frame < 2400 && level.waves()->phase() == game::LevelPhase::battle; ++frame) {
+            debug.update(engine, 1.0 / 30);
+            for (const auto& enemy : session.enemies()->enemies()) {
+                require(enemy.navigation->contains(enemy.position), "wave animal entered an obstacle");
+            }
+            if (frame % 60 == 0) {
+                tick(engine, 1);
+            }
+        }
+        require(level.waves()->phase() != game::LevelPhase::battle, "authored wave did not drain its enemies");
+    }
+    require(level.waves()->phase() == game::LevelPhase::victory && level.waves()->health() == 12 &&
+                session.enemies()->metrics().arrived == 18 && session.enemies()->enemies().empty(),
+            "fixed level counts, arrival damage or victory incorrect");
+
+    const auto definition = level.waves()->definition();
+    editor.document().open(engine.assetRoot() / definition.scene);
+    level.begin(engine, session, definition);
+    require(session.towers().towers().empty() && session.enemies()->metrics().arrived == 0 &&
+                level.waves()->wave() == 0 && level.waves()->health() == 30,
+            "level restart retained towers, arrivals or progress");
+
+    auto fragile = definition;
+    fragile.objectiveHealth = 1;
+    level.begin(engine, session, fragile);
+    level.startWave(session);
+    for (int frame = 0; frame < 2400 && level.waves()->phase() == game::LevelPhase::battle; ++frame) {
+        debug.update(engine, 1.0 / 30);
+    }
+    require(level.waves()->phase() == game::LevelPhase::defeat && level.waves()->health() == 0,
+            "arrival did not defeat a depleted objective");
+    const auto pending = level.waves()->pending();
+    const auto active = session.enemies()->enemies().size();
+    debug.update(engine, 60);
+    require(level.waves()->pending() == pending && session.enemies()->enemies().size() == active,
+            "defeat continued running the battle");
+    editor.document().open(engine.assetRoot() / "scenes/demo.json");
+    debug.update(engine, 0);
+    require(!level.waves() && session.enemies()->enemies().empty(), "leaving level retained gameplay state");
 }
 
 } // namespace
@@ -504,6 +854,8 @@ int main(int argc, char** argv) {
                     debug.session().spawn(engine, 3) == 0,
                 "missing geometry allowed unbounded navigation");
         debug.session().reset(engine);
+        checkTowers(engine, debug, editor, id, output.parent_path() / "tower-runtime.json");
+        checkLevels(engine, debug, editor, id);
         std::cout << "PASS enemy controls, edit-only overlay, world destinations, predefined radii, resources and "
                      "animations.\n";
         return 0;

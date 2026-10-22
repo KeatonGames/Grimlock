@@ -96,6 +96,15 @@ struct NavMesh::Data {
 NavMesh::NavMesh() = default;
 NavMesh::~NavMesh() = default;
 
+void NavMesh::replaceWith(NavMesh&& candidate) noexcept {
+    data_ = std::move(candidate.data_);
+    configuration_ = candidate.configuration_;
+    statistics_ = candidate.statistics_;
+    status_ = std::move(candidate.status_);
+    triangles_ = std::move(candidate.triangles_);
+    ++revision_;
+}
+
 bool NavMesh::ready() const noexcept {
     return data_ != nullptr;
 }

@@ -509,6 +509,9 @@ Json readSceneDocument(const std::filesystem::path& path) {
 }
 
 void readObjectProperties(Scene& scene, ObjectId object, const Json& record, const std::string& field) {
+    if (record.contains("role")) {
+        scene.setRole(object, string(record.at("role"), field + ".role"));
+    }
     if (record.contains("transform")) {
         readTransform(scene, object, record.at("transform"), field + ".transform");
     }
@@ -575,6 +578,9 @@ Json writeObject(ObjectId id, const SceneObject& object) {
 
     if (object.parent) {
         record["parent"] = std::to_string(*object.parent);
+    }
+    if (!object.role.empty()) {
+        record["role"] = object.role;
     }
 
     if (object.model) {
@@ -690,6 +696,7 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
                 fields(record,
                        field,
                        {"id",
+                        "role",
                         "name",
                         "parent",
                         "model",

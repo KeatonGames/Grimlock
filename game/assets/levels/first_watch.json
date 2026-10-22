@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "name": "First Watch",
+  "scene": "scenes/first_watch.json",
+  "objective": {"position": [5, 0], "health": 30, "damage_per_arrival": 1},
+  "spawns": [
+    {"name": "North meadow", "minimum": [-5.8, -3.5], "maximum": [-4.2, -2.5], "height": 0},
+    {"name": "South meadow", "minimum": [-5.8, 2.5], "maximum": [-4.2, 3.5], "height": 0}
+  ],
+  "waves": [
+    {
+      "name": "Morning visitors",
+      "groups": [
+        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 2}
+      ]
+    },
+    {
+      "name": "Both meadows",
+      "groups": [
+        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 1.5},
+        {"enemy": "Black Rat", "count": 4, "spawn": "South meadow", "start": 0, "batch_size": 2, "interval": 2}
+      ]
+    },
+    {
+      "name": "The late procession",
+      "groups": [
+        {"enemy": "Bunny", "count": 2, "spawn": "South meadow", "start": 0, "batch_size": 2, "interval": 0},
+        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 4, "batch_size": 1, "interval": 1}
+      ]
+    }
+  ]
+}

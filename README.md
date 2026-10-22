@@ -100,13 +100,14 @@ Runtime tests require a working Vulkan display and the supplied assets.
 The default scene is `game/assets/scenes/demo.json`, staged as `assets/scenes/demo.json`. Command-line paths are absolute or executable-relative, not relative to the terminal's working directory:
 
 ```powershell
+.\out\build\debug\Debug\Grimlock.exe --editor
 .\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/demo.json
 .\out\build\debug\Debug\Grimlock.exe --editor assets/scenes/navigation.json
 .\out\build\debug\Debug\Grimlock.exe assets/models/blackrat.glb
 .\out\build\debug\Debug\Grimlock.exe --help
 ```
 
-Editor mode opens JSON scenes; add models through the hierarchy. Standalone OBJ/GLB/glTF preview uses Game mode and starts the first clip if available.
+Editor mode without a scene opens the navigation debug lab. Explicit JSON paths still open their chosen scene; add models through the hierarchy. Standalone OBJ/GLB/glTF preview uses Game mode and starts the first clip if available.
 
 ### Camera and selection
 
@@ -147,6 +148,8 @@ New saves store `clip`, `autoplay`, `loop` and `speed`, using a unique imported 
 
 ### Terrain and navigation grid
 
+The default **debug lab** (`assets/scenes/debug.json`) has marked spawn/goal areas, wide and narrow gates, a tower-building plaza, two removable sample towers and an isolated pocket for Blocked-state checks. Its camera frames the whole layout. See the [debug scene guide](docs/debug_scene.md) for test scenarios and coordinates.
+
 Open `assets/scenes/navigation.json` for a cube floor, blocked-cell walls and existing GLB props. Every grid cell has a blue-grey floor cube; blocked cells also have a taller orange wall. Painting walkability updates the geometry in the same frame. Engine instances the shared `models/cube.obj` asset from the configured asset root; it creates no per-cell mesh resources or scene objects. GLB props stay independent and do not automatically block cells.
 
 - **Navigation > Edit Walkability** shows the grid overlay and enables left-drag painting. Green is walkable, red is blocked, and the hovered cell is highlighted. Choose **Paint Blocked** or **Paint Walkable**; disable editing to hide every grid line/highlight and restore normal picking. Camera controls remain available. Cube floors and walls stay visible in both modes.
@@ -167,9 +170,32 @@ Recast Navigation 1.6.0 builds shared NavMesh profiles from the same world-space
 
 Animal dimensions, independent visual heights, movement and animation settings live in `game/assets/config/animals.json`. Chickens use a 0.195-unit radius, approximately 4 mm of spawn padding and a short 2% soft separation band; hard circular contact checks remain active. Different animal types share one crowd solver and their model resources. Add an animal GLB to `assets/models` and a matching definition to the JSON catalog; unrelated GLB props are excluded from the selector.
 
-Enemies use a lightweight Idle/Moving/Reached/Blocked FSM with independent destinations, configurable stopping distance and bounded retries for unreachable or stuck movement. **Navigation > Inspect Enemy** shows each animal's state and lets you edit or clear its goal. **Destination X/Z** retargets all current animals and sets the default for future spawns. Reached animals stay visible by default; `despawn_on_arrival` can restore removal. Their physical footprints remain active, so a packed goal can block following animals safely.
+Enemies use a lightweight Idle/Moving/Reached/Blocked FSM with independent destinations, configurable stopping distance and bounded retries for unreachable or stuck movement. **Navigation > Inspect Enemy** shows each animal's state and lets you edit or clear its goal. **Destination X/Z** retargets all current animals and sets the default for future spawns. Animals disappear on arrival, releasing their render instances and physical footprints. Set `despawn_on_arrival` to false in an animal definition to retain reached animals for inspection.
 
 See [NavMesh navigation](docs/navigation.md) for architecture, AI settings, controls, tests and the changed-file list. The chicken model has no animation clips and uses its rest pose; animated enemy configurations retain independent playback and pause when stationary.
+
+### Tower placement
+
+Use **Navigation > Towers > Place Tower** in a terrain scene. The transparent preview responds immediately: green means a clear footprint; red indicates an overlap or the last rejected placement. Left-click performs full route validation and places a shared cube placeholder if valid; Escape or **Cancel Placement** exits. Layouts that close the last spawn-to-destination route are rejected. Mouse camera controls remain available.
+
+Towers are selectable scene objects and persist in saved scenes. Remove one through the hierarchy/Inspector delete command or **Remove Selected Tower**. Placing/removing towers updates Recast/Detour obstacles and invalidates enemy paths safely. See [tower placement](docs/towers.md) for architecture, validation and verification details.
+
+### Build zones
+
+Tower construction now requires a predefined build zone. Use **Navigation > Build
+Zones** to create/edit rectangles, and **Navigation > Towers > Tower Type** to choose
+Basic or Wide towers before placing freely inside them. First Watch and the debug
+scene include zones. See [build zones and placement](docs/build_zones.md) for controls,
+collision footprints and persistence.
+
+### Handcrafted levels and waves
+
+In the editor, choose **Navigation > Level > Load First Watch**. Place towers during
+preparation, then click **Start Wave** in the Level panel. Three predefined waves
+use exact animal counts, spawn areas and timing. Arrivals damage the objective and
+disappear; surviving the final wave wins, and zero objective health loses.
+**Restart Level** restores the authored scene and gameplay state. See
+[levels and wave authoring](docs/levels.md) for configuration and prototype limits.
 
 ## Current Limitations
 

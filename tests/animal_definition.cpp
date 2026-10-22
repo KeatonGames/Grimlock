@@ -96,8 +96,11 @@ int main(int argc, char** argv) {
         save(document);
         const auto configured = loadAnimalDefinitions(fixture).front();
         require(configured.stoppingDistance == 0.45 && configured.retryInterval == 1.5 &&
-                    configured.stuckTimeout == 3.0 && !configured.despawnOnArrival,
-                "AI configuration or retained Reached default incorrect");
+                    configured.stuckTimeout == 3.0 && configured.despawnOnArrival,
+                "AI configuration or despawn-on-arrival default incorrect");
+        document[0]["despawn_on_arrival"] = false;
+        save(document);
+        require(!loadAnimalDefinitions(fixture).front().despawnOnArrival, "arrival retention override ignored");
         auto unavailable = entry;
         unavailable["name"] = "Unavailable";
         unavailable["model"] = "models/not-installed.glb";

@@ -274,6 +274,7 @@ ObjectId SceneDocument::duplicate(ObjectId source) {
         scene.setTransform(id, original.local);
         scene.setEnabled(id, original.enabled);
         scene.setSelectable(id, original.selectable);
+        scene.setRole(id, original.role);
         scene.setTint(id, original.tint);
         scene.setModel(id, original.model);
         scene.setMaterialOverride(id, original.materialOverride);
