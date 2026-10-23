@@ -8,6 +8,35 @@
 
 namespace grimlock::game {
 
+namespace {
+TowerLevelDefinition readLevel(const nlohmann::json& entry, bool explicitLevel) {
+    TowerLevelDefinition level;
+    level.damage = explicitLevel ? entry.at("damage").get<float>() : entry.value("damage", level.damage);
+    level.attackRange =
+        explicitLevel ? entry.at("attack_range").get<double>() : entry.value("attack_range", level.attackRange);
+    level.fireRate = explicitLevel ? entry.at("fire_rate").get<double>() : entry.value("fire_rate", level.fireRate);
+    if (explicitLevel) {
+        const auto& cost = entry.at("upgrade_cost");
+        if (!cost.is_number_integer() || (!cost.is_number_unsigned() && cost.get<std::int64_t>() < 0)) {
+            throw std::invalid_argument("Tower upgrade cost must be a nonnegative integer.");
+        }
+        level.upgradeCost = cost.get<std::uint64_t>();
+    }
+    if (!std::isfinite(level.damage) || level.damage <= 0 || !std::isfinite(level.attackRange) ||
+        level.attackRange <= 0 || !std::isfinite(level.fireRate) || level.fireRate <= 0 || level.fireRate > 60) {
+        throw std::invalid_argument("Tower level statistics must be finite and positive (fire_rate <= 60).");
+    }
+    return level;
+}
+} // namespace
+
+const TowerLevelDefinition& TowerDefinition::statistics(std::size_t level) const {
+    if (level == 0 || level > levels.size()) {
+        throw std::out_of_range("Invalid tower level.");
+    }
+    return levels[level - 1];
+}
+
 Tower TowerDefinition::instance() const {
     Tower tower;
     tower.type = id;
@@ -32,19 +61,33 @@ std::vector<TowerDefinition> loadTowerDefinitions(const std::filesystem::path& a
         TowerDefinition definition;
         definition.id = entry.at("id").get<std::string>();
         definition.name = entry.at("name").get<std::string>();
+        definition.maximumHealth = entry.value("maximum_health", definition.maximumHealth);
+        if (!std::isfinite(definition.maximumHealth) || definition.maximumHealth <= 0) {
+            throw std::invalid_argument("Tower health must be finite and positive.");
+        }
         definition.model = entry.at("model").get<std::string>();
-        definition.damage = entry.value("damage", definition.damage);
-        definition.attackRange = entry.value("attack_range", definition.attackRange);
-        definition.fireRate = entry.value("fire_rate", definition.fireRate);
+        definition.levels.clear();
+        if (entry.contains("levels")) {
+            const auto& levels = entry.at("levels");
+            if (!levels.is_array() || levels.empty()) {
+                throw std::invalid_argument("Tower levels must be a nonempty array.");
+            }
+            for (const auto& level : levels) {
+                definition.levels.push_back(readLevel(level, true));
+            }
+            if (definition.levels.front().upgradeCost != 0) {
+                throw std::invalid_argument("Tower Level 1 must have zero upgrade cost; use construction_cost.");
+            }
+        } else {
+            definition.levels.push_back(readLevel(entry, false));
+        }
         definition.projectileSpeed = entry.value("projectile_speed", definition.projectileSpeed);
         definition.projectileRadius = entry.value("projectile_radius", definition.projectileRadius);
         if (entry.contains("projectile_tint")) {
             const auto color = entry.at("projectile_tint").get<std::array<float, 4>>();
             definition.projectileTint = {color[0], color[1], color[2], color[3]};
         }
-        if (!std::isfinite(definition.damage) || definition.damage <= 0 || !std::isfinite(definition.attackRange) ||
-            definition.attackRange <= 0 || !std::isfinite(definition.fireRate) || definition.fireRate <= 0 ||
-            definition.fireRate > 60 || !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
+        if (!std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
             !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0 ||
             !std::isfinite(glm::length(definition.projectileTint)) ||
             glm::any(glm::lessThan(definition.projectileTint, glm::vec4{0})) ||

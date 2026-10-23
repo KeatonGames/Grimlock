@@ -10,8 +10,9 @@ ProjectileSystem::~ProjectileSystem() {
     clear();
 }
 
-void ProjectileSystem::spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition) {
-    if (!std::isfinite(glm::length(origin)) || !std::isfinite(definition.damage) || definition.damage <= 0 ||
+void ProjectileSystem::spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition, std::size_t level) {
+    const auto& statistics = definition.statistics(level);
+    if (!std::isfinite(glm::length(origin)) || !std::isfinite(statistics.damage) || statistics.damage <= 0 ||
         !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
         !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0) {
         throw std::invalid_argument("Invalid projectile origin or statistics.");
@@ -26,7 +27,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin, EnemyId target, const TowerDefin
                              glm::translate(glm::mat4{1}, glm::vec3{origin}) *
                                  glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.projectileRadius)}));
         projectiles_.push_back(
-            {target, origin, definition.projectileSpeed, definition.projectileRadius, definition.damage, instance});
+            {target, origin, definition.projectileSpeed, definition.projectileRadius, statistics.damage, instance});
     } catch (...) {
         engine_.removeInstance(instance);
         throw;

@@ -35,6 +35,7 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
     WaveSystem prepared{std::move(definition)};
     combat_.reset();
     navigation.reset(engine);
+    navigation.resetTowerUpgrades();
     combat_.emplace(engine);
     navigation.setSpawnRoutes(std::move(routes));
     navigation.spawnArea() = prepared.definition().spawns.front().area;
@@ -49,6 +50,9 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
 }
 
 void LevelSession::stop(NavigationSession& navigation) {
+    if (navigation.enemies()) {
+        enemyCombat_.stop(*navigation.enemies());
+    }
     combat_.reset();
     waves_.reset();
     economy_.reset();
@@ -67,7 +71,7 @@ void LevelSession::startWave(NavigationSession& navigation) {
     navigation.setPlacementEnabled(false);
 }
 
-void LevelSession::update(Engine& engine, NavigationSession& navigation, double delta) {
+void LevelSession::update(Engine& engine, NavigationSession& navigation, double delta, HeroSystem* heroes) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Level delta must be finite and nonnegative.");
     }
@@ -84,18 +88,28 @@ void LevelSession::update(Engine& engine, NavigationSession& navigation, double 
         navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
         navigation.synchronize(engine);
         navigation.enemies()->updateEffects(delta);
+        navigation.towers().updateEffects(engine, delta);
         return;
     }
     // Advance movement, attacks and the authored schedule together on slow frames.
     do {
         const double step = std::min(delta, 1.0 / 30);
-        updateBattle(engine, navigation, step);
+        updateBattle(engine, navigation, step, heroes);
         delta -= step;
     } while (delta > 1e-10 && waves_->phase() == LevelPhase::battle);
 }
 
-void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, double delta) {
+void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, double delta, HeroSystem* heroes) {
+    navigation.synchronize(engine);
+    enemyCombat_.prepare(*navigation.enemies(),
+                         navigation.towers(),
+                         heroes,
+                         waves_->definition().objectivePosition,
+                         delta);
     navigation.update(engine, delta);
+    enemyCombat_.resolve(engine, *navigation.enemies(), navigation.towers(), heroes, delta);
+    navigation.synchronize(engine);
+    navigation.towers().updateEffects(engine, delta);
     combat_->update(navigation.towers(), *navigation.enemies(), delta);
     const auto arrived = navigation.enemies()->metrics().arrived;
     const auto newArrivals = arrived >= arrivals_ ? arrived - arrivals_ : 0;
@@ -122,6 +136,7 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
     }
     navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
     if (waves_->phase() != LevelPhase::battle) {
+        enemyCombat_.stop(*navigation.enemies());
         combat_->clearProjectiles();
     }
 }
@@ -149,6 +164,35 @@ ObjectId LevelSession::buildTower(Engine& engine, NavigationSession& navigation,
         throw std::logic_error("Gold changed during a synchronous tower placement.");
     }
     return object;
+}
+
+std::string LevelSession::upgradeError(const NavigationSession& navigation, ObjectId tower) const {
+    if (!waves_ || waves_->phase() != LevelPhase::preparation) {
+        return "Upgrades are only available during preparation.";
+    }
+    const auto& towers = navigation.towers();
+    if (!towers.contains(tower)) {
+        return "Select an existing tower to upgrade.";
+    }
+    const auto& progress = towers.progress(tower);
+    const auto& definition = towers.definition(progress.type);
+    if (progress.level >= definition.levels.size()) {
+        return "MAX LEVEL";
+    }
+    return economy_.canAfford(definition.statistics(progress.level + 1).upgradeCost)
+               ? std::string{}
+               : "Insufficient gold to upgrade this tower.";
+}
+
+void LevelSession::upgradeTower(Engine& engine, NavigationSession& navigation, ObjectId tower) {
+    if (engine.scene() != scene_) {
+        throw std::logic_error("Load the level before upgrading towers.");
+    }
+    navigation.synchronize(engine);
+    if (const auto error = upgradeError(navigation, tower); !error.empty()) {
+        throw std::invalid_argument(error);
+    }
+    navigation.upgradeTower(tower, economy_);
 }
 
 } // namespace grimlock::game

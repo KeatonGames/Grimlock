@@ -1,4 +1,9 @@
 add_library(GameLogic STATIC
+    src/entities/hero.cpp
+    src/systems/hero_system.cpp
+    src/systems/hero_combat_system.cpp
+    src/systems/enemy_combat_system.cpp
+    src/systems/melee_navigation.cpp
     src/entities/enemy_definition.cpp
     src/entities/level_definition.cpp
     src/entities/tower_definition.cpp

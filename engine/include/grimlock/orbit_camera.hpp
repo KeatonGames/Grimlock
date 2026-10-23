@@ -9,6 +9,7 @@ struct OrbitCameraConfig {
     glm::vec3 target{0};
     float distance = 10, yaw = 0, pitch = 0.610865238F; // Angles in radians, pitch above XZ.
     float panSensitivity = 1, rotationSensitivity = 0.005F, zoomSensitivity = 0.15F;
+    float panDragThreshold = 0; // Logical pixels; zero preserves immediate editor panning.
     float minDistance = 0.5F, maxDistance = 100;
     float minPitch = 0.087266463F, maxPitch = 1.483529864F; // 5 to 85 degrees.
 };

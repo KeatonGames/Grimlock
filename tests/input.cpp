@@ -149,7 +149,31 @@ int main() {
             event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
             event.button.windowID = id;
             event.button.button = SDL_BUTTON_RIGHT;
+            event.button.x = 30;
+            event.button.y = 40;
             input.handleEvent(event);
+            SDL_Event motion{};
+            motion.type = SDL_EVENT_MOUSE_MOTION;
+            motion.motion.windowID = id;
+            motion.motion.x = 33;
+            motion.motion.y = 44;
+            motion.motion.xrel = 3;
+            motion.motion.yrel = 4;
+            input.handleEvent(motion);
+            motion.motion.x = 30;
+            motion.motion.y = 40;
+            motion.motion.xrel = -3;
+            motion.motion.yrel = -4;
+            input.handleEvent(motion);
+            event.type = SDL_EVENT_MOUSE_BUTTON_UP;
+            input.handleEvent(event);
+            require(input.state().rightPressPosition == glm::vec2{30, 40} && input.state().rightDragDistance == 10 &&
+                        input.state().button(MouseButton::right).released,
+                    "right drag history or release anchor lost");
+            input.beginFrame();
+            event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            input.handleEvent(event);
+            require(input.state().rightDragDistance == 0, "new right gesture retained old drag distance");
             input.finishFrame(true);
             require(SDL_GetWindowRelativeMouseMode(window), "drag mode was not enabled");
         }

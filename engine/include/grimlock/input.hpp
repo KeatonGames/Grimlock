@@ -26,7 +26,9 @@ struct InputState {
     std::array<ButtonState, 5> mouseButtons{};
     std::array<ButtonState, keyCount> keys{};
     glm::vec2 mousePosition{}, mouseMotion{}, mouseWheel{};
-    std::optional<glm::vec2> leftPressPosition; // First press coordinates, not later drag motion.
+    std::optional<glm::vec2> leftPressPosition;  // First press coordinates, not later drag motion.
+    std::optional<glm::vec2> rightPressPosition; // Retained through release, including relative mouse mode.
+    float rightDragDistance = 0; // Total motion since right press; returning to the start still counts as a drag.
     bool focused = false;
 
     [[nodiscard]] const ButtonState& button(MouseButton button) const {

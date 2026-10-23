@@ -1,0 +1,263 @@
+#include "systems/enemy_combat_system.hpp"
+
+#include "systems/enemy_ai.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+namespace grimlock::game {
+namespace {
+double distance(glm::dvec3 a, glm::dvec3 b) {
+    return glm::length(glm::dvec2{a.x - b.x, a.z - b.z});
+}
+} // namespace
+
+int EnemyCombatSystem::priority(const EnemyCombatDefinition& definition, DefensiveTargetKind kind) {
+    switch (kind) {
+    case DefensiveTargetKind::hero:
+        return definition.heroPriority;
+    case DefensiveTargetKind::tower:
+        return definition.towerPriority;
+    case DefensiveTargetKind::objective:
+        return definition.objectivePriority;
+    default:
+        return 0;
+    }
+}
+
+const EnemyCombatSystem::Target* EnemyCombatSystem::find(DefensiveTarget reference) const {
+    const auto found = std::find_if(targets_.begin(), targets_.end(), [reference](const Target& target) {
+        return target.reference == reference;
+    });
+    return found == targets_.end() ? nullptr : &*found;
+}
+
+void EnemyCombatSystem::release(EnemySystem& enemies, Enemy& enemy, bool rejected) {
+    auto& combat = enemy.combat;
+    if (combat.swinging) {
+        enemies.attackAnimation(enemy, false);
+    }
+    if (rejected) {
+        combat.rejected = combat.target;
+        combat.rejectDelay = 2;
+    }
+    combat.target = {};
+    combat.swinging = false;
+    combat.impactRemaining = -1;
+    combat.searchDelay = 0.4;
+    EnemyAi::setDestination(enemy, combat.objective);
+}
+
+void EnemyCombatSystem::prepare(EnemySystem& enemies,
+                                const TowerSystem& towers,
+                                HeroSystem* heroes,
+                                glm::dvec2 objective,
+                                double delta) {
+    targets_.clear();
+    for (const auto& tower : towers.towers()) {
+        targets_.push_back({{DefensiveTargetKind::tower, tower.object}, meleeBody(tower)});
+    }
+    if (heroes) {
+        for (const auto& hero : heroes->heroes()) {
+            if (hero.health > 0) {
+                targets_.push_back(
+                    {{DefensiveTargetKind::hero, hero.id}, {hero.position, heroes->definition().radius}});
+            }
+        }
+    }
+    for (auto& enemy : enemies.enemies_) {
+        if (!enemy.active || !enemy.alive || !enemy.navigation) {
+            continue;
+        }
+        auto& state = enemy.combat;
+        const auto& stats = enemies.definition(enemy.type).combat;
+        if (!state.managed) {
+            state.managed = true;
+            state.objective = enemy.destination ? enemy.destination : std::optional{objective};
+        }
+        state.searchDelay = std::max(0.0, state.searchDelay - delta);
+        state.pathDelay = std::max(0.0, state.pathDelay - delta);
+        state.rejectDelay = std::max(0.0, state.rejectDelay - delta);
+        const auto& mesh = *enemy.navigation;
+        // The objective uses the authored arrival damage/removal rule after its melee windup.
+        Target goal{{DefensiveTargetKind::objective, 0},
+                    {{state.objective->x, enemy.position.y, state.objective->y}, 0}};
+        const Target* target = state.target.kind == DefensiveTargetKind::objective ? &goal : find(state.target);
+        if (state.target.kind != DefensiveTargetKind::none &&
+            (!target || distance(state.origin, target->body.position) > stats.pursuitRange ||
+             distance(state.origin, enemy.position) > stats.pursuitRange)) {
+            release(enemies, enemy, true);
+            target = nullptr;
+        }
+        if (state.swinging) {
+            continue;
+        }
+        if (!target && state.searchDelay <= 0) {
+            candidates_.clear();
+            const auto consider = [&](const Target& candidate, std::size_t index) {
+                const int rank = priority(stats, candidate.reference.kind);
+                const double gap = meleeGap(enemy.position, enemy.radius, candidate.body);
+                if (rank > 0 && gap <= stats.aggressionRange &&
+                    !(state.rejected == candidate.reference && state.rejectDelay > 0)) {
+                    candidates_.emplace_back(-static_cast<double>(rank), index);
+                }
+            };
+            for (std::size_t index = 0; index < targets_.size(); ++index) {
+                consider(targets_[index], index);
+            }
+            consider(goal, targets_.size());
+            if (stats.objectivePriority == 0 &&
+                meleeContact(mesh, enemy.position, enemy.radius, goal.body, stats.range)) {
+                candidates_.emplace_back(0, targets_.size());
+            }
+            std::sort(candidates_.begin(), candidates_.end(), [&](const auto& a, const auto& b) {
+                if (a.first != b.first) {
+                    return a.first < b.first;
+                }
+                const auto& first = a.second == targets_.size() ? goal : targets_[a.second];
+                const auto& second = b.second == targets_.size() ? goal : targets_[b.second];
+                return meleeGap(enemy.position, enemy.radius, first.body) <
+                       meleeGap(enemy.position, enemy.radius, second.body);
+            });
+            state.searchDelay = 0.4;
+            for (const auto& candidate : candidates_) {
+                const auto& option = candidate.second == targets_.size() ? goal : targets_[candidate.second];
+                const bool contact = meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range);
+                if (contact || approachMelee(mesh,
+                                             enemy.position,
+                                             enemy.radius,
+                                             option.body,
+                                             stats.range,
+                                             approachPath_,
+                                             enemy.id)) {
+                    state.target = option.reference;
+                    state.origin = enemy.position;
+                    state.pathDelay = 0;
+                    target = &option;
+                    if (!contact) {
+                        std::swap(enemy.path, approachPath_);
+                        enemy.destination = glm::dvec2{enemy.path.destination.x, enemy.path.destination.z};
+                        enemy.requestedDestination = enemy.destination;
+                        enemy.destinationAssigned = true;
+                        enemy.retryPath = false;
+                        enemy.state = EnemyState::moving;
+                        state.pathTarget = option.body.position;
+                        state.pathRevision = mesh.revision();
+                        state.pathDelay = 0.5;
+                    }
+                    break;
+                }
+            }
+        }
+        if (!target) {
+            continue;
+        }
+        if (meleeContact(mesh, enemy.position, enemy.radius, target->body, stats.range)) {
+            EnemyAi::setDestination(enemy, {});
+            enemy.yaw =
+                std::atan2(target->body.position.x - enemy.position.x, target->body.position.z - enemy.position.z);
+            if (state.cooldown <= 1e-10) {
+                state.swinging = true;
+                state.impactRemaining = stats.impactTime;
+                state.cooldown = stats.interval;
+                enemies.attackAnimation(enemy, true);
+            }
+            continue;
+        }
+        const bool changed =
+            distance(state.pathTarget, target->body.position) > 0.3 || state.pathRevision != mesh.revision();
+        if (state.pathDelay > 0 || (!changed && enemy.state == EnemyState::moving)) {
+            continue;
+        }
+        state.pathDelay = 0.5;
+        if (!approachMelee(mesh, enemy.position, enemy.radius, target->body, stats.range, enemy.path, enemy.id)) {
+            release(enemies, enemy, true);
+            continue;
+        }
+        state.pathTarget = target->body.position;
+        state.pathRevision = mesh.revision();
+        enemy.destination = glm::dvec2{enemy.path.destination.x, enemy.path.destination.z};
+        enemy.requestedDestination = enemy.destination;
+        enemy.destinationAssigned = true;
+        enemy.retryPath = false;
+        enemy.state = EnemyState::moving;
+        enemy.stuckTime = 0;
+    }
+}
+
+void EnemyCombatSystem::resolve(Engine& engine,
+                                EnemySystem& enemies,
+                                TowerSystem& towers,
+                                HeroSystem* heroes,
+                                double delta) {
+    arrivals_.clear();
+    for (auto& enemy : enemies.enemies_) {
+        auto& state = enemy.combat;
+        state.cooldown = std::max(0.0, state.cooldown - delta);
+        if (!enemy.alive || !enemy.active || !state.swinging) {
+            continue;
+        }
+        if (state.impactRemaining >= 0) {
+            state.impactRemaining -= delta;
+            if (state.impactRemaining <= 1e-10) {
+                const auto& stats = enemies.definition(enemy.type).combat;
+                MeleeBody body;
+                bool valid = false;
+                if (state.target.kind == DefensiveTargetKind::hero && heroes) {
+                    const auto* hero = heroes->find(state.target.id);
+                    valid = hero && hero->health > 0;
+                    if (valid) {
+                        body = {hero->position, heroes->definition().radius};
+                    }
+                } else if (state.target.kind == DefensiveTargetKind::tower) {
+                    const auto list = towers.towers();
+                    const auto found = std::find_if(list.begin(), list.end(), [&](const Tower& tower) {
+                        return tower.object == state.target.id;
+                    });
+                    valid = found != list.end();
+                    if (valid) {
+                        body = meleeBody(*found);
+                    }
+                } else if (state.target.kind == DefensiveTargetKind::objective && state.objective) {
+                    body = {{state.objective->x, enemy.position.y, state.objective->y}, 0};
+                    valid = true;
+                }
+                if (valid && meleeContact(*enemy.navigation, enemy.position, enemy.radius, body, stats.range)) {
+                    switch (state.target.kind) {
+                    case DefensiveTargetKind::hero:
+                        (void)heroes->applyDamage(state.target.id, stats.damage);
+                        break;
+                    case DefensiveTargetKind::tower:
+                        (void)towers.applyDamage(engine, state.target.id, stats.damage);
+                        break;
+                    case DefensiveTargetKind::objective:
+                        arrivals_.push_back(enemy.id);
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                state.impactRemaining = -1;
+            }
+        }
+        if (state.cooldown <= 1e-10) {
+            state.swinging = false;
+            enemies.attackAnimation(enemy, false);
+        }
+    }
+    for (const auto id : arrivals_) {
+        if (enemies.remove(id)) {
+            ++enemies.metrics_.arrived;
+        }
+    }
+}
+
+void EnemyCombatSystem::stop(EnemySystem& enemies) {
+    for (auto& enemy : enemies.enemies_) {
+        release(enemies, enemy, false);
+        enemy.combat = {};
+    }
+    targets_.clear();
+}
+
+} // namespace grimlock::game

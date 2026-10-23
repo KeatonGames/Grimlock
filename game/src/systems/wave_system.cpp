@@ -1,5 +1,7 @@
 #include "systems/wave_system.hpp"
 
+#include "systems/health.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -70,7 +72,7 @@ void WaveSystem::update(double delta, std::size_t activeEnemies, std::uint64_t a
         phase_ = LevelPhase::defeat;
         return;
     }
-    health_ -= arrivals * damage;
+    receiveDamage(health_, arrivals * damage);
     elapsed_ += delta;
     const auto& groups = definition_.waves[wave_].groups;
     for (std::size_t i = 0; i < groups.size(); ++i) {

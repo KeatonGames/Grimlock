@@ -54,6 +54,8 @@ void Input::beginFrame() {
 
 void Input::clearButtons(bool keyboard) {
     state_.leftPressPosition.reset();
+    state_.rightPressPosition.reset();
+    state_.rightDragDistance = 0;
 
     for (auto& b : state_.mouseButtons) {
         release(b);
@@ -104,6 +106,14 @@ void Input::handleEvent(const SDL_Event& event) {
                 state_.leftPressPosition = glm::vec2{event.button.x, event.button.y};
             }
 
+            if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_RIGHT &&
+                !state_.button(MouseButton::right).held) {
+                state_.rightPressPosition.reset();
+                if (finite(event.button.x, event.button.y)) {
+                    state_.rightPressPosition = glm::vec2{event.button.x, event.button.y};
+                }
+                state_.rightDragDistance = 0;
+            }
             transition(state_.mouseButtons[event.button.button - 1], event.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
 
             if (finite(event.button.x, event.button.y)) {
@@ -117,6 +127,9 @@ void Input::handleEvent(const SDL_Event& event) {
             finite(event.motion.xrel, event.motion.yrel)) {
             state_.mousePosition = {event.motion.x, event.motion.y};
             state_.mouseMotion += glm::vec2{event.motion.xrel, event.motion.yrel};
+            if (state_.button(MouseButton::right).held) {
+                state_.rightDragDistance += std::hypot(event.motion.xrel, event.motion.yrel);
+            }
         }
 
         break;

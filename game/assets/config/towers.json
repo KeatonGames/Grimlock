@@ -1,10 +1,18 @@
 [
-  {"id":"basic", "name":"Small Tower", "model":"models/cube.obj", "construction_cost":30,
-    "damage":25, "attack_range":3.5, "fire_rate":1.5, "projectile_speed":9,
+  {"id":"basic", "name":"Small Tower", "maximum_health":250, "model":"models/cube.obj", "construction_cost":30,
+    "levels":[
+      {"damage":25, "attack_range":3.5, "fire_rate":1.5, "upgrade_cost":0},
+      {"damage":45, "attack_range":4.2, "fire_rate":2.0, "upgrade_cost":25},
+      {"damage":70, "attack_range":4.8, "fire_rate":2.5, "upgrade_cost":40}],
+    "projectile_speed":9,
     "projectile_radius":0.06, "projectile_tint":[1,0.8,0.25,1],
     "half_extent":[0.45,0.75,0.45], "visual_scale":[0.45,0.75,0.45], "tint":[0.32,0.48,0.72,1]},
-  {"id":"wide", "name":"Large Tower", "model":"models/cube.obj", "construction_cost":50,
-    "damage":60, "attack_range":5, "fire_rate":2, "projectile_speed":12,
+  {"id":"wide", "name":"Large Tower", "maximum_health":500, "model":"models/cube.obj", "construction_cost":50,
+    "levels":[
+      {"damage":60, "attack_range":5, "fire_rate":2, "upgrade_cost":0},
+      {"damage":105, "attack_range":5.8, "fire_rate":2.5, "upgrade_cost":40},
+      {"damage":160, "attack_range":6.5, "fire_rate":3, "upgrade_cost":65}],
+    "projectile_speed":12,
     "projectile_radius":0.10, "projectile_tint":[1,0.42,0.12,1],
     "half_extent":[0.7,0.6,0.4], "visual_scale":[0.6,0.6,0.3], "tint":[0.65,0.42,0.24,1]}
 ]

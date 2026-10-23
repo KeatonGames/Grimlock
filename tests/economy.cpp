@@ -7,6 +7,7 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
+#include <string_view>
 
 using namespace grimlock::game;
 
@@ -59,6 +60,13 @@ void save(const std::filesystem::path& path, const nlohmann::json& document) {
 void configuration(const std::filesystem::path& assets, const std::filesystem::path& fixture) {
     const auto level = loadLevelDefinition(assets / "levels/first_watch.json");
     const auto towers = loadTowerDefinitions(assets);
+    require(towers[0].levels.size() == 3 && towers[1].levels.size() == 3, "expected three authored tower levels");
+    for (std::size_t level = 1; level <= 3; ++level) {
+        const auto& small = towers[0].statistics(level);
+        const auto& large = towers[1].statistics(level);
+        require(large.damage > small.damage && large.attackRange > small.attackRange && large.fireRate > small.fireRate,
+                "Large Tower must remain stronger at equivalent levels");
+    }
     require(level.startingGold == 100 && level.waves[0].goldReward == 25 && level.waves[1].goldReward == 35 &&
                 level.waves[2].goldReward == 50 && towers[0].constructionCost == 30 && towers[1].constructionCost == 50,
             "handcrafted economy values incorrect");
@@ -78,10 +86,40 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     }
     save(levelPath, levelJson);
     save(towerPath, towerJson);
+    for (const auto& invalid : nlohmann::json::array({-1, 1.5, true, "10", nullptr})) {
+        auto modified = towerJson;
+        modified[0]["levels"][1]["upgrade_cost"] = invalid;
+        save(towerPath, modified);
+        rejects([&] {
+            (void)loadTowerDefinitions(fixture);
+        });
+    }
+    for (const auto& invalid : nlohmann::json::array({nlohmann::json::array(), nullptr, 3})) {
+        auto modified = towerJson;
+        modified[0]["levels"] = invalid;
+        save(towerPath, modified);
+        rejects([&] {
+            (void)loadTowerDefinitions(fixture);
+        });
+    }
+    for (const auto* property : {"damage", "attack_range", "fire_rate", "upgrade_cost"}) {
+        auto modified = towerJson;
+        modified[0]["levels"][1].erase(property);
+        save(towerPath, modified);
+        rejects([&] {
+            (void)loadTowerDefinitions(fixture);
+        });
+    }
+    save(towerPath, towerJson);
     for (const auto* property : {"damage", "attack_range", "fire_rate", "projectile_speed", "projectile_radius"}) {
         for (const auto& invalid : nlohmann::json::array({-1, 0, "bad", nullptr})) {
             auto modified = towerJson;
-            modified[0][property] = invalid;
+            if (std::string_view{property} == "damage" || std::string_view{property} == "attack_range" ||
+                std::string_view{property} == "fire_rate") {
+                modified[0]["levels"][0][property] = invalid;
+            } else {
+                modified[0][property] = invalid;
+            }
             save(towerPath, modified);
             rejects([&] {
                 (void)loadTowerDefinitions(fixture);
@@ -90,13 +128,14 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     }
     auto legacy = towerJson;
     for (auto& tower : legacy) {
+        tower.erase("levels");
         for (const auto* property :
              {"damage", "attack_range", "fire_rate", "projectile_speed", "projectile_radius", "projectile_tint"}) {
             tower.erase(property);
         }
     }
     save(towerPath, legacy);
-    require(loadTowerDefinitions(fixture)[0].damage == TowerDefinition{}.damage,
+    require(loadTowerDefinitions(fixture)[0].statistics().damage == TowerDefinition{}.statistics().damage,
             "legacy towers did not receive compatible combat defaults");
     save(towerPath, towerJson);
     require(loadLevelDefinition(levelPath).startingGold == 0 &&

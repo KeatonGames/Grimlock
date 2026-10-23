@@ -11,6 +11,28 @@ namespace grimlock::game {
 
 using EnemyId = std::uint64_t; // Monotonic within an EnemySystem, independent of packed storage indices.
 
+enum class DefensiveTargetKind {
+    none,
+    hero,
+    tower,
+    objective
+};
+
+struct DefensiveTarget {
+    DefensiveTargetKind kind = DefensiveTargetKind::none;
+    std::uint64_t id = 0;
+    bool operator==(const DefensiveTarget&) const = default;
+};
+
+struct EnemyCombatState {
+    DefensiveTarget target, rejected;
+    glm::dvec3 origin{0}, pathTarget{0};
+    std::optional<glm::dvec2> objective;
+    double cooldown = 0, impactRemaining = -1, searchDelay = 0, pathDelay = 0, rejectDelay = 0;
+    bool managed = false, swinging = false;
+    std::uint64_t pathRevision = 0;
+};
+
 enum class MovementStatus {
     idle,
     moving,
@@ -28,6 +50,7 @@ enum class EnemyState {
 [[nodiscard]] const char* enemyStateName(EnemyState state) noexcept;
 
 struct Enemy {
+    EnemyCombatState combat;
     EnemyId id = 0;
     EnemyTypeId type = 0;
     const NavMesh* navigation = nullptr; // Borrowed; the owning session outlives all its enemies.

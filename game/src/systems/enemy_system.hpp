@@ -59,12 +59,16 @@ public:
     }
 
 private:
+    friend class EnemyCombatSystem;
+    void attackAnimation(Enemy& enemy, bool attacking);
+
     struct AnimalType {
         EnemyDefinition definition;
         std::optional<ModelId> model;
         ModelInfo info;
         std::optional<std::size_t> movementClip;
         std::optional<std::size_t> deathClip;
+        std::optional<std::size_t> attackClip;
     };
 
     struct DeathEffect {

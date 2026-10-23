@@ -32,8 +32,11 @@ void CombatSystem::update(const TowerSystem& towers, EnemySystem& enemies, doubl
                 return value.tower == tower.object;
             });
             const auto& definition = towers.definition(tower.type);
+            const auto level = towers.progress(tower.object).level;
+            const auto& statistics = definition.statistics(level);
+            attack.cooldown = std::min(attack.cooldown, 1.0 / statistics.fireRate);
             const Enemy* nearest = nullptr;
-            double nearestDistance = definition.attackRange * definition.attackRange;
+            double nearestDistance = statistics.attackRange * statistics.attackRange;
             for (const auto& enemy : enemies.enemies()) {
                 const glm::dvec2 offset{enemy.position.x - tower.position.x, enemy.position.z - tower.position.z};
                 const double distance = glm::dot(offset, offset);
@@ -46,8 +49,8 @@ void CombatSystem::update(const TowerSystem& towers, EnemySystem& enemies, doubl
             attack.target = nearest ? std::optional{nearest->id} : std::nullopt;
             if (attack.target && attack.cooldown <= 1e-10) {
                 const auto origin = tower.position + glm::dvec3{0, tower.halfExtent.y + 0.1, 0};
-                projectiles_.spawn(origin, *attack.target, definition);
-                attack.cooldown += 1.0 / definition.fireRate;
+                projectiles_.spawn(origin, *attack.target, definition, level);
+                attack.cooldown += 1.0 / statistics.fireRate;
                 ++shotsFired_;
             }
             attack.cooldown -= step;

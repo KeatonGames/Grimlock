@@ -3,6 +3,7 @@
 #include "entities/enemy.hpp"
 #include "entities/tower.hpp"
 #include "entities/tower_definition.hpp"
+#include "systems/economy_system.hpp"
 
 #include <grimlock/ray.hpp>
 #include <map>
@@ -17,6 +18,11 @@ public:
     [[nodiscard]] ObjectId create(Engine& engine, const Tower& tower);
     [[nodiscard]] bool remove(Engine& engine, ObjectId object);
     [[nodiscard]] bool contains(ObjectId object) const noexcept;
+    [[nodiscard]] const TowerProgress& progress(ObjectId object) const;
+    void upgrade(ObjectId object, EconomySystem& economy);
+    void resetUpgrades() noexcept;
+    [[nodiscard]] bool applyDamage(Engine& engine, ObjectId tower, float damage);
+    void updateEffects(Engine& engine, double delta);
 
     [[nodiscard]] std::span<const TowerDefinition> definitions() const noexcept {
         return definitions_;
@@ -46,6 +52,7 @@ private:
     std::map<std::filesystem::path, ModelInfo> models_;
     std::uint64_t revision_ = 0;
     std::vector<TowerDefinition> definitions_{TowerDefinition{}};
+    std::map<ObjectId, TowerProgress> progress_;
     bool catalogLoaded_ = false;
 };
 

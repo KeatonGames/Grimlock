@@ -1,6 +1,7 @@
 #include "systems/crowd_movement.hpp"
 
 #include "systems/enemy_ai.hpp"
+#include "systems/movement_contact.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -20,20 +21,6 @@ glm::dvec2 horizontal(glm::dvec3 value) {
 
 const NavMesh& navigationFor(const Enemy& enemy, const NavMesh& fallback) {
     return enemy.navigation ? *enemy.navigation : fallback;
-}
-
-double contactFraction(glm::dvec2 offset, glm::dvec2 displacement, double distance) {
-    const double a = glm::dot(displacement, displacement);
-    const double b = glm::dot(offset, displacement);
-    const double c = glm::dot(offset, offset) - distance * distance;
-    if (a < 1e-20 || b >= 0) {
-        return 1;
-    }
-    if (c <= 0) {
-        return 0;
-    }
-    const double discriminant = b * b - a * c;
-    return discriminant <= 0 ? 1 : std::clamp((-b - std::sqrt(discriminant)) / a - 1e-6, 0.0, 1.0);
 }
 
 } // namespace

@@ -196,7 +196,26 @@ Enemies use a lightweight Idle/Moving/Reached/Blocked FSM with independent desti
 
 See [NavMesh navigation](docs/navigation.md) for architecture, AI settings, controls, tests and the changed-file list. The chicken model has no animation clips and uses its rest pose; animated enemy configurations retain independent playback and pause when stationary.
 
+### Heroes
+
+In Game, use **Deploy Hero** during Preparation to place/reposition the Assassin
+on navigable ground, independently of build zones and gold. During Battle,
+left-click the hero and short right-click ground to move or an enemy to attack.
+Heroes automatically melee nearby enemies; use **Cleave** in Hero Info for a cone
+attack with its own cooldown. They return to their defensive position after combat;
+ground orders set a new defensive position and **Cancel Order** resumes autonomous
+behavior. Enemies can kill heroes and destroy towers; damaged defenses show health
+bars. Right-drag still pans,
+middle-drag orbits, and wheel zooms. See [heroes](docs/heroes.md) for configuration,
+initial level spawns, animation-asset limitations and verification.
+
 ### Tower placement
+
+Towers have three predefined levels. In Game, select a placed tower and use
+**Upgrade** in its information card during Preparation. The card shows current
+and next statistics, cost and maximum level; upgrades spend gold only on success.
+Configure the ordered `levels` entries in `game/assets/config/towers.json`.
+See [tower upgrades](docs/tower_upgrades.md) for all values and runtime behavior.
 
 Small and Large Towers automatically fire during level Battles. The Game HUD shows
 damage, range, shots/sec and cost; click a built tower to see its range. Combat stats

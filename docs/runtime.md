@@ -8,6 +8,11 @@ boundaries appear only while placing. Start Wave begins the authored schedule.
 Victory and defeat have dedicated result cards. Mouse camera controls are unchanged;
 clicking a placed tower shows its range and statistics. There is no general scene
 selection, hierarchy, Inspector, debug menu, grid painting or docking.
+Its Tower Info card also offers [preparation-only upgrades](tower_upgrades.md),
+including next-level statistics, cost, affordability and maximum-level status.
+The [hero controls](heroes.md) deploy/reposition during Preparation and accept
+selected-hero movement/attack commands and Cleave during Battle, using the same camera
+and shared scene picking/highlighting infrastructure.
 
 `Editor` produces **GrimlockEditor**. It retains the existing docked editor and
 navigation, build-zone, tower, animal and preview controls. Its tower tools remain

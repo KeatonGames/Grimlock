@@ -51,6 +51,11 @@ void validateLevelDefinition(const LevelDefinition& definition) {
         }
     }
     std::set<std::string> names;
+    for (const auto& position : definition.heroSpawns) {
+        if (!std::isfinite(glm::length(position))) {
+            throw std::invalid_argument("Hero spawns must be finite world positions.");
+        }
+    }
     for (const auto& spawn : definition.spawns) {
         const auto& area = spawn.area;
         if (spawn.name.empty() || !names.insert(spawn.name).second || !finite(area.minimum) || !finite(area.maximum) ||
@@ -93,6 +98,15 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     result.name = document.at("name").get<std::string>();
     result.scene = document.at("scene").get<std::string>();
     result.startingGold = document.contains("starting_gold") ? gold(document.at("starting_gold")) : 0;
+    if (document.contains("hero_spawns")) {
+        if (!document.at("hero_spawns").is_array()) {
+            throw std::invalid_argument("hero_spawns must be an array.");
+        }
+        for (const auto& value : document.at("hero_spawns")) {
+            const auto position = value.get<std::array<double, 3>>();
+            result.heroSpawns.push_back({position[0], position[1], position[2]});
+        }
+    }
     const auto& objective = document.at("objective");
     result.objectivePosition = point(objective.at("position"));
     result.objectiveHealth = positiveInteger(objective.at("health"));
@@ -157,6 +171,12 @@ void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinitio
         document["waves"].push_back(std::move(entry));
     }
     std::ofstream file{path};
+    if (!definition.heroSpawns.empty()) {
+        document["hero_spawns"] = nlohmann::json::array();
+        for (const auto& point : definition.heroSpawns) {
+            document["hero_spawns"].push_back({point.x, point.y, point.z});
+        }
+    }
     file << document.dump(2) << '\n';
     file.close();
     if (!file) {

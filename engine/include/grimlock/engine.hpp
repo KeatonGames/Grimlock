@@ -18,6 +18,7 @@ namespace grimlock {
 
 class Scene;
 class RenderOverlay;
+struct Ray;
 
 namespace assets {
 
@@ -117,6 +118,9 @@ public:
     void setObjectSelectionEnabled(bool enabled = true);
     [[nodiscard]] bool objectSelectionEnabled() const noexcept;
     [[nodiscard]] std::optional<ObjectId> selectedObject() const;
+    // Reuses scene geometry/pose picking without changing selection or enabling automatic viewport picking.
+    [[nodiscard]] std::optional<ObjectId> pickObject(const Ray& ray);
+    [[nodiscard]] std::optional<double> intersectInstance(const Ray& ray, InstanceId instance);
     void clearSelection() noexcept;
     void setCameraNavigationEnabled(bool enabled = true);
     [[nodiscard]] bool cameraNavigationEnabled() const noexcept;

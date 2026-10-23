@@ -15,7 +15,7 @@ public:
     ~ProjectileSystem();
     ProjectileSystem(const ProjectileSystem&) = delete;
     ProjectileSystem& operator=(const ProjectileSystem&) = delete;
-    void spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition);
+    void spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition, std::size_t level = 1);
     void update(EnemySystem& enemies, double delta);
     void clear() noexcept;
 

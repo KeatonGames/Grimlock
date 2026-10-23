@@ -37,6 +37,7 @@ struct LevelDefinition {
     std::vector<LevelSpawn> spawns;
     std::vector<WaveDefinition> waves;
     std::uint64_t startingGold = 0;
+    std::vector<glm::dvec3> heroSpawns;
 };
 
 // Scene paths are relative to the asset root; spawn/objective coordinates are world X/Z.

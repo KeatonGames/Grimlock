@@ -1,4 +1,4 @@
-# Tower and enemy combat
+# Autonomous combat
 
 Run `Grimlock`, build towers during preparation, then press **Start Wave**.
 Towers attack automatically during Battle. Click a placed tower to inspect its
@@ -6,28 +6,61 @@ statistics and show its range; click empty terrain to clear selection. Placement
 also displays the selected type's range. Camera gestures keep their existing behavior.
 The Editor's Level preview uses exactly the same combat update. Free tower authoring
 and navigation sandbox previews do not run combat outside an active level Battle.
+Heroes automatically defend their assigned area; see [hero controls](heroes.md).
+Enemies attack nearby living heroes and towers, then continue to their assigned
+objective when defenders die, escape pursuit range or cannot be reached.
+Damaged heroes/towers have health bars and red hit feedback; selected hero targets
+retain their red ground marker. These indicators use the existing HUD overlay.
 
 ## Configuration
 
-`game/assets/config/towers.json` defines each reusable tower type:
+`game/assets/config/towers.json` defines each reusable tower type. Base (Level 1) values:
 
 | Type ID | Display name | Cost | Damage/hit | Range | Shots/sec | Projectile speed | Projectile radius |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `basic` | Small Tower | 30 | 25 | 3.5 | 1.5 | 9 | 0.06 |
 | `wide` | Large Tower | 50 | 60 | 5 | 2 | 12 | 0.10 |
 
-Fields are `construction_cost`, `damage`, `attack_range`, `fire_rate`,
-`projectile_speed`, `projectile_radius`, and RGBA `projectile_tint`.
+Each type stores `construction_cost`, `projectile_speed`, `projectile_radius`, and
+RGBA `projectile_tint`. Its ordered `levels` entries hold `damage`, `attack_range`,
+`fire_rate`, and `upgrade_cost`. See [tower upgrades](tower_upgrades.md) for the
+three authored levels, selection controls, runtime ownership and transactions.
 Combat values must be finite and positive; `fire_rate` supports up to 60 shots/sec.
 Ranges use horizontal world distance from tower center to enemy foot position.
 Existing `half_extent`, `visual_scale`, model paths and scene role IDs are independent
 of these statistics. Old catalogs without combat fields receive compatible defaults.
+`maximum_health` is 250 for Small Towers and 500 for Large Towers, independent of
+their combat levels/physical footprints. Upgrades do not heal towers. Runtime damage
+is not saved into the authored scene, and restarting restores initial health.
 Rebuild to stage asset changes, or launch with an absolute source level path as
 described in [runtime applications](runtime.md).
 
 Enemy `maximum_health` belongs in `game/assets/config/animals.json` and defaults to
 100 for existing definitions. Each spawn copies it into maximum/current health.
 Enemy deaths grant no gold; the existing fixed wave rewards remain unchanged.
+
+Each animal's `combat` object defines explicit `damage`, `range`, `attack_interval`,
+`impact_time`, `aggression_range`, `pursuit_range`, `attack_animation`, and integer
+`hero_priority`, `tower_priority`, `objective_priority` values. Higher priority wins;
+nearest physical boundary distance breaks ties. Zero excludes that category from
+opportunistic acquisition. The assigned objective remains the fallback destination.
+Default priorities are hero 3, tower 2, objective 1. Targets stay stable while valid;
+searches run on a 0.4-second cadence and rejected pursuits wait before retrying.
+Intervals are seconds (at least 1/60), contact time lies within the interval, and
+all dimensions/damage must be finite and positive. Catalogs without new fields
+receive compatible explicit defaults; shipped animals have authored values.
+
+Melee range is the gap between circles or an animal circle and the tower's rotated
+footprint. Shared perimeter sampling finds valid attack positions on each attacker's
+existing Recast profile. Several animals can approach different sides. Combat uses
+a small approach arrival tolerance instead of the normal radius-sized objective
+tolerance, which could otherwise stop units outside attack range. Clear stand-off
+surface rays prevent attacks through navigation obstacles. Attack animations play
+once if configured/available; static assets pause movement and use timed hits.
+
+Objective attacks preserve the existing level rule: after a melee windup, an enemy
+resolves exactly one `damage_per_arrival` hit and is removed as an arrival. This
+keeps authored objective health, wave accounting and fixed rewards compatible.
 
 ## Shared implementation and lifetime
 
@@ -50,6 +83,15 @@ Enemy deaths grant no gold; the existing fixed wave rewards remain unchanged.
   defeat can complete a wave while its visual death effect finishes; objective
   damage applies only to arrivals. Battle termination clears remaining projectiles.
   Effects finish during preparation/results, and level restart clears all combat state.
+- `EnemyCombatSystem` selects stable defensive references, prepares movement orders,
+  and resolves timed impacts. It shares the same GameLogic/LevelSession code in Game
+  and Editor previews. It never writes unit positions. `HeroCombatSystem` remains
+  responsible for hero decisions and manual-command priority.
+- Shared saturating health subtraction validates damage for enemies, heroes, towers
+  and the integer-health objective. Lethal tower hits remove scene/target state;
+  navigation synchronization batches the resulting obstacle rebuilds after impacts.
+  Dead hero IDs remain inspectable but cannot act or block deployment. Missing/dead
+  references are checked again at impact time; all swings apply damage once.
 
 All gameplay code is in GameLogic, with no Editor or ImGui dependency. Player
 selection/range feedback uses the existing Game HUD projection overlay; it shares
@@ -66,7 +108,13 @@ construction/selection and combat-driven victory without Editor libraries.
 totals and rewards, objective arrivals, navigation, restart and free authoring.
 Catalog checks cover invalid combat values, legacy defaults and animal health.
 
-Debug and Release Game/Editor builds passed, with **29/29 CTest checks** passing
-in each configuration. The Editor-disabled Release build passed its three focused
-combat/Game checks. Vulkan validation logs contain no validation errors or
-synchronization hazards. Build/test logs are in `out/phase22/`.
+`Combat.Battle` covers autonomous melee exchanges, hero death, tower destruction and
+navigation restoration, unreachable defenders, command priority/recovery, multiple
+attackers and combat with 508 mixed animals plus two active heroes. The Release
+simulation averaged about 2.9 ms per tick on the development machine (simulation
+only; Debug averaged about 19 ms). These are measurements, not frame-rate guarantees.
+
+Full Game/Editor builds passed in Debug and Release, with 31/31 CTest checks passing
+in each configuration. The expanded mixed battle check was also rerun in Release.
+Vulkan validation reported no errors or synchronization hazards; formatting and
+whitespace checks passed. Phase 26 build/test logs are in `out/phase26/`.

@@ -60,6 +60,18 @@ public:
         return towers_;
     }
 
+    [[nodiscard]] TowerSystem& towers() noexcept {
+        return towers_;
+    }
+
+    void upgradeTower(ObjectId object, EconomySystem& economy) {
+        towers_.upgrade(object, economy);
+    }
+
+    void resetTowerUpgrades() noexcept {
+        towers_.resetUpgrades();
+    }
+
     [[nodiscard]] std::uint64_t revision() const noexcept {
         return navigationRevision_;
     }

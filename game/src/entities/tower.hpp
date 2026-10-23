@@ -5,6 +5,13 @@
 
 namespace grimlock::game {
 
+struct TowerProgress {
+    std::string type;
+    std::size_t level = 1;
+    float health = 250, maximumHealth = 250;
+    double hitFlashRemaining = 0;
+};
+
 // Scene IDs remain the selection/ownership handles. Footprints never depend on imported model bounds or scale.
 struct Tower {
     ObjectId object = 0;

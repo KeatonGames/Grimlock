@@ -164,6 +164,80 @@ void checkFrameRates(Engine& engine, const NavMesh& mesh, TowerSystem& towers) {
     require(*expectedHealth < 10000 && *expectedShots == 6, "configured fire rate incorrect");
     require(towers.remove(engine, tower), "cadence tower cleanup failed");
 }
+
+void checkUpgrades(Engine& engine, const NavMesh& mesh, TowerSystem& towers) {
+    EnemyDefinition enemyDefinition;
+    enemyDefinition.speed = 0;
+    enemyDefinition.maximumHealth = 10000;
+    EnemySystem enemies{engine, enemyDefinition};
+    for (const auto* type : {"basic", "wide"}) {
+        const auto& definition = towers.definition(type);
+        auto tower = definition.instance();
+        tower.position = {0, tower.halfExtent.y, 0};
+        const auto object = towers.create(engine, tower);
+        auto other = tower;
+        other.position.z = -7;
+        const auto independent = towers.create(engine, other);
+        const auto transform = engine.scene()->object(object).local;
+        const auto revision = towers.revision();
+        EconomySystem economy;
+        economy.reset(1000);
+        const auto target = spawn(enemies, mesh, definition.statistics().attackRange + 0.25);
+        CombatSystem combat{engine};
+        combat.update(towers, enemies, 0.1);
+        require(combat.shotsFired() == 0, "base tower attacked beyond its range");
+        towers.upgrade(object, economy);
+        towers.synchronize(engine);
+        require(towers.progress(object).level == 2 && towers.progress(independent).level == 1 &&
+                    towers.revision() == revision &&
+                    engine.scene()->object(object).local.matrix() == transform.matrix() &&
+                    economy.gold() == 1000 - definition.statistics(2).upgradeCost,
+                "upgrade changed another tower, footprint, transform, navigation revision or incorrect gold");
+        combat.update(towers, enemies, 0.01);
+        require(combat.shotsFired() == 1 &&
+                    combat.projectiles().projectiles().front().damage == definition.statistics(2).damage,
+                "upgrade did not change real targeting range/projectile damage");
+        towers.upgrade(object, economy);
+        require(combat.projectiles().projectiles().front().damage == definition.statistics(2).damage,
+                "upgrade retroactively changed an in-flight projectile");
+        combat.update(towers, enemies, 2);
+        float inFlight = 0;
+        for (const auto& projectile : combat.projectiles().projectiles()) {
+            inFlight += projectile.damage;
+        }
+        const auto dealt = definition.statistics(2).damage +
+                           static_cast<float>(combat.shotsFired() - 1) * definition.statistics(3).damage - inFlight;
+        require(combat.shotsFired() >= 1 + static_cast<std::uint64_t>(definition.statistics(3).fireRate) &&
+                    enemies.find(target)->health == enemyDefinition.maximumHealth - dealt && dealt > 0,
+                "upgraded attack rate or actual impact damage incorrect");
+        const auto gold = economy.gold();
+        bool maximumRejected = false;
+        try {
+            towers.upgrade(object, economy);
+        } catch (const std::invalid_argument&) {
+            maximumRejected = true;
+        }
+        require(maximumRejected && economy.gold() == gold && towers.progress(object).level == 3,
+                "maximum-level upgrade consumed gold or changed the level");
+        engine.scene()->setEnabled(object, false);
+        towers.synchronize(engine);
+        engine.scene()->setEnabled(object, true);
+        towers.synchronize(engine);
+        require(towers.progress(object).level == 3, "scene synchronization lost a runtime upgrade");
+        towers.resetUpgrades();
+        require(towers.progress(object).level == 1 && towers.progress(independent).level == 1,
+                "runtime level reset failed");
+        require(towers.remove(engine, object) && towers.remove(engine, independent), "upgrade tower cleanup failed");
+        bool removedRejected = false;
+        try {
+            towers.upgrade(object, economy);
+        } catch (const std::invalid_argument&) {
+            removedRejected = true;
+        }
+        require(removedRejected && economy.gold() == gold, "removed tower upgrade consumed gold");
+        enemies.clear();
+    }
+}
 } // namespace
 
 int main() {
@@ -178,8 +252,10 @@ int main() {
         towers.synchronize(engine);
         const auto& small = towers.definition("basic");
         const auto& large = towers.definition("wide");
-        require(large.damage > small.damage && large.attackRange > small.attackRange &&
-                    large.fireRate > small.fireRate && large.constructionCost > small.constructionCost,
+        require(large.statistics().damage > small.statistics().damage &&
+                    large.statistics().attackRange > small.statistics().attackRange &&
+                    large.statistics().fireRate > small.statistics().fireRate &&
+                    large.constructionCost > small.constructionCost,
                 "Large Tower is not explicitly more powerful/costly");
         EnemyDefinition definition;
         definition.speed = 0;
@@ -187,6 +263,7 @@ int main() {
         checkProjectiles(engine, enemies, mesh, small);
         checkTowers(engine, enemies, mesh, towers);
         checkFrameRates(engine, mesh, towers);
+        checkUpgrades(engine, mesh, towers);
         std::cout << "PASS tower targeting/range/cadence, mixed towers, projectile impacts/stale IDs, health, "
                      "death animation/cleanup and 1/5/30/60 FPS combat.\n";
         return 0;

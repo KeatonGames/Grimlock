@@ -1,6 +1,7 @@
 #include "systems/enemy_system.hpp"
 
 #include "systems/enemy_ai.hpp"
+#include "systems/health.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -62,12 +63,31 @@ EnemySystem::EnemySystem(Engine& engine, EnemyDefinition definition) : engine_(e
 EnemyTypeId EnemySystem::addDefinition(EnemyDefinition definition) {
     validateEnemyDefinition(definition);
     const auto type = types_.size();
-    types_.push_back({std::move(definition), {}, {}, {}, {}});
+    types_.push_back({std::move(definition), {}, {}, {}, {}, {}});
     return type;
 }
 
 EnemySystem::~EnemySystem() {
     clear();
+}
+
+void EnemySystem::attackAnimation(Enemy& enemy, bool attacking) {
+    auto& playback = engine_.animation(*enemy.instance);
+    const auto& animal = types_[enemy.type];
+    if (attacking && animal.attackClip) {
+        playback.setSpeed(1);
+        playback.play(*animal.attackClip, false);
+    } else {
+        if (animal.movementClip) {
+            playback.setSpeed(animal.definition.animationSpeed);
+            playback.play(*animal.movementClip);
+        }
+        playback.pause();
+    }
+    enemy.animationMoving = false;
+    if (enemy.hitFlashRemaining <= 0) {
+        engine_.setTint(*enemy.instance, attacking ? glm::vec4{1, 0.8F, 0.55F, 1} : glm::vec4{1});
+    }
 }
 
 void EnemySystem::loadModel(EnemyTypeId type) {
@@ -83,6 +103,19 @@ void EnemySystem::loadModel(EnemyTypeId type) {
     }
     animal.movementClip = movementClip(info.animationNames, definition.movementAnimation);
     animal.deathClip = deathClip(info.animationNames);
+    for (std::size_t i = 0; i < info.animationNames.size(); ++i) {
+        auto name = info.animationNames[i];
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        if (!definition.combat.attackAnimation.empty() &&
+            (info.animationNames[i] == definition.combat.attackAnimation ||
+             (name.find(definition.combat.attackAnimation) != std::string::npos &&
+              name.find("start") == std::string::npos && name.find("end") == std::string::npos))) {
+            animal.attackClip = i;
+            break;
+        }
+    }
     animal.info = std::move(info);
     animal.model = model;
 }
@@ -178,7 +211,7 @@ void EnemySystem::updateModel(Enemy& enemy) {
         glm::translate(glm::mat4{1}, glm::vec3{-center.x, -animal.info.minimum.y, -center.z});
     engine_.setTransform(*enemy.instance, matrix);
     const bool moving = enemy.movement == MovementStatus::moving;
-    if (animal.movementClip && moving != enemy.animationMoving) {
+    if (!enemy.combat.swinging && animal.movementClip && moving != enemy.animationMoving) {
         auto& playback = engine_.animation(*enemy.instance);
         if (moving) {
             playback.resume();
@@ -212,15 +245,13 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
 }
 
 bool EnemySystem::applyDamage(EnemyId id, float damage) {
-    if (!std::isfinite(damage) || damage < 0) {
-        throw std::invalid_argument("Enemy damage must be finite and nonnegative.");
-    }
+    validateDamage(damage);
     for (std::size_t index = 0; index < enemies_.size(); ++index) {
         auto& enemy = enemies_[index];
         if (enemy.id != id || !enemy.active || !enemy.alive || damage == 0) {
             continue;
         }
-        enemy.health = std::max(0.0F, enemy.health - damage);
+        receiveDamage(enemy.health, damage);
         enemy.hitFlashRemaining = 0.12;
         engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
         if (enemy.health > 0) {

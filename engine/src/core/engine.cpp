@@ -269,8 +269,16 @@ struct Engine::Impl {
             return;
         }
 
+        activeScene->selectObject(pickObject(*ray));
+    }
+
+    std::optional<ObjectId> pickObject(const Ray& ray) {
+        if (!activeScene) {
+            return {};
+        }
+        activeScene->updateTransforms();
         std::optional<ObjectId> selected;
-        double nearest = ray->maximum;
+        double nearest = ray.maximum;
 
         for (const auto& [id, object] : activeScene->objects_) {
             if (!object.instance_ || !object.visible_ || !object.selectable) {
@@ -279,7 +287,7 @@ struct Engine::Impl {
 
             auto& resource = resourceFor(*object.instance_);
 
-            if (const auto hit = resource.picking.intersect(*ray,
+            if (const auto hit = resource.picking.intersect(ray,
                                                             *object.instance_,
                                                             object.world_,
                                                             object.materialOverride,
@@ -290,7 +298,7 @@ struct Engine::Impl {
             }
         }
 
-        activeScene->selectObject(selected);
+        return selected;
     }
 
     void updateSelection(const Camera& view, bool allowPicking) {
@@ -745,6 +753,18 @@ bool Engine::objectSelectionEnabled() const noexcept {
 
 std::optional<ObjectId> Engine::selectedObject() const {
     return impl_->activeScene ? impl_->activeScene->selectedObject() : std::nullopt;
+}
+
+std::optional<ObjectId> Engine::pickObject(const Ray& ray) {
+    return impl_->pickObject(ray);
+}
+
+std::optional<double> Engine::intersectInstance(const Ray& ray, InstanceId instance) {
+    const auto index = impl_->instanceIndex(instance);
+    auto& model = *impl_->instances[index];
+    auto& resource = impl_->resourceFor(model);
+    const auto& draw = impl_->draws[index];
+    return resource.picking.intersect(ray, model, draw.transform, draw.materialOverride, ray.maximum, draw.baseColor.a);
 }
 
 void Engine::clearSelection() noexcept {

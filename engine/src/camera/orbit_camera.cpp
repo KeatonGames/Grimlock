@@ -46,6 +46,7 @@ void OrbitCameraController::configure(const OrbitCameraConfig& value) {
                          value.yaw,
                          value.pitch,
                          value.panSensitivity,
+                         value.panDragThreshold,
                          value.rotationSensitivity,
                          value.zoomSensitivity,
                          value.minDistance,
@@ -59,7 +60,7 @@ void OrbitCameraController::configure(const OrbitCameraConfig& value) {
 
     if (value.minDistance <= 0 || value.maxDistance < value.minDistance || value.minPitch < 0 ||
         value.maxPitch >= pi / 2 || value.maxPitch < value.minPitch || value.panSensitivity < 0 ||
-        value.rotationSensitivity < 0 || value.zoomSensitivity < 0 ||
+        value.rotationSensitivity < 0 || value.zoomSensitivity < 0 || value.panDragThreshold < 0 ||
         value.target.y + value.maxDistance * std::sin(value.maxPitch) < 0) {
         throw std::invalid_argument(
             "Invalid orbit sensitivities/bounds or target unreachable above the Y=0 ground plane.");
@@ -142,7 +143,8 @@ bool OrbitCameraController::update(Camera& camera, const InputState& input, floa
                            low,
                            static_cast<double>(config_.maxPitch)));
             changed = rebuild = true;
-        } else if (action == Drag::pan && config_.panSensitivity > 0) {
+        } else if (action == Drag::pan && config_.panSensitivity > 0 &&
+                   (config_.panDragThreshold == 0 || input.rightDragDistance > config_.panDragThreshold)) {
             (void)camera.projection(1);
 
             const auto forward = glm::normalize(glm::dvec3{camera.target} - glm::dvec3{camera.position});

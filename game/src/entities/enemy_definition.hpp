@@ -6,6 +6,14 @@
 
 namespace grimlock::game {
 
+struct EnemyCombatDefinition {
+    float damage = 8;
+    double range = 0.35, interval = 1, impactTime = 0.25;
+    double aggressionRange = 4, pursuitRange = 6;
+    int heroPriority = 3, towerPriority = 2, objectivePriority = 1;
+    std::string attackAnimation = "attack";
+};
+
 using EnemyTypeId = std::size_t;
 
 struct EnemyDefinition {
@@ -25,6 +33,7 @@ struct EnemyDefinition {
     float animationSpeed = 1;
     double forwardYaw = 0;
     bool despawnOnArrival = true;
+    EnemyCombatDefinition combat;
 };
 
 void validateEnemyDefinition(const EnemyDefinition& definition);

@@ -1,0 +1,32 @@
+{
+  "name": "Assassin",
+  "model": "models/assassin.glb",
+  "speed": 3.5,
+  "radius": 0.28,
+  "height": 1.4,
+  "visual_height": 1.25,
+  "maximum_health": 100,
+  "acceleration": 12,
+  "deceleration": 16,
+  "turning_speed": 12,
+  "stopping_distance": 0.08,
+  "idle_animation": "idle",
+  "walk_animation": "walk",
+  "run_animation": "run",
+  "forward_yaw": 0,
+  "combat": {
+    "damage": 25,
+    "range": 1.2,
+    "attack_interval": 0.8,
+    "impact_time": 0.25,
+    "acquisition_range": 5,
+    "pursuit_range": 8,
+    "attack_animation": "attack",
+    "cleave": {
+      "damage": 45,
+      "radius": 2,
+      "angle": 100,
+      "cooldown": 6
+    }
+  }
+}

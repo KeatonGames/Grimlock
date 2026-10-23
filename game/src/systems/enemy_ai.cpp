@@ -74,7 +74,7 @@ void EnemyAi::prepare(Enemy& enemy, const NavMesh& navigation, double delta, boo
         enemy.requestedDestination != enemy.destination || enemy.path.revision != navigation.revision();
     if (enemy.state == EnemyState::reached && !changed) {
         stop(enemy, EnemyState::reached, MovementStatus::arrived);
-        enemy.active = !(despawnOnArrival && enemy.despawnOnArrival);
+        enemy.active = !(despawnOnArrival && enemy.despawnOnArrival && !enemy.combat.managed);
         return;
     }
     if (changed || (enemy.retryPath && enemy.repathDelay <= 0)) {
@@ -98,10 +98,12 @@ void EnemyAi::prepare(Enemy& enemy, const NavMesh& navigation, double delta, boo
         block(enemy);
         return;
     }
-    const double stoppingDistance = enemy.stoppingDistance > 0 ? enemy.stoppingDistance : enemy.radius;
+    const double stoppingDistance = enemy.combat.managed && enemy.combat.target.kind != DefensiveTargetKind::none
+                                        ? 0.03
+                                        : (enemy.stoppingDistance > 0 ? enemy.stoppingDistance : enemy.radius);
     if (enemy.remainingDistance <= std::max(1e-4, stoppingDistance)) {
         stop(enemy, EnemyState::reached, MovementStatus::arrived);
-        enemy.active = !(despawnOnArrival && enemy.despawnOnArrival);
+        enemy.active = !(despawnOnArrival && enemy.despawnOnArrival && !enemy.combat.managed);
         return;
     }
     const glm::dvec2 offset{target->x - enemy.position.x, target->z - enemy.position.z};

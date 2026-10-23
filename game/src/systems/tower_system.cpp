@@ -1,5 +1,7 @@
 #include "systems/tower_system.hpp"
 
+#include "systems/health.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -65,6 +67,7 @@ void TowerSystem::clear() noexcept {
     scratchTowers_.clear();
     props_.clear();
     models_.clear();
+    progress_.clear();
     catalogLoaded_ = false;
     ++revision_;
 }
@@ -85,13 +88,18 @@ void TowerSystem::synchronize(Engine& engine) {
     scratchTowers_.clear();
     props_.clear();
     for (const auto& [id, object] : scene->objects()) {
-        if (!object.model || !scene->enabledInHierarchy(id)) {
+        if (!object.model || !scene->enabledInHierarchy(id) || object.role == "grimlock.hero") {
             continue;
         }
         const auto world = glm::dmat4{scene->worldTransform(id)};
         if (object.role == towerRole || object.role.starts_with("grimlock.tower:")) {
             const auto type = object.role == towerRole ? "basic" : object.role.substr(15);
             Tower tower = definition(type).instance();
+            const auto maximum = definition(type).maximumHealth;
+            auto& progress = progress_.try_emplace(id, TowerProgress{type, 1, maximum, maximum}).first->second;
+            if (progress.type != type) {
+                progress = TowerProgress{type, 1, maximum, maximum};
+            }
             tower.object = id;
             tower.position = world[3];
             glm::dmat3 orientation{world};
@@ -128,6 +136,14 @@ void TowerSystem::synchronize(Engine& engine) {
                    std::min(glm::length(a.rotation - b.rotation), glm::length(a.rotation + b.rotation)) < 1e-6;
         });
     towers_.swap(scratchTowers_);
+    std::erase_if(progress_, [&](const auto& entry) {
+        const auto id = entry.first;
+        if (!scene->contains(id)) {
+            return true;
+        }
+        const auto& role = scene->object(id).role;
+        return role != towerRole && !role.starts_with("grimlock.tower:");
+    });
     if (!sameObstacles) {
         ++revision_;
     }
@@ -184,6 +200,67 @@ const TowerDefinition& TowerSystem::definition(const std::string& type) const {
         throw std::invalid_argument("Unknown tower type: " + type);
     }
     return *found;
+}
+
+const TowerProgress& TowerSystem::progress(ObjectId object) const {
+    return progress_.at(object);
+}
+
+void TowerSystem::upgrade(ObjectId object, EconomySystem& economy) {
+    if (!contains(object)) {
+        throw std::invalid_argument("Select an existing tower to upgrade.");
+    }
+    auto& progress = progress_.at(object);
+    const auto& configured = definition(progress.type);
+    if (progress.level >= configured.levels.size()) {
+        throw std::invalid_argument("MAX LEVEL");
+    }
+    const auto cost = configured.statistics(progress.level + 1).upgradeCost;
+    if (!economy.trySpend(cost)) {
+        throw std::invalid_argument("Insufficient gold to upgrade this tower.");
+    }
+    // All validation precedes spending; the remaining state change cannot fail.
+    ++progress.level;
+}
+
+void TowerSystem::resetUpgrades() noexcept {
+    for (auto& [id, progress] : progress_) {
+        progress.level = 1;
+        progress.health = progress.maximumHealth;
+        progress.hitFlashRemaining = 0;
+    }
+}
+
+bool TowerSystem::applyDamage(Engine& engine, ObjectId object, float damage) {
+    validateDamage(damage);
+    const auto found = progress_.find(object);
+    if (found == progress_.end() || !engine.scene() || !engine.scene()->contains(object) || damage == 0) {
+        return false;
+    }
+    if (receiveDamage(found->second.health, damage)) {
+        engine.scene()->removeObject(object);
+        // One navigation synchronization after all impacts batches obstacle rebuilds.
+        progress_.erase(found);
+        std::erase_if(towers_, [object](const Tower& tower) {
+            return tower.object == object;
+        });
+        ++revision_;
+    } else {
+        found->second.hitFlashRemaining = 0.15;
+        engine.scene()->setTint(object, {1, 0.35F, 0.3F, 1});
+    }
+    return true;
+}
+
+void TowerSystem::updateEffects(Engine& engine, double delta) {
+    for (auto& [object, progress] : progress_) {
+        if (progress.hitFlashRemaining > 0) {
+            progress.hitFlashRemaining = std::max(0.0, progress.hitFlashRemaining - delta);
+            if (progress.hitFlashRemaining == 0 && engine.scene()->contains(object)) {
+                engine.scene()->setTint(object, definition(progress.type).tint);
+            }
+        }
+    }
 }
 
 std::string TowerSystem::check(const Tower& tower,
