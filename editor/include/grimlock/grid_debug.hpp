@@ -30,6 +30,11 @@ struct DebugQuad {
     glm::vec4 color{0.2F, 0.7F, 0.5F, 0.08F};
 };
 
+struct DebugLine {
+    glm::vec3 start{}, end{};
+    glm::vec4 color{1};
+};
+
 // Game-owned development controls hosted in the existing terrain tools menu.
 class GridDebug {
 public:
@@ -71,6 +76,10 @@ public:
 
     // Called before the attached Engine is destroyed; release owned preview instances here.
     virtual void shutdown(Engine&) noexcept {
+    }
+
+    [[nodiscard]] virtual std::span<const DebugLine> lines() const noexcept {
+        return {};
     }
 };
 

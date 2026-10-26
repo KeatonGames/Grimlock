@@ -64,11 +64,14 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     for (std::size_t level = 1; level <= 3; ++level) {
         const auto& small = towers[0].statistics(level);
         const auto& large = towers[1].statistics(level);
-        require(large.damage > small.damage && large.attackRange > small.attackRange && large.fireRate > small.fireRate,
+        require(large.damage > small.damage && large.attackRange > small.attackRange &&
+                    large.damage * large.fireRate > small.damage * small.fireRate,
                 "Large Tower must remain stronger at equivalent levels");
     }
-    require(level.startingGold == 100 && level.waves[0].goldReward == 25 && level.waves[1].goldReward == 35 &&
-                level.waves[2].goldReward == 50 && towers[0].constructionCost == 30 && towers[1].constructionCost == 50,
+    require(level.startingGold == 90 && level.objectiveHealth == 10 && level.waves.size() == 5 &&
+                level.waves[0].goldReward == 25 && level.waves[1].goldReward == 35 && level.waves[2].goldReward == 45 &&
+                level.waves[3].goldReward == 60 && level.waves[4].goldReward == 0 && towers[0].constructionCost == 30 &&
+                towers[1].constructionCost == 60,
             "handcrafted economy values incorrect");
     std::filesystem::create_directories(fixture / "models");
     std::filesystem::create_directories(fixture / "config");

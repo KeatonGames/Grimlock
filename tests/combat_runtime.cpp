@@ -127,7 +127,7 @@ void checkTowers(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, Towe
         (void)spawn(enemies, mesh, x);
     }
     combat.clear();
-    for (int frame = 0; frame < 180; ++frame) {
+    for (int frame = 0; frame < 600 && !enemies.enemies().empty(); ++frame) {
         combat.update(towers, enemies, 1.0 / 60);
     }
     require(enemies.enemies().empty() && enemies.metrics().defeated == 3 && combat.shotsFired() >= 3,
@@ -254,7 +254,8 @@ int main() {
         const auto& large = towers.definition("wide");
         require(large.statistics().damage > small.statistics().damage &&
                     large.statistics().attackRange > small.statistics().attackRange &&
-                    large.statistics().fireRate > small.statistics().fireRate &&
+                    large.statistics().damage * large.statistics().fireRate >
+                        small.statistics().damage * small.statistics().fireRate &&
                     large.constructionCost > small.constructionCost,
                 "Large Tower is not explicitly more powerful/costly");
         EnemyDefinition definition;

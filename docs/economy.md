@@ -23,9 +23,9 @@ the root. Each predefined wave adds its own fixed nonnegative integer
 
 ```json
 {
-  "starting_gold": 100,
+  "starting_gold": 90,
   "waves": [
-    {"name": "Morning visitors", "gold_reward": 25, "groups": []}
+    {"name": "First footsteps", "gold_reward": 25, "groups": []}
   ]
 }
 ```
@@ -40,8 +40,8 @@ Each entry in `assets/config/towers.json` adds `construction_cost`, for example:
 ```
 
 Keep the existing name, model, collision dimensions, scale and tint fields. First
-Watch starts with **100 gold**; Basic costs **30**, Wide costs **50**, and the three
-authored wave rewards are **25**, **35**, **50**. There is no income over time, kill
+Watch starts with **90 gold**; Small costs **30**, Large costs **60**, and the five
+authored wave rewards are **25**, **35**, **45**, **60**, **0**. There is no income over time, kill
 reward, scaling, selling, or procedural reward calculation.
 
 Missing economy fields default to zero so older level and tower catalogs continue
@@ -75,5 +75,7 @@ does not advance the wave and awards no reward, even if its last enemies arrived
 `Economy.Cpu` checks transactions, overflow, exact configuration, legacy defaults
 and malformed JSON. `Enemies.Runtime` exercises paid construction through the
 gameplay panel, failed and unaffordable placements, free authoring, no removal
-refund, all three fixed rewards exactly once, final victory, defeat without a
+refund, its editor fixture's fixed rewards exactly once, final victory, defeat without a
 reward, and restart reset with real scenes/navigation.
+`Level.Playable` verifies the actual five-wave level, including successful and failed
+defense plans, all five rewards, and restarting after each result.

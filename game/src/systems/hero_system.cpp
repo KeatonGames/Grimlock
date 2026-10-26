@@ -78,55 +78,29 @@ void HeroSystem::clear() noexcept {
 }
 
 void HeroSystem::synchronize(const TowerSystem& towers) {
+    if (!sharedGeometry_) {
+        combatGeometry_.synchronize(engine_, towers.towers());
+    }
     if (engine_.scene() != scene_) {
         throw std::logic_error("Reset heroes when replacing a scene.");
     }
-    scratchBoxes_.clear();
-    if (const auto* grid = scene_->navigationGrid()) {
-        if (terrainRevision_ != grid->revision() || terrainConfiguration_ != grid->configuration()) {
-            terrain_ = terrainBoxes(*grid);
-            terrainRevision_ = grid->revision();
-            terrainConfiguration_ = grid->configuration();
-        }
-        scratchBoxes_ = terrain_;
+    levelGeometry_.synchronize(engine_, true);
+    if (geometryRevision_ == levelGeometry_.revision() && towerRevision_ == towers.revision()) {
+        return;
     }
+    auto geometry = levelGeometry_.navigation();
     for (const auto& tower : towers.towers()) {
-        scratchBoxes_.push_back(tower.bounds());
+        const auto box = tower.bounds();
+        geometry.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
     }
-    for (const auto& [id, object] : scene_->objects()) {
-        if (!object.model || !scene_->enabledInHierarchy(id) || object.role == "grimlock.hero" ||
-            object.role == "grimlock.tower" || object.role.starts_with("grimlock.tower:")) {
-            continue;
-        }
-        auto found = props_.find(*object.model);
-        if (found == props_.end()) {
-            found =
-                props_.emplace(*object.model, engine_.modelInfo(engine_.loadModel(engine_.assetRoot() / *object.model)))
-                    .first;
-        }
-        const auto& info = found->second;
-        const glm::dmat4 world{scene_->worldTransform(id)};
-        const glm::dvec3 center = world * glm::dvec4{(info.minimum + info.maximum) * 0.5F, 1};
-        const auto size = glm::dvec3{info.maximum - info.minimum} * 0.5;
-        const auto extent = glm::abs(glm::dvec3{world[0]}) * size.x + glm::abs(glm::dvec3{world[1]}) * size.y +
-                            glm::abs(glm::dvec3{world[2]}) * size.z;
-        if (extent.y * 2 > 0.05) {
-            scratchBoxes_.push_back({glm::vec3{center}, glm::vec3{extent}, false});
-        }
+    NavMeshConfiguration config;
+    config.agentRadius = static_cast<float>(definition_.radius);
+    config.agentHeight = static_cast<float>(definition_.height);
+    if (!navigation_.build(geometry, config)) {
+        throw std::runtime_error("Cannot build hero navigation: " + navigation_.status());
     }
-    const bool same = boxes_.size() == scratchBoxes_.size() &&
-                      std::equal(boxes_.begin(), boxes_.end(), scratchBoxes_.begin(), [](const auto& a, const auto& b) {
-                          return a.center == b.center && a.halfExtent == b.halfExtent && a.walkableTop == b.walkableTop;
-                      });
-    if (!same || !navigation_.ready()) {
-        boxes_.swap(scratchBoxes_);
-        NavMeshConfiguration config;
-        config.agentRadius = static_cast<float>(definition_.radius);
-        config.agentHeight = static_cast<float>(definition_.height);
-        if (!navigation_.build(navigationGeometry(boxes_), config)) {
-            throw std::runtime_error("Cannot build hero navigation: " + navigation_.status());
-        }
-    }
+    geometryRevision_ = levelGeometry_.revision();
+    towerRevision_ = towers.revision();
 }
 
 bool HeroSystem::validPosition(glm::dvec3 position, std::optional<HeroId> ignore) const {
@@ -135,6 +109,9 @@ bool HeroSystem::validPosition(glm::dvec3 position, std::optional<HeroId> ignore
     }
     for (const auto& hero : heroes_) {
         if (ignore == hero.id || hero.health <= 0) {
+            continue;
+        }
+        if (std::abs(hero.position.y - position.y) >= definition_.height) {
             continue;
         }
         if (glm::length(glm::dvec2{hero.position.x - position.x, hero.position.z - position.z}) <
@@ -308,7 +285,8 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
         const Enemy* neighbor = nullptr;
         double fraction = 1;
         for (const auto& enemy : enemies) {
-            if (!enemy.active || !enemy.alive || std::abs(next.y - enemy.position.y) > definition_.height) {
+            if (!enemy.active || !enemy.alive ||
+                (next.y >= enemy.position.y + enemy.height || enemy.position.y >= next.y + definition_.height)) {
                 continue;
             }
             const double t = contactFraction({next.x - enemy.position.x, next.z - enemy.position.z},
@@ -366,7 +344,9 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     const Enemy* obstacle = nullptr;
     double nearest = distance;
     for (const auto& enemy : enemies) {
-        if (!enemy.alive || !enemy.active || std::abs(hero.position.y - enemy.position.y) > definition_.height) {
+        if (!enemy.alive || !enemy.active ||
+            (hero.position.y >= enemy.position.y + enemy.height ||
+             enemy.position.y >= hero.position.y + definition_.height)) {
             continue;
         }
         const auto relative = horizontal(enemy.position - hero.position);
@@ -486,7 +466,7 @@ void HeroSystem::preview(std::optional<glm::dvec3> position, bool valid) {
 }
 
 std::optional<glm::dvec3> HeroSystem::ground(const Ray& ray) const {
-    return TowerSystem::terrainHit(ray, boxes_);
+    return levelGeometry_.intersect(ray);
 }
 
 Hero* HeroSystem::findMutable(HeroId id) noexcept {
@@ -515,7 +495,8 @@ std::optional<HeroId> HeroSystem::fromObject(ObjectId object) const noexcept {
 std::string HeroSystem::towerError(const Tower& tower) const {
     const auto box = tower.bounds();
     for (const auto& hero : heroes_) {
-        if (hero.health <= 0) {
+        if (hero.health <= 0 || hero.position.y >= box.center.y + box.halfExtent.y ||
+            hero.position.y + definition_.height <= box.center.y - box.halfExtent.y) {
             continue;
         }
         const auto nearest = glm::clamp(glm::dvec2{hero.position.x, hero.position.z},

@@ -60,7 +60,8 @@ void paintLine(SceneDocument& document, GridCell from, GridCell to, bool walkabl
 } // namespace
 
 void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug* debug) {
-    if (!debug || (debug->triangles().empty() && debug->boxes().empty() && debug->quads().empty())) {
+    if (!debug ||
+        (debug->triangles().empty() && debug->boxes().empty() && debug->quads().empty() && debug->lines().empty())) {
         return;
     }
     glm::ivec2 drawable{};
@@ -73,6 +74,37 @@ void drawDebugGeometry(const Camera& camera, SDL_Window* window, const GridDebug
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
     std::array<ImVec2, 12> points{};
+    for (const auto& line : debug->lines()) {
+        auto a = matrix * glm::dvec4{line.start, 1}, b = matrix * glm::dvec4{line.end, 1};
+        bool visible = true;
+        const std::array<glm::dvec4, 6> planes{
+            {{1, 0, 0, 1}, {-1, 0, 0, 1}, {0, 1, 0, 1}, {0, -1, 0, 1}, {0, 0, 1, 0}, {0, 0, -1, 1}}};
+        for (const auto plane : planes) {
+            const double first = glm::dot(plane, a), second = glm::dot(plane, b);
+            if (first < 0 && second < 0) {
+                visible = false;
+                break;
+            }
+            if ((first < 0) != (second < 0)) {
+                const auto point = a + (b - a) * (first / (first - second));
+                if (first < 0) {
+                    a = point;
+                } else {
+                    b = point;
+                }
+            }
+        }
+        if (visible && a.w > 1e-8 && b.w > 1e-8) {
+            const auto screen = [&](glm::dvec4 point) {
+                return ImVec2{viewport->Pos.x + static_cast<float>((point.x / point.w + 1) * 0.5) * viewport->Size.x,
+                              viewport->Pos.y + static_cast<float>((point.y / point.w + 1) * 0.5) * viewport->Size.y};
+            };
+            draw->AddLine(screen(a),
+                          screen(b),
+                          ImGui::ColorConvertFloat4ToU32({line.color.r, line.color.g, line.color.b, line.color.a}),
+                          1.5F);
+        }
+    }
     for (const auto& quad : debug->quads()) {
         std::array<glm::dvec3, 4> vertices;
         std::copy(quad.vertices.begin(), quad.vertices.end(), vertices.begin());

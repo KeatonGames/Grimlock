@@ -32,9 +32,11 @@ void NavigationSession::synchronize(Engine& engine) {
         }
     }
     towers_.synchronize(engine);
+    combatGeometry_.synchronize(engine, towers_.towers());
     placement_.synchronize(engine.scene());
+    levelGeometry_.synchronize(engine);
     const auto* scene = engine.scene();
-    const auto* grid = scene ? scene->navigationGrid() : nullptr;
+    const auto* grid = scene && !levelGeometry_.imported() ? scene->navigationGrid() : nullptr;
     const bool replaced = scene_ != scene || grid_ != grid;
     const bool resized = grid && (!configuration_ || *configuration_ != grid->configuration());
     if (replaced || resized) {
@@ -45,6 +47,7 @@ void NavigationSession::synchronize(Engine& engine) {
         geometryRevision_.reset();
         if (replaced) {
             destination_ = glm::dvec2{4, 4};
+            destinationHeight_ = grid ? grid->configuration().origin.y : 0;
         }
         configuration_ = grid ? std::optional{grid->configuration()} : std::nullopt;
         if (grid) {
@@ -60,25 +63,15 @@ void NavigationSession::synchronize(Engine& engine) {
             spawnArea_ = {{-4, -4}, {4, 4}};
         }
     }
-    if (grid && (geometryRevision_ != grid->revision() || towerRevision_ != towers_.revision())) {
+    if (geometryRevision_ != levelGeometry_.revision() || towerRevision_ != towers_.revision()) {
         buildNavigation();
-    } else if (!grid && (replaced || navigation_.ready())) {
-        navigation_.reset();
-        for (auto& profile : profiles_) {
-            if (profile.mesh->revision() > 0) {
-                profile.mesh->reset();
-            }
-        }
-        geometry_ = {};
-        terrain_.clear();
-        geometryRevision_.reset();
     }
 }
 
 void NavigationSession::buildNavigation() {
     candidate_.reset();
     ++navigationRevision_;
-    if (!grid_) {
+    if (levelGeometry_.navigation().vertices.empty()) {
         navigation_.reset();
         for (auto& profile : profiles_) {
             if (profile.mesh->revision() > 0) {
@@ -87,10 +80,12 @@ void NavigationSession::buildNavigation() {
         }
         geometry_ = {};
         terrain_.clear();
+        geometryRevision_ = levelGeometry_.revision();
+        towerRevision_ = towers_.revision();
         return;
     }
-    terrain_ = terrainBoxes(*grid_);
-    geometry_ = navigationGeometry(terrain_);
+    terrain_.assign(levelGeometry_.boxes().begin(), levelGeometry_.boxes().end());
+    geometry_ = levelGeometry_.navigation();
     for (const auto& tower : towers_.towers()) {
         const auto box = tower.bounds();
         geometry_.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
@@ -103,7 +98,7 @@ void NavigationSession::buildNavigation() {
             buildProfile(profile.type);
         }
     }
-    geometryRevision_ = grid_->revision();
+    geometryRevision_ = levelGeometry_.revision();
     towerRevision_ = towers_.revision();
 }
 
@@ -125,7 +120,7 @@ void NavigationSession::selectAnimal(Engine& engine, EnemyTypeId type) {
     synchronize(engine);
     auto& surface = navigationFor(type);
     selectedType_ = type;
-    if (grid_ && !surface.ready()) {
+    if (!geometry_.vertices.empty() && !surface.ready()) {
         buildProfile(type);
     }
 }
@@ -147,7 +142,7 @@ std::size_t NavigationSession::spawn(Engine& engine, std::size_t count) {
 
 const NavMesh& NavigationSession::surface(Engine& engine, EnemyTypeId type) {
     synchronize(engine);
-    if (!navigationFor(type).ready() && grid_) {
+    if (!navigationFor(type).ready() && !geometry_.vertices.empty()) {
         buildProfile(type);
     }
     return navigationFor(type);
@@ -169,7 +164,9 @@ std::size_t NavigationSession::spawnAt(Engine& engine, EnemyTypeId type, SpawnAr
     if (enemies_->sharedDestination() != destination_) {
         enemies_->setSharedDestination(destination_);
     }
-    return enemies_->spawn(mesh, area, count, type);
+    const auto spawned = enemies_->spawn(mesh, area, count, type);
+    enemies_->setDestinationHeight(destinationHeight_);
+    return spawned;
 }
 
 void NavigationSession::reset(Engine& engine) {
@@ -184,11 +181,14 @@ void NavigationSession::shutdown() noexcept {
     grid_ = nullptr;
     configuration_.reset();
     destination_.reset();
+    destinationHeight_ = 0;
     navigation_.reset();
     profiles_.clear();
     typeProfiles_.clear();
     geometry_ = {};
     spawnRoutes_.clear();
+    levelGeometry_ = {};
+    combatGeometry_ = {};
     selectedType_ = 0;
     geometryRevision_.reset();
     candidate_.reset();
@@ -201,7 +201,7 @@ void NavigationSession::shutdown() noexcept {
 }
 
 std::optional<Tower> NavigationSession::towerAt(const Ray& ray, const std::string& type, double yaw) const {
-    const auto hit = TowerSystem::terrainHit(ray, terrain_);
+    const auto hit = levelGeometry_.intersect(ray);
     if (!hit) {
         return {};
     }
@@ -221,7 +221,7 @@ void NavigationSession::preparePlacement(const Tower& tower) {
         auto& current = navigationFor(type);
         auto trial = std::make_unique<NavMesh>();
         const bool selected = typeProfiles_[type] == typeProfiles_[selectedType_];
-        const auto goal = current.project({destination_->x, spawnArea_.height, destination_->y});
+        const auto goal = current.project({destination_->x, destinationHeight_, destination_->y});
         const bool hadRoute = goal && TowerSystem::routeFromArea(current, spawnArea_, goal->position);
         if (selected && !hadRoute) {
             candidate.error = "Configure a reachable spawn area and destination before placing towers.";
@@ -277,7 +277,7 @@ std::string NavigationSession::checkEnemyRoutes(const PlacementCandidate& candid
             if (typeProfiles_[route.type] != typeProfiles_[prepared.type]) {
                 continue;
             }
-            const glm::dvec3 goal{route.destination.x, route.area.height, route.destination.y};
+            const glm::dvec3 goal{route.destination.x, route.destinationHeight, route.destination.y};
             if (!prepared.mesh->contains(goal) || !TowerSystem::routeFromArea(*prepared.mesh, route.area, goal)) {
                 return "Tower would close a predefined wave's spawn-to-objective route.";
             }
@@ -293,7 +293,8 @@ std::string NavigationSession::checkEnemyRoutes(const PlacementCandidate& candid
                 return "Tower would remove navigation clearance beneath an animal.";
             }
             if (enemy.destination) {
-                const auto goal = current->project({enemy.destination->x, enemy.position.y, enemy.destination->y});
+                const auto goal = current->project(
+                    {enemy.destination->x, enemy.destinationHeight.value_or(enemy.position.y), enemy.destination->y});
                 const bool hadRoute = (enemy.path.valid && enemy.path.revision == current->revision()) ||
                                       (goal && current->findPath(enemy.position, goal->position, path));
                 if (hadRoute && goal &&
@@ -315,10 +316,10 @@ std::string NavigationSession::checkTower(Engine& engine, const Tower& tower, bo
     if (const auto zoneError = placement_.check(tower); !zoneError.empty()) {
         return zoneError;
     }
-    if (!grid_ || !navigation().ready()) {
+    if (!navigation().ready()) {
         return "Tower placement requires navigable terrain.";
     }
-    const auto error = towers_.check(tower, terrain_, enemies_->enemies());
+    const auto error = towers_.check(tower, terrain_, enemies_->enemies(), &levelGeometry_);
     if (!error.empty()) {
         return error;
     }
@@ -370,7 +371,7 @@ ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower, Place
         }
     }
     geometry_ = std::move(prepared.geometry);
-    geometryRevision_ = grid_->revision();
+    geometryRevision_ = levelGeometry_.revision();
     towerRevision_ = towers_.revision();
     ++navigationRevision_;
     return id;
@@ -392,6 +393,17 @@ void NavigationSession::setDestination(std::optional<glm::dvec2> destination) {
     destination_ = destination;
     if (enemies_) {
         enemies_->setSharedDestination(destination);
+    }
+}
+
+void NavigationSession::setDestinationHeight(double height) {
+    if (!std::isfinite(height)) {
+        throw std::invalid_argument("Destination height must be finite.");
+    }
+    destinationHeight_ = height;
+    candidate_.reset();
+    if (enemies_) {
+        enemies_->setDestinationHeight(height);
     }
 }
 

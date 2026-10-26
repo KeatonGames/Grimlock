@@ -22,7 +22,8 @@ During Battle:
 - **Cancel Order** interrupts a manual order or swing and resumes automatic defense.
   The Hero Info card distinguishes manual movement/attacks, returning and automatic AI.
 - Press **Cleave** in Hero Info for a delayed cone attack in the hero's current
-  facing direction. It has an independent per-hero cooldown and a brief gold cone
+  facing direction. A manual Cleave can interrupt an automatic basic swing so the
+  ability is usable during sustained combat. It has an independent per-hero cooldown and a brief gold cone
   on impact. Cancelling the windup with another order does not refund cooldown.
 - Right-drag pans, middle-drag orbits, and wheel zooms. The five-pixel total drag
   threshold distinguishes commands from camera gestures. Commands occur on release;
@@ -47,8 +48,8 @@ Physical dimensions are independent of visual scale. Its `combat` object contain
   "range": 1.2,
   "attack_interval": 0.8,
   "impact_time": 0.25,
-  "acquisition_range": 5,
-  "pursuit_range": 8,
+  "acquisition_range": 3.5,
+  "pursuit_range": 6,
   "attack_animation": "attack",
   "cleave": { "damage": 45, "radius": 2, "angle": 100, "cooldown": 6 }
 }

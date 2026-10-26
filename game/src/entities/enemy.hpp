@@ -28,6 +28,7 @@ struct EnemyCombatState {
     DefensiveTarget target, rejected;
     glm::dvec3 origin{0}, pathTarget{0};
     std::optional<glm::dvec2> objective;
+    double objectiveHeight = 0;
     double cooldown = 0, impactRemaining = -1, searchDelay = 0, pathDelay = 0, rejectDelay = 0;
     bool managed = false, swinging = false;
     std::uint64_t pathRevision = 0;
@@ -65,6 +66,8 @@ struct Enemy {
     MovementStatus movement = MovementStatus::idle;
     EnemyState state = EnemyState::idle;
     std::optional<glm::dvec2> destination;
+    std::optional<double> destinationHeight;
+    double height = 0.5;
     double stoppingDistance = 0; // Zero uses the physical radius.
     double retryInterval = 1, stuckTimeout = 2;
     double remainingDistance = 0;

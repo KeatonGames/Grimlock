@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 2, "expected level path");
         auto definition = loadLevelDefinition(argv[1]);
-        require(definition.waves.size() == 3 && definition.spawns.size() == 2 && definition.objectiveHealth == 30,
+        require(definition.waves.size() == 5 && definition.spawns.size() == 2 && definition.objectiveHealth == 10,
                 "authored level incorrect");
         checkSchedule(definition);
         definition.waves[0].groups[0].count = 1001;

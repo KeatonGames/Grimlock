@@ -1,5 +1,7 @@
 #pragma once
 
+#include "navigation/level_geometry.hpp"
+#include "systems/combat_geometry.hpp"
 #include "systems/enemy_system.hpp"
 #include "systems/placement_system.hpp"
 #include "systems/tower_system.hpp"
@@ -10,6 +12,7 @@ struct SpawnRoute {
     EnemyTypeId type;
     SpawnArea area;
     glm::dvec2 destination;
+    double destinationHeight = 0;
 };
 
 // Owns the runtime enemy preview and its world-space X/Z destination.
@@ -30,6 +33,7 @@ public:
     void rebuild(Engine& engine);
 
     void setDestination(std::optional<glm::dvec2> destination);
+    void setDestinationHeight(double height);
     void selectAnimal(Engine& engine, EnemyTypeId type);
     [[nodiscard]] std::optional<Tower> towerAt(const Ray& ray, const std::string& type = "basic", double yaw = 0) const;
 
@@ -84,6 +88,14 @@ public:
         return destination_;
     }
 
+    [[nodiscard]] double destinationHeight() const noexcept {
+        return destinationHeight_;
+    }
+
+    [[nodiscard]] const CombatGeometry& combatGeometry() const noexcept {
+        return combatGeometry_;
+    }
+
     [[nodiscard]] EnemySystem* enemies() noexcept {
         return enemies_.get();
     }
@@ -117,6 +129,9 @@ private:
     std::vector<std::size_t> typeProfiles_;
     EnemyTypeId selectedType_ = 0;
     NavigationGeometry geometry_;
+    LevelGeometry levelGeometry_;
+    CombatGeometry combatGeometry_;
+    double destinationHeight_ = 0;
     std::vector<SpawnRoute> spawnRoutes_;
     std::optional<std::uint64_t> geometryRevision_;
     TowerSystem towers_;

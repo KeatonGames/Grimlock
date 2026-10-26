@@ -19,8 +19,8 @@
     "range": 1.2,
     "attack_interval": 0.8,
     "impact_time": 0.25,
-    "acquisition_range": 5,
-    "pursuit_range": 8,
+    "acquisition_range": 3.5,
+    "pursuit_range": 6,
     "attack_animation": "attack",
     "cleave": {
       "damage": 45,

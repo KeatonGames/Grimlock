@@ -10,6 +10,8 @@
 
 namespace grimlock::game {
 
+class LevelGeometry;
+
 class TowerSystem final {
 public:
     [[nodiscard]] std::optional<ObjectId> pick(const Ray& ray) const;
@@ -31,7 +33,8 @@ public:
     [[nodiscard]] const TowerDefinition& definition(const std::string& type) const;
     [[nodiscard]] std::string check(const Tower& tower,
                                     std::span<const TerrainBox> terrain,
-                                    std::span<const Enemy> enemies) const;
+                                    std::span<const Enemy> enemies,
+                                    const LevelGeometry* geometry = nullptr) const;
 
     [[nodiscard]] std::span<const Tower> towers() const noexcept {
         return towers_;

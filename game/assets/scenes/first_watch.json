@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "name": "First Watch | two meadows and a winding approach",
+  "name": "First Watch | Meadow Gates",
   "navigation_grid": {
-    "width": 14, "height": 10, "cell_size": 1, "origin": [-7, 0, -5],
+    "width": 16, "height": 10, "cell_size": 1, "origin": [-7, 0, -5],
     "blocked": [[5,0],[5,1],[5,2],[5,7],[5,8],[5,9],[9,3],[9,4],[9,5],[9,6]]
   },
   "cameras": [{"id":"main","position":[3,24,11],"target":[0,0,0],"vertical_fov_degrees":50,"far":100}],
@@ -12,6 +12,8 @@
     "environment_intensity":1, "exposure":1
   },
   "objects": [
+    {"id":"102","name":"Last stand build zone","role":"grimlock.build_zone",
+      "transform":{"position":[5.3,0,0],"scale":[2.1,1,3.5]}},
     {"id":"100","name":"West approach build zone","role":"grimlock.build_zone",
       "transform":{"position":[-3.3,0,0],"scale":[1.5,1,1.75]}},
     {"id":"101","name":"Central meadow build zone","role":"grimlock.build_zone",
@@ -21,8 +23,8 @@
     {"id":"2","name":"South meadow spawn","model":"models/cube.obj","tint":[0.1,0.65,0.6,1],
       "transform":{"position":[-5,0.008,3],"scale":[1,0.008,0.7]}},
     {"id":"3","name":"Defense objective arrival marker","model":"models/cube.obj","tint":[0.95,0.65,0.1,1],
-      "transform":{"position":[5,0.012,0],"scale":[0.7,0.012,0.7]}},
+      "transform":{"position":[7,0.012,0],"scale":[0.7,0.012,0.7]}},
     {"id":"4","name":"Defense objective monument","model":"models/cube.obj","tint":[0.95,0.65,0.1,1],
-      "transform":{"position":[6.2,0.65,0],"scale":[0.35,0.65,0.35]}}
+      "transform":{"position":[8.2,0.65,0],"scale":[0.35,0.65,0.35]}}
   ]
 }

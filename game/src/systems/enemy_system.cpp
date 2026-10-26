@@ -157,6 +157,10 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             const glm::dvec3 position = surface->position;
             bool occupied = false;
             spawnNeighbors_.visit(position, definition.radius + maximumRadius + padding, [&](std::size_t index) {
+                if (position.y >= enemies_[index].position.y + enemies_[index].height ||
+                    enemies_[index].position.y >= position.y + definition.height) {
+                    return;
+                }
                 const auto offset = enemies_[index].position - position;
                 const double footprint = enemies_[index].radius + definition.radius;
                 const double distance = std::max(footprint, footprint + padding - 1e-5);
@@ -175,6 +179,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             enemy.position = position;
             enemy.speed = definition.speed;
             enemy.radius = definition.radius;
+            enemy.height = definition.height;
             enemy.acceleration = definition.acceleration;
             enemy.deceleration = definition.deceleration;
             enemy.stoppingDistance = definition.stoppingDistance;
@@ -362,6 +367,19 @@ void EnemySystem::setSharedDestination(std::optional<glm::dvec2> destination) {
     sharedDestination_ = destination;
     for (auto& enemy : enemies_) {
         EnemyAi::setDestination(enemy, destination);
+    }
+}
+
+void EnemySystem::setDestinationHeight(double height) {
+    if (!std::isfinite(height)) {
+        throw std::invalid_argument("Enemy destination height must be finite.");
+    }
+    for (auto& enemy : enemies_) {
+        enemy.combat.objectiveHeight = height;
+        if (!enemy.combat.managed && enemy.destinationHeight != height) {
+            enemy.destinationHeight = height;
+            EnemyAi::setDestination(enemy, enemy.destination);
+        }
     }
 }
 

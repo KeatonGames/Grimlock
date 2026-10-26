@@ -10,6 +10,7 @@ struct Projectile {
     double speed = 0, radius = 0;
     float damage = 0;
     InstanceId instance;
+    ObjectId source = 0;
 };
 
 } // namespace grimlock::game

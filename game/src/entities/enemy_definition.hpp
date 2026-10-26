@@ -34,6 +34,7 @@ struct EnemyDefinition {
     double forwardYaw = 0;
     bool despawnOnArrival = true;
     EnemyCombatDefinition combat;
+    bool showHealthBar = false;
 };
 
 void validateEnemyDefinition(const EnemyDefinition& definition);

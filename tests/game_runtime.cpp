@@ -135,6 +135,7 @@ int main() {
         scene->save(assetRoot / definition.scene);
         definition.name = "Edited level";
         definition.startingGold = 200;
+        definition.objectiveHealth = 30;
         definition.waves.resize(1);
         definition.waves[0].goldReward = 7;
         definition.waves[0].groups[0].count = 2;
@@ -146,6 +147,7 @@ int main() {
         const auto sceneBefore = contents(assetRoot / definition.scene), levelBefore = contents(levelPath);
         LevelRuntime runtime;
         runtime.load(engine, levelPath);
+        std::uint64_t expectedGold = 200;
         GameHud hud{engine, runtime};
         tick(engine, runtime, 4);
         require(!ImGui::FindWindowByName("Scene Hierarchy") && !ImGui::FindWindowByName("Inspector") &&
@@ -174,7 +176,9 @@ int main() {
         tick(engine, runtime);
         require(runtime.preview() && runtime.placementError().empty(), "game placement preview is not valid");
         click(engine, runtime, id, point);
-        require(runtime.navigation().towers().towers().size() == 1 && runtime.level().economy().gold() == 170 &&
+        expectedGold -= runtime.navigation().towers().definition("basic").constructionCost;
+        require(runtime.navigation().towers().towers().size() == 1 &&
+                    runtime.level().economy().gold() == expectedGold &&
                     !runtime.navigation().navigation().contains({-3.3, 0, 0}),
                 "game construction or navigation update failed");
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
@@ -190,7 +194,8 @@ int main() {
         tick(engine, runtime);
         require(runtime.preview() && runtime.placementError().empty(), "Large Tower preview invalid");
         click(engine, runtime, id, largePoint);
-        require(runtime.navigation().towers().towers().size() == 2 && runtime.level().economy().gold() == 120,
+        expectedGold -= runtime.navigation().towers().definition("wide").constructionCost;
+        require(runtime.navigation().towers().towers().size() == 2 && runtime.level().economy().gold() == expectedGold,
                 "Large Tower construction failed");
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
         tick(engine, runtime);
@@ -201,12 +206,14 @@ int main() {
         const auto smallTower = runtime.inspectedTower()->object;
         const auto revision = runtime.navigation().revision();
         control(engine, runtime, id, "Tower Info", "Upgrade");
+        expectedGold -= runtime.navigation().towers().definition("basic").statistics(2).upgradeCost;
         require(runtime.navigation().towers().progress(smallTower).level == 2 &&
-                    runtime.level().economy().gold() == 95 && runtime.inspectedTower()->object == smallTower,
+                    runtime.level().economy().gold() == expectedGold && runtime.inspectedTower()->object == smallTower,
                 "first HUD upgrade, payment or stable selection failed");
         control(engine, runtime, id, "Tower Info", "Upgrade");
+        expectedGold -= runtime.navigation().towers().definition("basic").statistics(3).upgradeCost;
         require(runtime.navigation().towers().progress(smallTower).level == 3 &&
-                    runtime.level().economy().gold() == 55 && runtime.navigation().revision() == revision &&
+                    runtime.level().economy().gold() == expectedGold && runtime.navigation().revision() == revision &&
                     runtime.level().upgradeError(runtime.navigation(), smallTower) == "MAX LEVEL",
                 "maximum HUD upgrade rebuilt navigation or used incorrect statistics/payment");
         const auto rejectUpgrade = [&](ObjectId tower) {
@@ -228,7 +235,9 @@ int main() {
         const auto largeTower = runtime.inspectedTower()->object;
         require(runtime.navigation().towers().progress(largeTower).level == 1, "one tower upgraded another");
         control(engine, runtime, id, "Tower Info", "Upgrade");
-        require(runtime.navigation().towers().progress(largeTower).level == 2 && runtime.level().economy().gold() == 15,
+        expectedGold -= runtime.navigation().towers().definition("wide").statistics(2).upgradeCost;
+        require(runtime.navigation().towers().progress(largeTower).level == 2 &&
+                    runtime.level().economy().gold() == expectedGold,
                 "Large Tower upgrade incorrect");
         rejectUpgrade(largeTower);
         require(runtime.heroes() && runtime.heroes()->heroes().size() == 1, "configured hero spawn missing");
@@ -380,7 +389,7 @@ int main() {
                 "standalone Game towers did not defeat enemies");
         require(runtime.level().waves()->phase() == LevelPhase::victory &&
                     runtime.level().waves()->health() == 30 - metrics.arrived &&
-                    runtime.level().economy().gold() == 22 && resultPanel && resultPanel->Active,
+                    runtime.level().economy().gold() == expectedGold + 7 && resultPanel && resultPanel->Active,
                 "Game victory, reward or result HUD failed");
         require(contents(levelPath) == levelBefore && contents(assetRoot / definition.scene) == sceneBefore,
                 "gameplay overwrote authored files");

@@ -565,6 +565,29 @@ ModelInfo Engine::modelInfo(ModelId model) const {
     return impl_->resources.at(model.index_)->info;
 }
 
+std::vector<std::array<glm::vec3, 3>> Engine::modelTriangles(ModelId model) const {
+    const auto& asset = impl_->resources.at(model.index_)->asset;
+    const assets::ModelInstance rest{asset};
+    std::vector<std::array<glm::vec3, 3>> result;
+    for (const auto node : rest.pose().activeNodes) {
+        for (const auto meshIndex : asset->nodes[node].meshes) {
+            const auto& mesh = asset->meshes[meshIndex];
+            if (mesh.morphTargetCount || !rest.pose().joints[node].empty()) {
+                throw std::invalid_argument("Navigation geometry must use a static, unskinned model.");
+            }
+            for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+                std::array<glm::vec3, 3> triangle;
+                for (std::size_t corner = 0; corner < 3; ++corner) {
+                    triangle[corner] =
+                        rest.pose().world[node] * glm::vec4{mesh.vertices.at(mesh.indices[i + corner]).position, 1};
+                }
+                result.push_back(triangle);
+            }
+        }
+    }
+    return result;
+}
+
 InstanceId Engine::createInstance(ModelId model, bool visibleInScenes) {
     const auto& resource = *impl_->resources.at(model.index_);
     auto instance = std::make_unique<assets::ModelInstance>(resource.asset);

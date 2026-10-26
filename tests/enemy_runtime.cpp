@@ -597,9 +597,19 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     navigationControl(engine, window, "Level", "Load First Watch");
     auto& level = debug.level();
     auto& session = debug.session();
-    require(level.waves() && level.waves()->phase() == game::LevelPhase::preparation && level.waves()->health() == 30 &&
-                session.enemies()->enemies().empty() && level.economy().gold() == 100,
+    require(level.waves() && level.waves()->phase() == game::LevelPhase::preparation &&
+                level.waves()->health() == level.waves()->definition().objectiveHealth &&
+                session.enemies()->enemies().empty() &&
+                level.economy().gold() == level.waves()->definition().startingGold,
             "level load did not reset the scene, objective and enemies");
+    // Keep editor transaction/wave controls independent of the full gameplay balance playthrough.
+    auto fixture = level.waves()->definition();
+    fixture.startingGold = 100;
+    fixture.objectiveHealth = 30;
+    fixture.waves = {{"Editor first wave", {{"Chicken", 0, 4, 2, 0, 2}}, 25},
+                     {"Editor mixed wave", {{"Chicken", 0, 4, 2, 0, 1.5}, {"Black Rat", 1, 4, 2, 0, 2}}, 35},
+                     {"Editor final wave", {{"Bunny", 1, 2, 2, 0, 0}, {"Chicken", 0, 4, 1, 4, 1}}, 50}};
+    level.begin(engine, session, fixture);
     game::Tower tower;
     tower.position = {-3.3, 0.75, 0};
     const auto failsWithoutSpending = [&](const game::Tower& candidate) {
@@ -680,7 +690,7 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     require(session.removeTower(engine, authored) && level.economy().gold() == 29, "removal refunded gold");
 
     auto exact = definition;
-    exact.startingGold = 50;
+    exact.startingGold = session.towers().definition("wide").constructionCost;
     level.begin(engine, session, exact);
     auto wide = session.towers().definition("wide").instance();
     wide.position = {-3.3, wide.halfExtent.y, 0};
@@ -936,6 +946,19 @@ int main(int argc, char** argv) {
         debug.session().reset(engine);
         checkTowers(engine, debug, editor, id, output.parent_path() / "tower-runtime.json");
         checkLevels(engine, debug, editor, id);
+        editor.document().open(game / "assets/scenes/hill_watch.json");
+        debug.update(engine, 0);
+        navigationControl(engine, id, "Level", "Load Hill Watch");
+        tick(engine, 3);
+        require(debug.level().waves() && debug.level().waves()->definition().objectiveHeight == 2 &&
+                    !engine.scene()->navigationGrid() && debug.session().navigation().ready(),
+                "Editor could not load the elevated level independently of a grid");
+        navigationControl(engine, id, "Show NavMesh");
+        require(!debug.triangles().empty(), "elevated NavMesh overlay was unavailable in Editor");
+        navigationControl(engine, id, "Show NavMesh");
+        const auto elevated = debug.session().towerAt({{8, 10, 2}, {0, -1, 0}, 0, 30});
+        require(elevated && debug.session().checkTower(engine, *elevated, false).empty(),
+                "Editor rejected an elevated tower preview");
         std::cout << "PASS enemy controls, edit-only overlay, world destinations, predefined radii, resources and "
                      "animations.\n";
         return 0;

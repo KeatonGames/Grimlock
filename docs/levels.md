@@ -17,13 +17,12 @@ costs belong to the tower catalog. The Level panel displays the runtime balance.
 See [economy and construction](economy.md). The separate Navigation tower tools
 remain free editor authoring controls.
 
-First Watch has two meadow spawn areas, a winding approach, and a gold objective
-marker. Its three waves contain exactly 4 chickens, then 4 chickens with 4 rats,
-then 2 bunnies followed by 4 chickens. The objective starts with 30 health and loses
-one health per arrival. This initial test is deliberately survivable without
-combat: all 18 arrivals leave 12 health. Built towers redirect navigation and attack
-during Battle; defeated animals do not damage the objective. See [combat](combat.md).
-A level with fewer health points demonstrates defeat using the same arrival rules.
+First Watch is the first playable level: two meadow entrances converge through
+the west gate, then split around the eastern wall into an expanded rear courtyard.
+The three build zones support a west interception tower, central coverage on both
+routes, and a protected rear battery. The gold marker at (7, 0) is the objective.
+Start with 90 gold, one hero and 10 objective health; every arrival costs one health.
+See [the level guide](first_watch.md) for the five exact waves, balance and tested plans.
 
 ## Authoring
 
@@ -33,8 +32,10 @@ the current sample uses existing cube terrain. Level/wave data never addresses
 grid cells: destinations, spawn rectangles and elevations use world coordinates.
 Animal configuration remains in `assets/config/animals.json`.
 
+For imported terrain and the grid-free Hill Watch test map, see [terrain authoring](terrain.md).
+
 The level JSON has version `1`, a name, an asset-relative scene path, an objective
-with world X/Z `position`, positive integer `health` and `damage_per_arrival`, named
+with world X/Z `position`, optional `height` (defaults to the first spawn's height), positive integer `health` and `damage_per_arrival`, named
 spawn rectangles (`minimum`, `maximum`, `height`), and an ordered `waves` array.
 Every named wave has explicit groups:
 
@@ -75,9 +76,13 @@ gameplay decisions remain in Game. Engine rendering, navigation algorithms and
 scene JSON have no knowledge of waves or objective health. Runtime health and wave
 progress are not written into scene files.
 
+`Level.Playable` runs the actual authored level through five scripted player plans:
+mixed towers, Small Tower coverage, rear defense, no construction and neglected
+upgrades. It requires three distinct wins and two losses, exact scheduled totals,
+one-time rewards, navigation containment, no stalled waves and clean restart.
 `Levels.Waves` checks exact scheduling, simultaneous and sequential groups,
 partial/occupied spawning, preparation transitions, health, victory, defeat,
 restart and invalid definitions. `Enemies.Runtime` loads the level through ImGui,
-places a preparation tower, runs all three waves with real navigation/rendered
+places a preparation tower, runs a separate three-wave editor-control fixture with real navigation/rendered
 animals, checks exact arrival damage and victory, reloads the scene, verifies
 defeat, and leaves level mode safely.

@@ -8,10 +8,13 @@ namespace grimlock::game {
 
 class CombatSystem final {
 public:
-    explicit CombatSystem(Engine& engine) : projectiles_(engine) {
+    explicit CombatSystem(Engine& engine) : engine_(engine), projectiles_(engine) {
     }
 
-    void update(const TowerSystem& towers, EnemySystem& enemies, double delta);
+    void update(const TowerSystem& towers,
+                EnemySystem& enemies,
+                double delta,
+                const CombatGeometry* geometry = nullptr);
     void clear() noexcept;
 
     void clearProjectiles() noexcept {
@@ -31,6 +34,8 @@ public:
     }
 
 private:
+    Engine& engine_;
+    CombatGeometry geometry_;
     ProjectileSystem projectiles_;
     std::vector<TowerAttack> attacks_;
     std::uint64_t shotsFired_ = 0;

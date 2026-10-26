@@ -2,6 +2,7 @@
 
 #include "entities/projectile.hpp"
 #include "entities/tower_definition.hpp"
+#include "systems/combat_geometry.hpp"
 #include "systems/enemy_system.hpp"
 
 namespace grimlock::game {
@@ -15,8 +16,12 @@ public:
     ~ProjectileSystem();
     ProjectileSystem(const ProjectileSystem&) = delete;
     ProjectileSystem& operator=(const ProjectileSystem&) = delete;
-    void spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition, std::size_t level = 1);
-    void update(EnemySystem& enemies, double delta);
+    void spawn(glm::dvec3 origin,
+               EnemyId target,
+               const TowerDefinition& definition,
+               std::size_t level = 1,
+               ObjectId source = 0);
+    void update(EnemySystem& enemies, double delta, const CombatGeometry* geometry = nullptr);
     void clear() noexcept;
 
     [[nodiscard]] std::span<const Projectile> projectiles() const noexcept {
@@ -33,6 +38,7 @@ private:
     std::optional<ModelId> model_;
     std::vector<Projectile> projectiles_;
     std::uint64_t impacts_ = 0;
+    CombatGeometry geometry_;
 };
 
 } // namespace grimlock::game

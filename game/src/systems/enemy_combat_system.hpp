@@ -12,11 +12,15 @@ public:
                  const TowerSystem& towers,
                  HeroSystem* heroes,
                  glm::dvec2 objective,
-                 double delta);
+                 double delta,
+                 const CombatGeometry* geometry = nullptr);
     void resolve(Engine& engine, EnemySystem& enemies, TowerSystem& towers, HeroSystem* heroes, double delta);
     void stop(EnemySystem& enemies);
 
 private:
+    const CombatGeometry* geometry_ = nullptr;
+    bool clearStrike(const Enemy& enemy, const MeleeBody& body, ObjectId target = 0) const;
+
     struct Target {
         DefensiveTarget reference;
         MeleeBody body;

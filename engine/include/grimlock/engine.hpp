@@ -6,6 +6,7 @@
 #include "grimlock/scene.hpp"
 #include "grimlock/transform.hpp"
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
@@ -82,6 +83,8 @@ public:
     [[nodiscard]] ModelId loadModel(const std::filesystem::path& path);
     [[nodiscard]] ModelId addModel(assets::ModelData model);
     [[nodiscard]] ModelInfo modelInfo(ModelId model) const;
+    // Static rest-pose triangles, including imported node transforms; never changes the rendered asset.
+    [[nodiscard]] std::vector<std::array<glm::vec3, 3>> modelTriangles(ModelId model) const;
     // Scene-visible runtime instances are independent of scene serialization and picking.
     [[nodiscard]] InstanceId createInstance(ModelId model, bool visibleInScenes = false);
     // Invalidates this handle; reused storage never makes an old handle valid again.

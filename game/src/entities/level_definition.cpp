@@ -41,8 +41,9 @@ std::uint64_t gold(const nlohmann::json& value) {
 void validateLevelDefinition(const LevelDefinition& definition) {
     if (definition.name.empty() || definition.scene.empty() || definition.scene.is_absolute() ||
         definition.scene.has_root_name() || definition.scene.extension() != ".json" ||
-        !finite(definition.objectivePosition) || !definition.objectiveHealth || !definition.damagePerArrival ||
-        definition.spawns.empty() || definition.waves.empty()) {
+        !finite(definition.objectivePosition) || !std::isfinite(definition.objectiveHeight) ||
+        !definition.objectiveHealth || !definition.damagePerArrival || definition.spawns.empty() ||
+        definition.waves.empty()) {
         throw std::invalid_argument("Level requires a name, relative scene, objective, spawns and waves.");
     }
     for (const auto& part : definition.scene) {
@@ -116,6 +117,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
             {entry.at("name").get<std::string>(),
              {point(entry.at("minimum")), point(entry.at("maximum")), entry.at("height").get<double>()}});
     }
+    result.objectiveHeight = objective.value("height", result.spawns.empty() ? 0.0 : result.spawns.front().area.height);
     for (const auto& entry : document.at("waves")) {
         WaveDefinition wave{entry.at("name").get<std::string>(), {}};
         wave.goldReward = entry.contains("gold_reward") ? gold(entry.at("gold_reward")) : 0;
@@ -146,6 +148,7 @@ void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinitio
                             {"starting_gold", definition.startingGold},
                             {"objective",
                              {{"position", {definition.objectivePosition.x, definition.objectivePosition.y}},
+                              {"height", definition.objectiveHeight},
                               {"health", definition.objectiveHealth},
                               {"damage_per_arrival", definition.damagePerArrival}}},
                             {"spawns", nlohmann::json::array()},

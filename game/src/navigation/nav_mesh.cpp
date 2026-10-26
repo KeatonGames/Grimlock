@@ -300,15 +300,33 @@ bool NavMesh::findPath(glm::dvec3 start, glm::dvec3 destination, NavigationPath&
 
 bool NavMesh::visible(glm::dvec3 start, glm::dvec3 destination) const {
     const auto from = project(start, 0.03);
-    if (!from || !contains(destination, 0.03)) {
+    const auto to = project(destination, 0.03);
+    if (!from || !to || !contains(destination, 0.03)) {
         return false;
     }
     const glm::vec3 a{from->position}, b{destination};
     float fraction = 0;
     glm::vec3 normal{0};
-    const auto status =
-        data_->query->raycast(from->polygon, &a.x, &b.x, &data_->filter, &fraction, &normal.x, nullptr, nullptr, 0);
-    return dtStatusSucceed(status) && fraction >= 1;
+    std::array<dtPolyRef, maximumPath> visited{};
+    int count = 0;
+    const auto status = data_->query->raycast(from->polygon,
+                                              &a.x,
+                                              &b.x,
+                                              &data_->filter,
+                                              &fraction,
+                                              &normal.x,
+                                              visited.data(),
+                                              &count,
+                                              maximumPath);
+    if (dtStatusFailed(status) || dtStatusDetail(status, DT_BUFFER_TOO_SMALL) || fraction < 1 || count == 0) {
+        return false;
+    }
+    // Shared contour edges may resolve to either adjacent polygon. Compare their surface points,
+    // while rejecting the same X/Z location on a disconnected floor above or below the ray.
+    glm::vec3 endpoint;
+    return dtStatusSucceed(data_->query->closestPointOnPoly(visited[count - 1], &b.x, &endpoint.x, nullptr)) &&
+           horizontalDistance(endpoint, to->position) <= 0.03 &&
+           std::abs(endpoint.y - to->position.y) <= configuration_.cellHeight * 2;
 }
 
 std::optional<glm::dvec3> NavMesh::steering(glm::dvec3 position, NavigationPath& path, double* remaining) const {

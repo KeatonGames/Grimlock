@@ -104,6 +104,29 @@ void GameHud::status() {
                         static_cast<unsigned long long>(runtime_.level().economy().gold()),
                         static_cast<unsigned long long>(waves->health()),
                         static_cast<unsigned long long>(definition.objectiveHealth));
+            const auto index = std::min(waves->wave(), definition.waves.size() - 1);
+            const auto& wave = definition.waves[index];
+            ImGui::TextUnformatted(wave.name.c_str());
+            if (waves->phase() == LevelPhase::preparation) {
+                for (const auto& group : wave.groups) {
+                    ImGui::Text("%zu %s | %s",
+                                group.count,
+                                group.enemy.c_str(),
+                                definition.spawns[group.spawn].name.c_str());
+                }
+                ImGui::Text("Completion reward: %llu gold", static_cast<unsigned long long>(wave.goldReward));
+                ImGui::TextUnformatted("Build, upgrade and position your hero before starting.");
+            } else if (waves->phase() == LevelPhase::battle) {
+                const auto active = runtime_.navigation().enemies()->enemies().size();
+                const auto pending = waves->pending();
+                std::size_t total = 0;
+                for (const auto& group : wave.groups) {
+                    total += group.count;
+                }
+                const auto finished = total > active + pending ? total - active - pending : 0;
+                ImGui::Text("On field %zu | Still to spawn %zu", active, pending);
+                ImGui::ProgressBar(static_cast<float>(finished) / total, {210, 0}, "Wave resolved");
+            }
             if (const auto reward = runtime_.level().lastWaveReward()) {
                 ImGui::Text("Wave completed: +%llu gold", static_cast<unsigned long long>(*reward));
             }
@@ -280,7 +303,7 @@ void GameHud::heroControls() {
         }
         const bool battle = runtime_.level().waves() && runtime_.level().waves()->phase() == LevelPhase::battle;
         ImGui::BeginDisabled(!battle || hero->health <= 0 || hero->combat.cleaveCooldown > 1e-10 ||
-                             hero->combat.swinging);
+                             (hero->combat.swinging && hero->combat.abilitySwing));
         if (ImGui::Button("Cleave")) {
             (void)runtime_.activateHeroAbility(HeroAbility::cleave);
         }
@@ -371,6 +394,17 @@ void GameHud::placementOverlay(const Camera& camera) {
         healthBar(tower.position + glm::dvec3{0, tower.halfExtent.y + 0.12, 0},
                   progress.health,
                   progress.maximumHealth);
+    }
+    const auto* selected = runtime_.selectedHero();
+    if (const auto* enemies = runtime_.navigation().enemies()) {
+        for (const auto& enemy : enemies->enemies()) {
+            const auto& definition = enemies->definition(enemy.type);
+            if (definition.showHealthBar || (selected && selected->combat.target == enemy.id)) {
+                healthBar(enemy.position + glm::dvec3{0, definition.visualHeight + 0.12, 0},
+                          enemy.health,
+                          enemy.maximumHealth);
+            }
+        }
     }
     const auto polygon = [&](std::span<const glm::dvec3> vertices, ImU32 color, bool outline = true) {
         std::array<ImVec2, 12> points;

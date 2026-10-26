@@ -13,10 +13,12 @@ add_library(GameLogic STATIC
     src/systems/economy_system.cpp
     src/runtime/level_runtime.cpp
     src/navigation/navigation_geometry.cpp
+    src/navigation/level_geometry.cpp
     src/navigation/nav_mesh.cpp
     src/systems/crowd_movement.cpp
     src/systems/enemy_ai.cpp
     src/systems/combat_system.cpp
+    src/systems/combat_geometry.cpp
     src/systems/projectile_system.cpp
     src/systems/tower_system.cpp
     src/systems/enemy_system.cpp

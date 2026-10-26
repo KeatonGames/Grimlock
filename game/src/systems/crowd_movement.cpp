@@ -19,6 +19,10 @@ glm::dvec2 horizontal(glm::dvec3 value) {
     return {value.x, value.z};
 }
 
+bool verticalOverlap(const Enemy& first, const Enemy& second) {
+    return first.position.y < second.position.y + second.height && second.position.y < first.position.y + first.height;
+}
+
 const NavMesh& navigationFor(const Enemy& enemy, const NavMesh& fallback) {
     return enemy.navigation ? *enemy.navigation : fallback;
 }
@@ -194,7 +198,8 @@ glm::dvec2 CrowdMovement::separation(std::size_t index, std::span<const Enemy> e
     glm::dvec2 force{0};
     const double range = (enemy.radius + maximumRadius) * 1.02;
     neighbors_.visit(enemy.position, range, [&](std::size_t otherIndex) {
-        if (index == otherIndex || !enemies[otherIndex].active || !enemies[otherIndex].alive) {
+        if (index == otherIndex || !enemies[otherIndex].active || !enemies[otherIndex].alive ||
+            !verticalOverlap(enemy, enemies[otherIndex])) {
             return;
         }
         ++metrics_.neighborChecks;
@@ -229,7 +234,8 @@ glm::dvec3 CrowdMovement::move(const NavMesh& navigation,
         neighbors_.visit(position,
                          enemy.radius + maximumRadius + glm::length(displacement) + skin,
                          [&](std::size_t other) {
-                             if (index == other || !enemies[other].active || !enemies[other].alive) {
+                             if (index == other || !enemies[other].active || !enemies[other].alive ||
+                                 !verticalOverlap(enemy, enemies[other])) {
                                  return;
                              }
                              ++metrics_.neighborChecks;
@@ -266,7 +272,8 @@ void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> 
             }
             glm::dvec2 correction{0};
             neighbors_.visit(enemy.position, enemy.radius + maximumRadius, [&](std::size_t other) {
-                if (index == other || !enemies[other].active || !enemies[other].alive) {
+                if (index == other || !enemies[other].active || !enemies[other].alive ||
+                    !verticalOverlap(enemy, enemies[other])) {
                     return;
                 }
                 ++metrics_.neighborChecks;

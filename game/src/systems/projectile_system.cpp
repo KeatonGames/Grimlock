@@ -10,7 +10,11 @@ ProjectileSystem::~ProjectileSystem() {
     clear();
 }
 
-void ProjectileSystem::spawn(glm::dvec3 origin, EnemyId target, const TowerDefinition& definition, std::size_t level) {
+void ProjectileSystem::spawn(glm::dvec3 origin,
+                             EnemyId target,
+                             const TowerDefinition& definition,
+                             std::size_t level,
+                             ObjectId source) {
     const auto& statistics = definition.statistics(level);
     if (!std::isfinite(glm::length(origin)) || !std::isfinite(statistics.damage) || statistics.damage <= 0 ||
         !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
@@ -26,17 +30,26 @@ void ProjectileSystem::spawn(glm::dvec3 origin, EnemyId target, const TowerDefin
         engine_.setTransform(instance,
                              glm::translate(glm::mat4{1}, glm::vec3{origin}) *
                                  glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.projectileRadius)}));
-        projectiles_.push_back(
-            {target, origin, definition.projectileSpeed, definition.projectileRadius, statistics.damage, instance});
+        projectiles_.push_back({target,
+                                origin,
+                                definition.projectileSpeed,
+                                definition.projectileRadius,
+                                statistics.damage,
+                                instance,
+                                source});
     } catch (...) {
         engine_.removeInstance(instance);
         throw;
     }
 }
 
-void ProjectileSystem::update(EnemySystem& enemies, double delta) {
+void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGeometry* geometry) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Projectile delta must be finite and nonnegative.");
+    }
+    if (!geometry) {
+        geometry_.synchronize(engine_);
+        geometry = &geometry_;
     }
     for (std::size_t index = 0; index < projectiles_.size();) {
         auto& projectile = projectiles_[index];
@@ -45,10 +58,18 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta) {
             removeAt(index);
             continue;
         }
-        const auto center = target->position + glm::dvec3{0, enemies.definition(target->type).visualHeight * 0.5, 0};
+        const auto center = combatAim(*target);
         const auto offset = center - projectile.position;
         const auto distance = glm::length(offset);
         const auto travel = projectile.speed * delta;
+        const double hitDistance = std::max(0.0, distance - projectile.radius - target->radius);
+        const double segmentLength = std::min(travel, hitDistance);
+        const auto next =
+            distance > 1e-10 ? projectile.position + offset * (segmentLength / distance) : projectile.position;
+        if (geometry->trace(projectile.position, next, projectile.radius, projectile.source)) {
+            removeAt(index);
+            continue;
+        }
         // Sweeping the entire homing segment prevents tunneling, even when one frame crosses the target.
         if (distance <= travel + projectile.radius + target->radius) {
             if (enemies.applyDamage(projectile.target, projectile.damage)) {
@@ -57,7 +78,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta) {
             removeAt(index);
             continue;
         }
-        projectile.position += offset * (travel / distance);
+        projectile.position = next;
         engine_.setTransform(projectile.instance,
                              glm::translate(glm::mat4{1}, glm::vec3{projectile.position}) *
                                  glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(projectile.radius)}));

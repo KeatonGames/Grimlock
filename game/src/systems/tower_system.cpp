@@ -1,5 +1,6 @@
 #include "systems/tower_system.hpp"
 
+#include "navigation/level_geometry.hpp"
 #include "systems/health.hpp"
 
 #include <algorithm>
@@ -88,7 +89,9 @@ void TowerSystem::synchronize(Engine& engine) {
     scratchTowers_.clear();
     props_.clear();
     for (const auto& [id, object] : scene->objects()) {
-        if (!object.model || !scene->enabledInHierarchy(id) || object.role == "grimlock.hero") {
+        if (!object.model || !scene->enabledInHierarchy(id) || object.role == "grimlock.hero" ||
+            object.role == "grimlock.terrain" || object.role == "grimlock.decoration" ||
+            object.role == "grimlock.obstacle") {
             continue;
         }
         const auto world = glm::dmat4{scene->worldTransform(id)};
@@ -126,7 +129,10 @@ void TowerSystem::synchronize(Engine& engine) {
             const auto size = glm::dvec3{info.maximum - info.minimum} * 0.5;
             const auto extent = glm::abs(glm::dvec3{world[0]}) * size.x + glm::abs(glm::dvec3{world[1]}) * size.y +
                                 glm::abs(glm::dvec3{world[2]}) * size.z;
-            props_.push_back({glm::vec3{center}, glm::vec3{extent}, false});
+            // Flat spawn/objective markers are floor decoration, not placement obstacles.
+            if (extent.y * 2 > 0.05) {
+                props_.push_back({glm::vec3{center}, glm::vec3{extent}, false});
+            }
         }
     }
     const bool sameObstacles =
@@ -265,7 +271,8 @@ void TowerSystem::updateEffects(Engine& engine, double delta) {
 
 std::string TowerSystem::check(const Tower& tower,
                                std::span<const TerrainBox> terrain,
-                               std::span<const Enemy> enemies) const {
+                               std::span<const Enemy> enemies,
+                               const LevelGeometry* geometry) const {
     const auto& configured = definition(tower.type);
     if (!std::isfinite(glm::length(tower.position)) || !std::isfinite(glm::length(tower.halfExtent)) ||
         tower.halfExtent != configured.halfExtent || tower.model != configured.model ||
@@ -291,7 +298,11 @@ std::string TowerSystem::check(const Tower& tower,
                              std::max(0.0F, std::min(maximum.z, b.z) - std::max(minimum.z, a.z));
         }
     }
-    if (supportedArea + 1e-4 < 4 * box.halfExtent.x * box.halfExtent.z) {
+    if (geometry) {
+        if (const auto error = geometry->supportError(tower); !error.empty()) {
+            return error;
+        }
+    } else if (supportedArea + 1e-4 < 4 * box.halfExtent.x * box.halfExtent.z) {
         return "The entire footprint must rest on terrain.";
     }
     for (const auto& existing : towers_) {
@@ -312,7 +323,7 @@ std::string TowerSystem::check(const Tower& tower,
                                         glm::dvec2{minimum.x, minimum.z},
                                         glm::dvec2{maximum.x, maximum.z});
         if (glm::length(nearest - glm::dvec2{enemy.position.x, enemy.position.z}) < enemy.radius + 1e-4 &&
-            enemy.position.y >= minimum.y - 0.1 && enemy.position.y <= maximum.y) {
+            enemy.position.y + enemy.height > minimum.y && enemy.position.y < maximum.y) {
             return "Tower overlaps an animal.";
         }
     }
@@ -381,6 +392,7 @@ bool TowerSystem::routeFromArea(const NavMesh& navigation, const SpawnArea& area
         const auto start = navigation.project({center.x, area.height, center.z}, 0.03);
         if (start && start->position.x >= area.minimum.x - 1e-5 && start->position.x <= area.maximum.x + 1e-5 &&
             start->position.z >= area.minimum.y - 1e-5 && start->position.z <= area.maximum.y + 1e-5 &&
+            navigation.contains({center.x, area.height, center.z}, 0.03) &&
             navigation.findPath(start->position, destination, path)) {
             return true;
         }

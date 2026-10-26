@@ -29,6 +29,7 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     level_.begin(engine, navigation_, std::move(definition));
     engine_ = &engine;
     heroes_ = std::make_unique<HeroSystem>(engine);
+    heroes_->shareCombatGeometry(navigation_.combatGeometry());
     heroes_->synchronize(navigation_.towers());
     for (const auto& position : level_.waves()->definition().heroSpawns) {
         (void)heroes_->deploy(position);

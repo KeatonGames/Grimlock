@@ -16,19 +16,19 @@ tower types have three explicitly authored levels:
 | Tower | Level | Damage | Range | Shots/sec | Cost to enter level |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Small | 1 | 25 | 3.5 | 1.5 | 30 construction |
-| Small | 2 | 45 | 4.2 | 2 | 25 upgrade |
-| Small | 3 | 70 | 4.8 | 2.5 | 40 upgrade |
-| Large | 1 | 60 | 5 | 2 | 50 construction |
-| Large | 2 | 105 | 5.8 | 2.5 | 40 upgrade |
-| Large | 3 | 160 | 6.5 | 3 | 65 upgrade |
+| Small | 2 | 36 | 3.9 | 1.7 | 25 upgrade |
+| Small | 3 | 50 | 4.3 | 2 | 40 upgrade |
+| Large | 1 | 55 | 4.2 | 1 | 60 construction |
+| Large | 2 | 80 | 4.7 | 1.15 | 45 upgrade |
+| Large | 3 | 110 | 5.2 | 1.3 | 65 upgrade |
 
 For example, Small Tower's array is:
 
 ```json
 "levels": [
   {"damage":25, "attack_range":3.5, "fire_rate":1.5, "upgrade_cost":0},
-  {"damage":45, "attack_range":4.2, "fire_rate":2, "upgrade_cost":25},
-  {"damage":70, "attack_range":4.8, "fire_rate":2.5, "upgrade_cost":40}
+  {"damage":36, "attack_range":3.9, "fire_rate":1.7, "upgrade_cost":25},
+  {"damage":50, "attack_range":4.3, "fire_rate":2, "upgrade_cost":40}
 ]
 ```
 
@@ -48,7 +48,7 @@ type using their original values, with no invented upgrade levels.
 ## Runtime and persistence
 
 `TowerLevelDefinition` contains immutable level statistics. `TowerProgress` holds
-only a type and its current level, owned by TowerSystem and keyed by stable scene
+type, current level and runtime health, owned by TowerSystem and keyed by stable scene
 object ID. Synchronization, transforms and temporary hiding retain progress;
 deletion removes it. New towers start at Level 1.
 
@@ -79,7 +79,7 @@ files. `Economy.Cpu` checks the authored level definitions and rejects invalid o
 incomplete statistics/costs. Run the README CMake presets and CTest commands for
 both Game and Editor builds.
 
-Final verification passed: Debug and Release Game/Editor builds, **29/29 tests**
+Phase 23 verification passed: Debug and Release Game/Editor builds, **29/29 tests**
 in each configuration, formatting for all 16 modified C++ files, and whitespace
 checks. Vulkan validation reported no errors or synchronization hazards. Logs are
 under `out/phase23/`.

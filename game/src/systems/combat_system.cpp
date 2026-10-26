@@ -6,11 +6,18 @@
 
 namespace grimlock::game {
 
-void CombatSystem::update(const TowerSystem& towers, EnemySystem& enemies, double delta) {
+void CombatSystem::update(const TowerSystem& towers,
+                          EnemySystem& enemies,
+                          double delta,
+                          const CombatGeometry* geometry) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Combat delta must be finite and nonnegative.");
     }
     const auto instances = towers.towers();
+    if (!geometry) {
+        geometry_.synchronize(engine_, instances);
+        geometry = &geometry_;
+    }
     std::erase_if(attacks_, [&](const TowerAttack& attack) {
         return std::none_of(instances.begin(), instances.end(), [&](const Tower& tower) {
             return tower.object == attack.tower;
@@ -36,20 +43,42 @@ void CombatSystem::update(const TowerSystem& towers, EnemySystem& enemies, doubl
             const auto& statistics = definition.statistics(level);
             attack.cooldown = std::min(attack.cooldown, 1.0 / statistics.fireRate);
             const Enemy* nearest = nullptr;
-            double nearestDistance = statistics.attackRange * statistics.attackRange;
-            for (const auto& enemy : enemies.enemies()) {
-                const glm::dvec2 offset{enemy.position.x - tower.position.x, enemy.position.z - tower.position.z};
-                const double distance = glm::dot(offset, offset);
-                if (enemy.active && enemy.alive && distance <= nearestDistance &&
-                    (!nearest || distance < nearestDistance || enemy.id < nearest->id)) {
-                    nearest = &enemy;
-                    nearestDistance = distance;
+            const auto origin = firingOrigin(tower);
+            const auto valid = [&](const Enemy& enemy) {
+                const auto offset = enemy.position - (tower.position - glm::dvec3{0, tower.halfExtent.y, 0});
+                return enemy.active && enemy.alive &&
+                       glm::dot(offset, offset) <= statistics.attackRange * statistics.attackRange &&
+                       !geometry->trace(origin, combatAim(enemy), definition.projectileRadius, tower.object);
+            };
+            if (attack.target) {
+                const auto* current = enemies.find(*attack.target);
+                if (current && valid(*current)) {
+                    nearest = current;
                 }
             }
+            double nearestDistance = statistics.attackRange * statistics.attackRange;
+            attack.searchDelay = std::max(0.0, attack.searchDelay - step);
+            const bool rescan = attack.target || attack.searchDelay <= 0 ||
+                                attack.geometryRevision != geometry->revision() ||
+                                attack.enemyCount != enemies.enemies().size();
+            if (!nearest && rescan) {
+                for (const auto& enemy : enemies.enemies()) {
+                    // Range uses terrain-level entity anchors, independent of either model's visual height.
+                    const auto offset = enemy.position - (tower.position - glm::dvec3{0, tower.halfExtent.y, 0});
+                    const double distance = glm::dot(offset, offset);
+                    if (enemy.active && enemy.alive && distance <= nearestDistance &&
+                        (!nearest || distance < nearestDistance || enemy.id < nearest->id) && valid(enemy)) {
+                        nearest = &enemy;
+                        nearestDistance = distance;
+                    }
+                }
+                attack.searchDelay = 0.15;
+            }
+            attack.geometryRevision = geometry->revision();
+            attack.enemyCount = enemies.enemies().size();
             attack.target = nearest ? std::optional{nearest->id} : std::nullopt;
             if (attack.target && attack.cooldown <= 1e-10) {
-                const auto origin = tower.position + glm::dvec3{0, tower.halfExtent.y + 0.1, 0};
-                projectiles_.spawn(origin, *attack.target, definition, level);
+                projectiles_.spawn(origin, *attack.target, definition, level, tower.object);
                 attack.cooldown += 1.0 / statistics.fireRate;
                 ++shotsFired_;
             }
@@ -58,7 +87,7 @@ void CombatSystem::update(const TowerSystem& towers, EnemySystem& enemies, doubl
                 attack.cooldown = std::max(0.0, attack.cooldown);
             }
         }
-        projectiles_.update(enemies, step);
+        projectiles_.update(enemies, step, geometry);
         for (auto& attack : attacks_) {
             if (attack.target && !enemies.find(*attack.target)) {
                 attack.target.reset();

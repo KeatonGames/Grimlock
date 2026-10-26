@@ -12,6 +12,11 @@ public:
     void menu(Engine& engine) override;
     void update(Engine& engine, double delta) override;
     void panel(Engine& engine) override;
+
+    [[nodiscard]] std::span<const editor::DebugLine> lines() const noexcept override {
+        return combatLines_;
+    }
+
     [[nodiscard]] std::optional<std::filesystem::path> takeSceneRequest() override;
     void sceneOpened(Engine& engine, const std::filesystem::path& path) override;
     void requestLevelLoad(Engine& engine, const std::filesystem::path& path);
@@ -51,6 +56,7 @@ private:
     void enemyInspector(EnemySystem& enemies);
     void towerMenu(Engine& engine);
     void buildZoneMenu(Engine& engine);
+    void combatDebug(Engine& engine);
     void constructionControls(Engine& engine);
     void levelMenu(Engine& engine);
     void levelDefinitionMenu(Engine& engine);
@@ -66,6 +72,8 @@ private:
     std::size_t lastSpawned_ = 0;
     std::string error_;
     bool showNavMesh_ = false;
+    bool showCombat_ = false;
+    std::vector<editor::DebugLine> combatLines_;
     bool placingTower_ = false, showPreview_ = false, sceneChanged_ = false;
     bool gameplayPlacement_ = false;
     const Scene* placementScene_ = nullptr;
@@ -80,6 +88,7 @@ private:
         std::optional<glm::dvec2> destination;
         std::uint64_t revision;
         EnemyTypeId type;
+        double destinationHeight;
         bool operator==(const PreviewKey&) const = default;
     };
 

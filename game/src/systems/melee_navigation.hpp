@@ -5,6 +5,7 @@
 #include "navigation/nav_mesh.hpp"
 
 namespace grimlock::game {
+class CombatGeometry;
 
 struct MeleeBody {
     glm::dvec3 position{0}; // Foot position.
@@ -29,6 +30,9 @@ struct MeleeBody {
                                  NavigationPath& path,
                                  std::uint64_t slot = 0,
                                  std::span<const Enemy> blockers = {},
-                                 EnemyId targetId = 0);
+                                 EnemyId targetId = 0,
+                                 const CombatGeometry* geometry = nullptr,
+                                 double height = 0.5,
+                                 ObjectId targetObject = 0);
 
 } // namespace grimlock::game

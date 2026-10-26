@@ -91,6 +91,16 @@ void combatChecks(Engine& engine) {
     }
     enemies.clear();
     (void)heroes.deploy({0, 0, 0}, hero);
+    const auto interrupted = spawn(0, 1);
+    combat.update(heroes, enemies, 0.1, true);
+    require(heroes.find(hero)->combat.swinging && !heroes.find(hero)->combat.abilitySwing,
+            "basic swing interruption fixture failed");
+    require(combat.activate(heroes, hero, HeroAbility::cleave, true), "basic attack locked out manual Cleave");
+    combat.update(heroes, enemies, 0.3, true);
+    require(enemies.find(interrupted)->health == 55 && !combat.activate(heroes, hero, HeroAbility::cleave, true),
+            "interrupted basic swing dealt duplicate damage or bypassed ability cooldown");
+    enemies.clear();
+    (void)heroes.deploy({0, 0, 0}, hero);
     const auto front = spawn(0, 1), side = spawn(0.7, 1), behind = spawn(0, -1), far = spawn(0, 4);
     require(!combat.activate(heroes, hero, HeroAbility::cleave, false), "Cleave allowed outside battle");
     require(combat.activate(heroes, hero, HeroAbility::cleave, true), "Cleave activation failed");

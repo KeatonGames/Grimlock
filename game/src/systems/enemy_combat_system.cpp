@@ -8,7 +8,7 @@
 namespace grimlock::game {
 namespace {
 double distance(glm::dvec3 a, glm::dvec3 b) {
-    return glm::length(glm::dvec2{a.x - b.x, a.z - b.z});
+    return glm::length(a - b);
 }
 } // namespace
 
@@ -46,13 +46,16 @@ void EnemyCombatSystem::release(EnemySystem& enemies, Enemy& enemy, bool rejecte
     combat.impactRemaining = -1;
     combat.searchDelay = 0.4;
     EnemyAi::setDestination(enemy, combat.objective);
+    enemy.destinationHeight = combat.objectiveHeight;
 }
 
 void EnemyCombatSystem::prepare(EnemySystem& enemies,
                                 const TowerSystem& towers,
                                 HeroSystem* heroes,
                                 glm::dvec2 objective,
-                                double delta) {
+                                double delta,
+                                const CombatGeometry* geometry) {
+    geometry_ = geometry;
     targets_.clear();
     for (const auto& tower : towers.towers()) {
         targets_.push_back({{DefensiveTargetKind::tower, tower.object}, meleeBody(tower)});
@@ -74,6 +77,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         if (!state.managed) {
             state.managed = true;
             state.objective = enemy.destination ? enemy.destination : std::optional{objective};
+            state.objectiveHeight = enemy.destinationHeight.value_or(enemy.position.y);
         }
         state.searchDelay = std::max(0.0, state.searchDelay - delta);
         state.pathDelay = std::max(0.0, state.pathDelay - delta);
@@ -81,7 +85,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         const auto& mesh = *enemy.navigation;
         // The objective uses the authored arrival damage/removal rule after its melee windup.
         Target goal{{DefensiveTargetKind::objective, 0},
-                    {{state.objective->x, enemy.position.y, state.objective->y}, 0}};
+                    {{state.objective->x, state.objectiveHeight, state.objective->y}, 0}};
         const Target* target = state.target.kind == DefensiveTargetKind::objective ? &goal : find(state.target);
         if (state.target.kind != DefensiveTargetKind::none &&
             (!target || distance(state.origin, target->body.position) > stats.pursuitRange ||
@@ -122,14 +126,24 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             state.searchDelay = 0.4;
             for (const auto& candidate : candidates_) {
                 const auto& option = candidate.second == targets_.size() ? goal : targets_[candidate.second];
-                const bool contact = meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range);
-                if (contact || approachMelee(mesh,
-                                             enemy.position,
-                                             enemy.radius,
-                                             option.body,
-                                             stats.range,
-                                             approachPath_,
-                                             enemy.id)) {
+                const bool contact =
+                    meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range) &&
+                    clearStrike(enemy,
+                                option.body,
+                                option.reference.kind == DefensiveTargetKind::tower ? option.reference.id : 0);
+                if (contact ||
+                    approachMelee(mesh,
+                                  enemy.position,
+                                  enemy.radius,
+                                  option.body,
+                                  stats.range,
+                                  approachPath_,
+                                  enemy.id,
+                                  {},
+                                  0,
+                                  geometry_,
+                                  enemy.height,
+                                  option.reference.kind == DefensiveTargetKind::tower ? option.reference.id : 0)) {
                     state.target = option.reference;
                     state.origin = enemy.position;
                     state.pathDelay = 0;
@@ -137,6 +151,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                     if (!contact) {
                         std::swap(enemy.path, approachPath_);
                         enemy.destination = glm::dvec2{enemy.path.destination.x, enemy.path.destination.z};
+                        enemy.destinationHeight = enemy.path.destination.y;
                         enemy.requestedDestination = enemy.destination;
                         enemy.destinationAssigned = true;
                         enemy.retryPath = false;
@@ -152,7 +167,10 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         if (!target) {
             continue;
         }
-        if (meleeContact(mesh, enemy.position, enemy.radius, target->body, stats.range)) {
+        if (meleeContact(mesh, enemy.position, enemy.radius, target->body, stats.range) &&
+            clearStrike(enemy,
+                        target->body,
+                        target->reference.kind == DefensiveTargetKind::tower ? target->reference.id : 0)) {
             EnemyAi::setDestination(enemy, {});
             enemy.yaw =
                 std::atan2(target->body.position.x - enemy.position.x, target->body.position.z - enemy.position.z);
@@ -170,13 +188,25 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             continue;
         }
         state.pathDelay = 0.5;
-        if (!approachMelee(mesh, enemy.position, enemy.radius, target->body, stats.range, enemy.path, enemy.id)) {
+        if (!approachMelee(mesh,
+                           enemy.position,
+                           enemy.radius,
+                           target->body,
+                           stats.range,
+                           enemy.path,
+                           enemy.id,
+                           {},
+                           0,
+                           geometry_,
+                           enemy.height,
+                           target->reference.kind == DefensiveTargetKind::tower ? target->reference.id : 0)) {
             release(enemies, enemy, true);
             continue;
         }
         state.pathTarget = target->body.position;
         state.pathRevision = mesh.revision();
         enemy.destination = glm::dvec2{enemy.path.destination.x, enemy.path.destination.z};
+        enemy.destinationHeight = enemy.path.destination.y;
         enemy.requestedDestination = enemy.destination;
         enemy.destinationAssigned = true;
         enemy.retryPath = false;
@@ -219,10 +249,11 @@ void EnemyCombatSystem::resolve(Engine& engine,
                         body = meleeBody(*found);
                     }
                 } else if (state.target.kind == DefensiveTargetKind::objective && state.objective) {
-                    body = {{state.objective->x, enemy.position.y, state.objective->y}, 0};
+                    body = {{state.objective->x, state.objectiveHeight, state.objective->y}, 0};
                     valid = true;
                 }
-                if (valid && meleeContact(*enemy.navigation, enemy.position, enemy.radius, body, stats.range)) {
+                if (valid && meleeContact(*enemy.navigation, enemy.position, enemy.radius, body, stats.range) &&
+                    clearStrike(enemy, body, state.target.kind == DefensiveTargetKind::tower ? state.target.id : 0)) {
                     switch (state.target.kind) {
                     case DefensiveTargetKind::hero:
                         (void)heroes->applyDamage(state.target.id, stats.damage);
@@ -253,11 +284,16 @@ void EnemyCombatSystem::resolve(Engine& engine,
 }
 
 void EnemyCombatSystem::stop(EnemySystem& enemies) {
+    geometry_ = nullptr;
     for (auto& enemy : enemies.enemies_) {
         release(enemies, enemy, false);
         enemy.combat = {};
     }
     targets_.clear();
+}
+
+bool EnemyCombatSystem::clearStrike(const Enemy& enemy, const MeleeBody& body, ObjectId target) const {
+    return !geometry_ || geometry_->visible(combatAim(enemy), body.position + glm::dvec3{0, 0.25, 0}, 0, target);
 }
 
 } // namespace grimlock::game

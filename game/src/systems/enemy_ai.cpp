@@ -79,7 +79,9 @@ void EnemyAi::prepare(Enemy& enemy, const NavMesh& navigation, double delta, boo
     }
     if (changed || (enemy.retryPath && enemy.repathDelay <= 0)) {
         const auto goal = *enemy.destination;
-        const bool found = navigation.findPath(enemy.position, {goal.x, enemy.position.y, goal.y}, enemy.path);
+        const bool found = navigation.findPath(enemy.position,
+                                               {goal.x, enemy.destinationHeight.value_or(enemy.position.y), goal.y},
+                                               enemy.path);
         enemy.requestedDestination = enemy.destination;
         enemy.retryPath = !found;
         enemy.repathDelay = enemy.retryInterval;

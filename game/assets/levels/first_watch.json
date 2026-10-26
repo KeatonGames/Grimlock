@@ -1,37 +1,37 @@
 {
   "version": 1,
-  "name": "First Watch",
+  "name": "First Watch | Meadow Gates",
   "scene": "scenes/first_watch.json",
-  "starting_gold": 100,
+  "starting_gold": 90,
   "hero_spawns": [[4, 0, 2]],
-  "objective": {"position": [5, 0], "health": 30, "damage_per_arrival": 1},
+  "objective": {"position": [7, 0], "health": 10, "damage_per_arrival": 1},
   "spawns": [
     {"name": "North meadow", "minimum": [-5.8, -3.5], "maximum": [-4.2, -2.5], "height": 0},
     {"name": "South meadow", "minimum": [-5.8, 2.5], "maximum": [-4.2, 3.5], "height": 0}
   ],
   "waves": [
-    {
-      "name": "Morning visitors",
-      "gold_reward": 25,
-      "groups": [
-        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 2}
-      ]
-    },
-    {
-      "name": "Both meadows",
-      "gold_reward": 35,
-      "groups": [
-        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 1.5},
-        {"enemy": "Black Rat", "count": 4, "spawn": "South meadow", "start": 0, "batch_size": 2, "interval": 2}
-      ]
-    },
-    {
-      "name": "The late procession",
-      "gold_reward": 50,
-      "groups": [
-        {"enemy": "Bunny", "count": 2, "spawn": "South meadow", "start": 0, "batch_size": 2, "interval": 0},
-        {"enemy": "Chicken", "count": 4, "spawn": "North meadow", "start": 4, "batch_size": 1, "interval": 1}
-      ]
-    }
+    {"name": "First footsteps", "gold_reward": 25, "groups": [
+      {"enemy": "Chicken", "count": 6, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 4}
+    ]},
+    {"name": "Southern sprint", "gold_reward": 35, "groups": [
+      {"enemy": "Chicken", "count": 6, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Black Rat", "count": 6, "spawn": "South meadow", "start": 3, "batch_size": 2, "interval": 3}
+    ]},
+    {"name": "Hold both gates", "gold_reward": 45, "groups": [
+      {"enemy": "Dog", "count": 4, "spawn": "North meadow", "start": 0, "batch_size": 1, "interval": 4},
+      {"enemy": "Chicken", "count": 8, "spawn": "South meadow", "start": 2, "batch_size": 2, "interval": 3},
+      {"enemy": "Black Rat", "count": 4, "spawn": "North meadow", "start": 9, "batch_size": 2, "interval": 3}
+    ]},
+    {"name": "Heavy crossing", "gold_reward": 60, "groups": [
+      {"enemy": "Deer", "count": 4, "spawn": "South meadow", "start": 0, "batch_size": 1, "interval": 5},
+      {"enemy": "Dog", "count": 6, "spawn": "North meadow", "start": 2, "batch_size": 2, "interval": 4},
+      {"enemy": "Black Rat", "count": 12, "spawn": "South meadow", "start": 5, "batch_size": 3, "interval": 3}
+    ]},
+    {"name": "The last watch", "gold_reward": 0, "groups": [
+      {"enemy": "Deer", "count": 6, "spawn": "North meadow", "start": 0, "batch_size": 2, "interval": 6},
+      {"enemy": "Dog", "count": 8, "spawn": "South meadow", "start": 2, "batch_size": 2, "interval": 4},
+      {"enemy": "Black Rat", "count": 12, "spawn": "North meadow", "start": 5, "batch_size": 3, "interval": 3},
+      {"enemy": "Chicken", "count": 8, "spawn": "South meadow", "start": 12, "batch_size": 4, "interval": 5}
+    ]}
   ]
 }

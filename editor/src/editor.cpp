@@ -697,6 +697,26 @@ void Editor::inspector() {
 
     if (object.model) {
         ImGui::TextWrapped("Model: %s", text(*object.model).c_str());
+        const char* roles[]{"Legacy prop", "Terrain / navigation surface", "Navigation obstacle", "Decoration"};
+        const char* values[]{"", "grimlock.terrain", "grimlock.obstacle", "grimlock.decoration"};
+        int geometry = 0;
+        for (int i = 0; i < 4; ++i) {
+            if (object.role == values[i]) {
+                geometry = i;
+            }
+        }
+        const bool managed =
+            object.role.empty() || object.role == values[1] || object.role == values[2] || object.role == values[3];
+        if (managed && ImGui::Combo("Level geometry", &geometry, roles, 4)) {
+            attempt([&] {
+                scene.setRole(id, values[geometry]);
+                document_.markChanged();
+            });
+        }
+        if (managed) {
+            ImGui::SetItemTooltip("Import a static GLB with Add Model, then mark it as terrain. Terrain replaces the "
+                                  "debug grid for navigation.");
+        }
     } else {
         ImGui::TextDisabled("%zu direct children", scene.children(id).size());
     }

@@ -19,7 +19,7 @@ retain their red ground marker. These indicators use the existing HUD overlay.
 | Type ID | Display name | Cost | Damage/hit | Range | Shots/sec | Projectile speed | Projectile radius |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `basic` | Small Tower | 30 | 25 | 3.5 | 1.5 | 9 | 0.06 |
-| `wide` | Large Tower | 50 | 60 | 5 | 2 | 12 | 0.10 |
+| `wide` | Large Tower | 60 | 55 | 4.2 | 1 | 12 | 0.10 |
 
 Each type stores `construction_cost`, `projectile_speed`, `projectile_radius`, and
 RGBA `projectile_tint`. Its ordered `levels` entries hold `damage`, `attack_range`,

@@ -43,6 +43,15 @@ void NavigationDebug::menu(Engine& engine) {
     }
 
     ImGui::SetNextItemWidth(150);
+    double destinationHeight = session_.destinationHeight();
+    if (ImGui::InputDouble("Destination Height", &destinationHeight, 0.1, 1, "%.3f")) {
+        try {
+            session_.setDestinationHeight(destinationHeight);
+            error_.clear();
+        } catch (const std::exception& error) {
+            error_ = error.what();
+        }
+    }
     if (ImGui::InputInt("Enemy Count", &count_)) {
         count_ = std::clamp(count_, 1, 1000);
     }
@@ -57,6 +66,7 @@ void NavigationDebug::menu(Engine& engine) {
         ImGui::InputDouble("Minimum Z", &area.minimum.y);
         ImGui::InputDouble("Maximum X", &area.maximum.x);
         ImGui::InputDouble("Maximum Z", &area.maximum.y);
+        ImGui::InputDouble("Spawn Height", &area.height);
         ImGui::EndMenu();
     }
     if (ImGui::Button("Spawn Animals")) {
@@ -92,6 +102,7 @@ void NavigationDebug::menu(Engine& engine) {
     ImGui::Separator();
     ImGui::TextUnformatted("NavMesh");
     ImGui::Checkbox("Show NavMesh", &showNavMesh_);
+    ImGui::Checkbox("Show Combat Visibility", &showCombat_);
     if (ImGui::Button("Rebuild NavMesh")) {
         session_.rebuild(engine);
     }
@@ -150,6 +161,7 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
     const bool changed = std::exchange(sceneChanged_, false);
     session_.synchronize(engine);
     zoneQuads_.clear();
+    combatDebug(engine);
     if (showZones_ || placingTower_) {
         for (const auto& zone : session_.placement().zones()) {
             zoneQuads_.push_back({zone.corners()});
@@ -177,7 +189,8 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
                          session_.spawnArea(),
                          session_.destination(),
                          session_.revision(),
-                         session_.selectedAnimal()};
+                         session_.selectedAnimal(),
+                         session_.destinationHeight()};
     if (!previewKey_ || *previewKey_ != key) {
         previewKey_ = key;
         rejectedPlacement_.clear();
@@ -214,6 +227,63 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
         IM_COL32(235, 235, 235, 255),
         previewError_.empty() ? "Place tower (routes checked on click; Escape cancels)" : previewError_.c_str());
     return changed;
+}
+
+void NavigationDebug::combatDebug(Engine& engine) {
+    combatLines_.clear();
+    if (!showCombat_) {
+        return;
+    }
+    const auto selected = engine.selectedObject();
+    const Tower* tower = nullptr;
+    for (const auto& item : session_.towers().towers()) {
+        if (selected == item.object) {
+            tower = &item;
+            break;
+        }
+    }
+    const Enemy* inspected =
+        inspectedEnemy_ && session_.enemies() ? session_.enemies()->find(*inspectedEnemy_) : nullptr;
+    if (!tower && !inspected) {
+        return;
+    }
+    const glm::dvec3 origin = tower ? firingOrigin(*tower) : combatAim(*inspected);
+    const ObjectId ignore = tower ? tower->object : 0;
+    const auto line = [&](glm::dvec3 a, glm::dvec3 b, glm::vec4 color) {
+        combatLines_.push_back({a, b, color});
+    };
+    for (const auto& enemy : session_.enemies()->enemies()) {
+        if (!enemy.alive || !enemy.active || (&enemy == inspected && !tower)) {
+            continue;
+        }
+        const auto target = combatAim(enemy);
+        const auto hit = session_.combatGeometry().trace(origin, target, 0, ignore);
+        line(origin, target, hit ? glm::vec4{1, 0.25F, 0.2F, 0.7F} : glm::vec4{0.2F, 1, 0.4F, 0.7F});
+        if (hit) {
+            for (const auto axis : {glm::dvec3{0.08, 0, 0}, glm::dvec3{0, 0.08, 0}, glm::dvec3{0, 0, 0.08}}) {
+                line(hit->position - axis, hit->position + axis, {1, 0.8F, 0.1F, 1});
+            }
+        }
+    }
+    if (tower) {
+        const auto radius = session_.towers()
+                                .definition(tower->type)
+                                .statistics(session_.towers().progress(tower->object).level)
+                                .attackRange;
+        const auto center = tower->position - glm::dvec3{0, tower->halfExtent.y, 0};
+        for (int plane = 0; plane < 3; ++plane) {
+            for (int i = 0; i < 64; ++i) {
+                const auto point = [&](int step) {
+                    const double angle = glm::radians(360.0) * step / 64;
+                    glm::dvec3 p{0};
+                    p[plane] = std::cos(angle) * radius;
+                    p[(plane + 1) % 3] = std::sin(angle) * radius;
+                    return center + p;
+                };
+                line(point(i), point(i + 1), {0.3F, 0.8F, 1, 0.5F});
+            }
+        }
+    }
 }
 
 void NavigationDebug::enemyInspector(EnemySystem& enemies) {
@@ -308,6 +378,22 @@ void NavigationDebug::levelMenu(Engine& engine) {
                 error_ = error.what();
             }
         }
+        if (ImGui::Button("Load Hill Watch")) {
+            try {
+                requestLevelLoad(engine, engine.assetRoot() / "levels/hill_watch.json");
+                error_.clear();
+            } catch (const std::exception& error) {
+                error_ = error.what();
+            }
+        }
+        if (ImGui::Button("Load Cover Watch")) {
+            try {
+                requestLevelLoad(engine, engine.assetRoot() / "levels/cover_watch.json");
+                error_.clear();
+            } catch (const std::exception& error) {
+                error_ = error.what();
+            }
+        }
         ImGui::TextUnformatted("Handcrafted waves. Level status appears in its own panel.");
         levelDefinitionMenu(engine);
         ImGui::EndMenu();
@@ -335,6 +421,7 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
     }
     ImGui::InputScalar("Starting Gold", ImGuiDataType_U64, &definition.startingGold);
     ImGui::InputScalarN("Objective X/Z", ImGuiDataType_Double, &definition.objectivePosition.x, 2);
+    ImGui::InputDouble("Objective Height", &definition.objectiveHeight, 0.1, 1, "%.3f");
     ImGui::InputScalar("Objective Health", ImGuiDataType_U64, &definition.objectiveHealth);
     ImGui::InputScalar("Arrival Damage", ImGuiDataType_U64, &definition.damagePerArrival);
     for (std::size_t i = 0; i < definition.spawns.size(); ++i) {
@@ -488,7 +575,7 @@ void NavigationDebug::buildZoneMenu(Engine& engine) {
     if (ImGui::Button("Create Build Zone")) {
         BuildZone zone;
         zone.name = "Build zone";
-        zone.position = {engine.camera().target.x, 0, engine.camera().target.z};
+        zone.position = engine.camera().target;
         try {
             (void)PlacementSystem::createZone(scene, zone);
             sceneChanged_ = true;

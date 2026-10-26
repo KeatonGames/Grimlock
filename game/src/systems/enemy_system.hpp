@@ -35,6 +35,7 @@ public:
     void setSpeed(double speed, EnemyTypeId type = 0);
     void setSpawnSpeed(double speed, EnemyTypeId type);
     void setSharedDestination(std::optional<glm::dvec2> destination);
+    void setDestinationHeight(double height);
     [[nodiscard]] bool setDestination(EnemyId id, std::optional<glm::dvec2> destination);
     [[nodiscard]] const Enemy* find(EnemyId id) const noexcept;
 

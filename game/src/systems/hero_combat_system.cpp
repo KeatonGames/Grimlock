@@ -10,7 +10,7 @@
 namespace grimlock::game {
 namespace {
 double distance(glm::dvec3 first, glm::dvec3 second) {
-    return glm::length(glm::dvec2{first.x - second.x, first.z - second.z});
+    return glm::length(first - second);
 }
 } // namespace
 
@@ -31,6 +31,8 @@ void HeroCombatSystem::abandon(HeroSystem& heroes, Hero& hero) {
 
 bool HeroCombatSystem::inRange(const HeroSystem& heroes, const Hero& hero, const Enemy& enemy, double range) {
     return enemy.alive && enemy.active && enemy.health > 0 &&
+           heroes.combatGeometry().visible(hero.position + glm::dvec3{0, heroes.definition_.height * 0.5, 0},
+                                           combatAim(enemy)) &&
            meleeContact(heroes.navigation_,
                         hero.position,
                         heroes.definition_.radius,
@@ -61,9 +63,11 @@ bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, He
 bool HeroCombatSystem::activate(HeroSystem& heroes, HeroId id, HeroAbility ability, bool battle) {
     auto* hero = heroes.findMutable(id);
     if (!battle || ability != HeroAbility::cleave || !hero || !hero->controllable || hero->health <= 0 ||
-        hero->combat.cleaveCooldown > 1e-10 || hero->combat.swinging) {
+        hero->combat.cleaveCooldown > 1e-10 || (hero->combat.swinging && hero->combat.abilitySwing)) {
         return false;
     }
+    // A deliberate ability command takes priority over the automatic basic attack.
+    heroes.finishAttack(*hero);
     stop(*hero);
     auto& state = hero->combat;
     state.playerMoving = false;
@@ -184,7 +188,9 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
                        hero.path,
                        hero.id,
                        enemies.enemies(),
-                       enemy->id)) {
+                       enemy->id,
+                       &heroes.combatGeometry(),
+                       heroes.definition_.height)) {
         state.unreachableTarget = enemy->id;
         state.unreachableRetry = 2;
         state.failedRevision = heroes.navigation_.revision();
@@ -230,7 +236,9 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
                                        approachPath_,
                                        hero.id,
                                        enemies.enemies(),
-                                       enemy.id)) {
+                                       enemy.id,
+                                       &heroes.combatGeometry(),
+                                       heroes.definition_.height)) {
             continue;
         }
         state.target = id;

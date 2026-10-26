@@ -1,6 +1,8 @@
 #pragma once
 
 #include "entities/hero.hpp"
+#include "navigation/level_geometry.hpp"
+#include "systems/combat_geometry.hpp"
 #include "systems/tower_system.hpp"
 
 namespace grimlock::game {
@@ -13,6 +15,15 @@ public:
     HeroSystem(const HeroSystem&) = delete;
     HeroSystem& operator=(const HeroSystem&) = delete;
     void synchronize(const TowerSystem& towers);
+
+    void shareCombatGeometry(const CombatGeometry& geometry) noexcept {
+        sharedGeometry_ = &geometry;
+    }
+
+    [[nodiscard]] const CombatGeometry& combatGeometry() const noexcept {
+        return sharedGeometry_ ? *sharedGeometry_ : combatGeometry_;
+    }
+
     [[nodiscard]] HeroId deploy(glm::dvec3 position, std::optional<HeroId> existing = {});
     [[nodiscard]] bool command(HeroId hero, glm::dvec3 destination);
     [[nodiscard]] bool cancelCommand(HeroId hero);
@@ -58,11 +69,10 @@ private:
     NavMesh navigation_;
     std::vector<Hero> heroes_;
     HeroId nextId_ = 1;
-    std::vector<TerrainBox> boxes_, scratchBoxes_;
-    std::vector<TerrainBox> terrain_;
-    std::optional<GridConfiguration> terrainConfiguration_;
-    std::optional<std::uint64_t> terrainRevision_;
-    std::map<std::filesystem::path, ModelInfo> props_;
+    LevelGeometry levelGeometry_;
+    CombatGeometry combatGeometry_;
+    const CombatGeometry* sharedGeometry_ = nullptr;
+    std::uint64_t geometryRevision_ = 0, towerRevision_ = 0;
     std::optional<InstanceId> preview_;
 };
 

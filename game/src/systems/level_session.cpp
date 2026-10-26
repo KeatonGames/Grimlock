@@ -24,12 +24,14 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
             }
             const auto& mesh = navigation.surface(engine, type);
             const auto area = definition.spawns[group.spawn].area;
-            const glm::dvec3 goal{definition.objectivePosition.x, area.height, definition.objectivePosition.y};
+            const glm::dvec3 goal{definition.objectivePosition.x,
+                                  definition.objectiveHeight,
+                                  definition.objectivePosition.y};
             if (!mesh.contains(goal) || !TowerSystem::routeFromArea(mesh, area, goal)) {
                 throw std::invalid_argument("Wave spawn cannot reach the objective: " + group.enemy);
             }
             types.push_back(type);
-            routes.push_back({type, area, definition.objectivePosition});
+            routes.push_back({type, area, definition.objectivePosition, definition.objectiveHeight});
         }
     }
     WaveSystem prepared{std::move(definition)};
@@ -40,6 +42,7 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
     navigation.setSpawnRoutes(std::move(routes));
     navigation.spawnArea() = prepared.definition().spawns.front().area;
     navigation.setDestination(prepared.definition().objectivePosition);
+    navigation.setDestinationHeight(prepared.definition().objectiveHeight);
     waves_ = std::move(prepared);
     economy_.reset(waves_->definition().startingGold);
     lastWaveReward_.reset();
@@ -105,12 +108,13 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
                          navigation.towers(),
                          heroes,
                          waves_->definition().objectivePosition,
-                         delta);
+                         delta,
+                         &navigation.combatGeometry());
     navigation.update(engine, delta);
     enemyCombat_.resolve(engine, *navigation.enemies(), navigation.towers(), heroes, delta);
     navigation.synchronize(engine);
     navigation.towers().updateEffects(engine, delta);
-    combat_->update(navigation.towers(), *navigation.enemies(), delta);
+    combat_->update(navigation.towers(), *navigation.enemies(), delta, &navigation.combatGeometry());
     const auto arrived = navigation.enemies()->metrics().arrived;
     const auto newArrivals = arrived >= arrivals_ ? arrived - arrivals_ : 0;
     arrivals_ = arrived;

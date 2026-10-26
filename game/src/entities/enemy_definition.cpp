@@ -54,6 +54,7 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
         d.visualHeight = entry.at("visual_height").get<float>();
         d.speed = entry.value("speed", d.speed);
         d.maximumHealth = entry.value("maximum_health", d.maximumHealth);
+        d.showHealthBar = entry.value("show_health_bar", d.showHealthBar);
         d.acceleration = entry.value("acceleration", d.acceleration);
         d.deceleration = entry.value("deceleration", d.deceleration);
         d.stoppingDistance = entry.value("stopping_distance", d.stoppingDistance);
