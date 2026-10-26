@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Grunt", "animal": "Chicken", "maximum_health": 120, "speed": 1.4,
+    "combat": {
+      "damage": 8, "range": 0.35, "attack_interval": 1, "impact_time": 0.25,
+      "aggression_range": 2.6, "pursuit_range": 4,
+      "hero_priority": 2, "tower_priority": 2, "objective_priority": 1,
+      "objective_first": true, "obstruction_range": 0.8, "threat_memory": 2
+    }
+  },
+  {
+    "name": "Siege", "animal": "Deer", "maximum_health": 300, "speed": 0.95,
+    "combat": {
+      "damage": 14, "range": 0.4, "attack_interval": 1.2, "impact_time": 0.35,
+      "aggression_range": 4.5, "pursuit_range": 6,
+      "hero_priority": 2, "tower_priority": 3, "objective_priority": 1,
+      "tower_damage_modifier": 2
+    }
+  },
+  {
+    "name": "Hunter", "animal": "Dog", "maximum_health": 80, "speed": 2.2,
+    "combat": {
+      "damage": 9, "range": 0.35, "attack_interval": 0.7, "impact_time": 0.2,
+      "aggression_range": 4, "pursuit_range": 5.5,
+      "hero_priority": 3, "tower_priority": 2, "objective_priority": 1,
+      "hero_damage_modifier": 1.5
+    }
+  }
+]

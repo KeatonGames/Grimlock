@@ -72,7 +72,9 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         }
         // Sweeping the entire homing segment prevents tunneling, even when one frame crosses the target.
         if (distance <= travel + projectile.radius + target->radius) {
-            if (enemies.applyDamage(projectile.target, projectile.damage)) {
+            const DefensiveTarget attacker =
+                projectile.source ? DefensiveTarget{DefensiveTargetKind::tower, projectile.source} : DefensiveTarget{};
+            if (enemies.applyDamage(projectile.target, projectile.damage, attacker)) {
                 ++impacts_;
             }
             removeAt(index);

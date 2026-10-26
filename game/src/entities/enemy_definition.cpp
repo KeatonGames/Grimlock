@@ -7,6 +7,27 @@
 #include <stdexcept>
 
 namespace grimlock::game {
+namespace {
+
+void readCombat(const nlohmann::json& source, EnemyCombatDefinition& combat) {
+    combat.damage = source.value("damage", combat.damage);
+    combat.range = source.value("range", combat.range);
+    combat.interval = source.value("attack_interval", combat.interval);
+    combat.impactTime = source.value("impact_time", combat.impactTime);
+    combat.aggressionRange = source.value("aggression_range", combat.aggressionRange);
+    combat.pursuitRange = source.value("pursuit_range", combat.pursuitRange);
+    combat.heroPriority = source.value("hero_priority", combat.heroPriority);
+    combat.towerPriority = source.value("tower_priority", combat.towerPriority);
+    combat.objectivePriority = source.value("objective_priority", combat.objectivePriority);
+    combat.attackAnimation = source.value("attack_animation", combat.attackAnimation);
+    combat.objectiveFirst = source.value("objective_first", combat.objectiveFirst);
+    combat.obstructionRange = source.value("obstruction_range", combat.obstructionRange);
+    combat.threatMemory = source.value("threat_memory", combat.threatMemory);
+    combat.heroDamageModifier = source.value("hero_damage_modifier", combat.heroDamageModifier);
+    combat.towerDamageModifier = source.value("tower_damage_modifier", combat.towerDamageModifier);
+}
+
+} // namespace
 
 void validateEnemyDefinition(const EnemyDefinition& d) {
     const auto& c = d.combat;
@@ -14,7 +35,11 @@ void validateEnemyDefinition(const EnemyDefinition& d) {
         !std::isfinite(c.interval) || c.interval < 1.0 / 60 || !std::isfinite(c.impactTime) || c.impactTime < 0 ||
         c.impactTime > c.interval || !std::isfinite(c.aggressionRange) || c.aggressionRange <= 0 ||
         !std::isfinite(c.pursuitRange) || c.pursuitRange < c.aggressionRange || c.heroPriority < 0 ||
-        c.towerPriority < 0 || c.objectivePriority < 0) {
+        c.towerPriority < 0 || c.objectivePriority < 0 || !std::isfinite(c.obstructionRange) ||
+        c.obstructionRange < 0 || !std::isfinite(c.threatMemory) || c.threatMemory < 0 ||
+        !std::isfinite(c.heroDamageModifier) || c.heroDamageModifier < 0 || !std::isfinite(c.towerDamageModifier) ||
+        c.towerDamageModifier < 0 || !std::isfinite(c.damage * c.heroDamageModifier) ||
+        !std::isfinite(c.damage * c.towerDamageModifier)) {
         throw std::invalid_argument("Invalid enemy combat statistics or target priorities.");
     }
     if (d.name.empty() || d.model.empty() || !std::isfinite(d.speed) || d.speed < 0 || d.speed > 20 ||
@@ -64,18 +89,7 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
         d.animationSpeed = entry.value("animation_speed", d.animationSpeed);
         d.forwardYaw = entry.value("forward_yaw", d.forwardYaw);
         d.despawnOnArrival = entry.value("despawn_on_arrival", d.despawnOnArrival);
-        const auto combat = entry.value("combat", nlohmann::json::object());
-        auto& c = d.combat;
-        c.damage = combat.value("damage", c.damage);
-        c.range = combat.value("range", c.range);
-        c.interval = combat.value("attack_interval", c.interval);
-        c.impactTime = combat.value("impact_time", c.impactTime);
-        c.aggressionRange = combat.value("aggression_range", c.aggressionRange);
-        c.pursuitRange = combat.value("pursuit_range", c.pursuitRange);
-        c.heroPriority = combat.value("hero_priority", c.heroPriority);
-        c.towerPriority = combat.value("tower_priority", c.towerPriority);
-        c.objectivePriority = combat.value("objective_priority", c.objectivePriority);
-        c.attackAnimation = combat.value("attack_animation", c.attackAnimation);
+        readCombat(entry.value("combat", nlohmann::json::object()), d.combat);
         validateEnemyDefinition(d);
         if (std::filesystem::is_regular_file(assetRoot / d.model)) {
             definitions.push_back(std::move(d));
@@ -83,6 +97,48 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
     }
     if (definitions.empty() || definitions.front().model != "models/chicken.glb") {
         throw std::invalid_argument("Animal definitions must list the available chicken model first.");
+    }
+    // Archetypes inherit physical dimensions and presentation from a named animal, not AI behavior from its model.
+    const auto archetypePath = assetRoot / "config/enemy_archetypes.json";
+    if (std::filesystem::exists(archetypePath)) {
+        std::ifstream archetypes{archetypePath};
+        if (!archetypes) {
+            throw std::runtime_error("Cannot open enemy archetypes: " + archetypePath.string());
+        }
+        const auto entries = nlohmann::json::parse(archetypes);
+        if (!entries.is_array()) {
+            throw std::invalid_argument("Enemy archetypes must be an array.");
+        }
+        const auto animalCount = definitions.size();
+        std::set<std::string> names;
+        for (const auto& definition : definitions) {
+            names.insert(definition.name);
+        }
+        for (const auto& entry : entries) {
+            const auto animal = entry.at("animal").get<std::string>();
+            std::size_t index = 0;
+            while (index < animalCount && definitions[index].name != animal) {
+                ++index;
+            }
+            if (index == animalCount) {
+                throw std::invalid_argument("Unknown archetype animal: " + animal);
+            }
+            auto d = definitions[index];
+            d.name = entry.at("name").get<std::string>();
+            if (!names.insert(d.name).second) {
+                throw std::invalid_argument("Duplicate enemy definition: " + d.name);
+            }
+            d.maximumHealth = entry.at("maximum_health").get<float>();
+            d.speed = entry.at("speed").get<double>();
+            d.radius = entry.value("radius", d.radius);
+            d.showHealthBar = true;
+            const auto attackAnimation = d.combat.attackAnimation;
+            d.combat = {};
+            d.combat.attackAnimation = attackAnimation;
+            readCombat(entry.at("combat"), d.combat);
+            validateEnemyDefinition(d);
+            definitions.push_back(std::move(d));
+        }
     }
     return definitions;
 }

@@ -1,4 +1,5 @@
 #include "navigation/navigation_session.hpp"
+#include "runtime/level_runtime.hpp"
 #include "systems/enemy_combat_system.hpp"
 #include "systems/health.hpp"
 #include "systems/hero_combat_system.hpp"
@@ -220,6 +221,95 @@ void enemyBattle(Engine& engine) {
     enemyCombat.stop(enemies);
 }
 
+void archetypes(Engine& engine) {
+    auto scene = std::make_unique<Scene>("Enemy archetype decisions");
+    scene->setNavigationGrid(GridConfiguration{30, 24, 1, {-15, 0, -12}});
+    engine.setScene(std::move(scene));
+    NavigationSession navigation;
+    navigation.synchronize(engine);
+    navigation.setDestination(glm::dvec2{12, 0});
+    HeroSystem heroes{engine};
+    heroes.synchronize(navigation.towers());
+    const auto hero = heroes.deploy({0, 0, -2});
+    auto tower = navigation.towers().definition("basic").instance();
+    tower.position = {0, tower.halfExtent.y, 2};
+    const auto towerId = navigation.towers().create(engine, tower);
+    navigation.synchronize(engine);
+    heroes.synchronize(navigation.towers());
+    auto& enemies = *navigation.enemies();
+    EnemyCombatSystem combat;
+    const auto type = [&](const std::string& name) {
+        EnemyTypeId result = 0;
+        while (result < enemies.typeCount() && enemies.definition(result).name != name) {
+            ++result;
+        }
+        require(result < enemies.typeCount(), "missing archetype");
+        return result;
+    };
+    const auto prepare = [&](double dt) {
+        combat.prepare(enemies, navigation.towers(), &heroes, {12, 0}, dt, &navigation.combatGeometry());
+    };
+    const auto grunt = spawn(engine, navigation, {-2, 0}, type("Grunt"));
+    prepare(0.4);
+    require(enemies.find(grunt)->combat.target.kind == DefensiveTargetKind::none &&
+                enemies.find(grunt)->destination == std::optional{glm::dvec2{12, 0}},
+            "grunt abandoned objective for a non-obstructing defender");
+    HeroCombatSystem heroCombat;
+    require(heroCombat.attack(heroes, enemies, hero, grunt), "hero interception command failed");
+    prepare(0.4);
+    require(enemies.find(grunt)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, hero},
+            "grunt ignored an engaging nearby hero");
+    require(heroes.command(hero, {5, 0, -2}), "hero disengagement command failed");
+    prepare(0.4);
+    require(enemies.find(grunt)->combat.target.kind == DefensiveTargetKind::none,
+            "grunt did not resume objective after threat disappeared");
+    (void)heroes.deploy({-1.3, 0, 0}, hero);
+    prepare(2.1);
+    require(enemies.find(grunt)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, hero},
+            "grunt ignored defender directly obstructing its advance");
+    enemies.clear();
+
+    (void)heroes.deploy({0, 0, -2}, hero);
+    const auto siege = spawn(engine, navigation, {-2, 0}, type("Siege"));
+    prepare(0.4);
+    require(enemies.find(siege)->combat.target == DefensiveTarget{DefensiveTargetKind::tower, towerId},
+            "siege did not prefer reachable tower over hero");
+    const float initialHealth = navigation.towers().progress(towerId).health;
+    for (int frame = 0; frame < 600 && navigation.towers().progress(towerId).health == initialHealth; ++frame) {
+        prepare(1.0 / 60);
+        navigation.update(engine, 1.0 / 60);
+        combat.resolve(engine, enemies, navigation.towers(), &heroes, 1.0 / 60);
+    }
+    require(navigation.towers().progress(towerId).health == initialHealth - 28,
+            "siege impact did not apply explicit structure damage modifier exactly once");
+    require(navigation.removeTower(engine, towerId), "archetype tower cleanup failed");
+    prepare(0.4);
+    require(enemies.find(siege)->combat.target.kind != DefensiveTargetKind::tower,
+            "siege retained destroyed tower reference");
+    enemies.clear();
+
+    (void)heroes.deploy({0, 0, -2}, hero);
+    const auto hunter = spawn(engine, navigation, {-2, 0}, type("Hunter"));
+    prepare(0.4);
+    require(enemies.find(hunter)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, hero},
+            "hunter did not prioritize hero");
+    const float heroHealth = heroes.find(hero)->health;
+    for (int frame = 0; frame < 600 && heroes.find(hero)->health == heroHealth; ++frame) {
+        prepare(1.0 / 60);
+        navigation.update(engine, 1.0 / 60);
+        combat.resolve(engine, enemies, navigation.towers(), &heroes, 1.0 / 60);
+    }
+    require(heroes.find(hero)->health == heroHealth - 13.5F, "hunter hero damage modifier or impact timing incorrect");
+    (void)heroes.deploy({4, 0, -2}, hero);
+    prepare(0.4);
+    require(enemies.find(hunter)->combat.target.kind == DefensiveTargetKind::none,
+            "hunter chased hero beyond pursuit range");
+    prepare(2.1);
+    require(enemies.find(hunter)->combat.target.kind == DefensiveTargetKind::none,
+            "hunter restarted an exhausted pursuit after retry timeout");
+    combat.stop(enemies);
+}
+
 void unreachableDefender(Engine& engine) {
     auto scene = std::make_unique<Scene>("Unreachable defender regression");
     scene->setNavigationGrid(GridConfiguration{24, 16, 1, {-12, 0, -8}});
@@ -245,6 +335,58 @@ void unreachableDefender(Engine& engine) {
         heroes.find(hero)->health == 100 &&
             (!remaining || (remaining->combat.target.kind != DefensiveTargetKind::hero && remaining->position.x < -2)),
         "enemy hit through a wall or stalled instead of continuing to objective");
+    navigation.enemies()->clear();
+    const auto reachable = heroes.deploy({-3, 0, -2});
+    for (int index = 0; index < 5; ++index) {
+        auto tower = navigation.towers().definition("basic").instance();
+        tower.position = {1.8, tower.halfExtent.y, index - 2.0};
+        (void)navigation.towers().create(engine, tower);
+    }
+    navigation.synchronize(engine);
+    heroes.synchronize(navigation.towers());
+    EnemyTypeId siegeType = 0;
+    while (siegeType < navigation.enemies()->typeCount() &&
+           navigation.enemies()->definition(siegeType).name != "Siege") {
+        ++siegeType;
+    }
+    const auto siege = spawn(engine, navigation, {-1.2, 0}, siegeType);
+    combat.prepare(*navigation.enemies(), navigation.towers(), &heroes, {-10, 0}, 0.4);
+    require(navigation.enemies()->find(siege)->combat.target.kind == DefensiveTargetKind::none,
+            "target search exceeded the four-candidate reachability budget");
+    combat.prepare(*navigation.enemies(), navigation.towers(), &heroes, {-10, 0}, 0.4);
+    require(navigation.enemies()->find(siege)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, reachable},
+            "unreachable preferred towers starved a reachable fallback");
+}
+
+void archetypeWaves(Engine& engine) {
+    LevelRuntime runtime;
+    runtime.load(engine, "assets/levels/rival_watch.json");
+    require(runtime.level().waves()->definition().waves.size() == 4, "archetype scenario needs four authored waves");
+    bool elevated = false, grunt = false, siege = false, hunter = false;
+    for (int wave = 0; wave < 4; ++wave) {
+        runtime.startWave();
+        for (int frame = 0; frame < 1800 && runtime.level().waves()->phase() == LevelPhase::battle; ++frame) {
+            runtime.update(engine, 0.1);
+            for (const auto& enemy : runtime.navigation().enemies()->enemies()) {
+                const auto& name = runtime.navigation().enemies()->definition(enemy.type).name;
+                grunt = grunt || name == "Grunt";
+                siege = siege || name == "Siege";
+                hunter = hunter || name == "Hunter";
+                elevated = elevated || enemy.position.y > 1.5;
+                require(enemy.navigation->contains(enemy.position), "archetype crowd left elevated NavMesh");
+            }
+        }
+        require(runtime.level().waves()->phase() == (wave == 3 ? LevelPhase::victory : LevelPhase::preparation),
+                "handcrafted archetype wave failed to finish");
+    }
+    require(grunt && siege && hunter && elevated, "mixed archetypes did not traverse elevated scenario");
+    const auto& metrics = runtime.navigation().enemies()->metrics();
+    require(metrics.arrived + metrics.defeated == 40 && runtime.level().economy().gold() == 285,
+            "archetype waves lost enemies or paid incorrect fixed rewards");
+    runtime.restart(engine);
+    require(runtime.level().economy().gold() == 150 && runtime.level().waves()->phase() == LevelPhase::preparation,
+            "archetype scenario restart failed");
+    require(engine.update(), "mixed archetype battle failed to render");
 }
 } // namespace
 
@@ -263,6 +405,8 @@ int main() {
         heroNavigation(engine);
         enemyBattle(engine);
         unreachableDefender(engine);
+        archetypes(engine);
+        archetypeWaves(engine);
         std::cout
             << "PASS autonomous heroes, reachable perimeter attacks, profile/radius regression, return to defense, "
                "manual priority/recovery, enemy siege/hero death/objective, crowd engagement and shared damage.\n";

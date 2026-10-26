@@ -26,12 +26,17 @@ struct DefensiveTarget {
 
 struct EnemyCombatState {
     DefensiveTarget target, rejected;
+    DefensiveTarget attacker;
+    double threatRemaining = 0;
     glm::dvec3 origin{0}, pathTarget{0};
+    glm::dvec3 rejectedOrigin{0};
+    bool pursuitExhausted = false;
     std::optional<glm::dvec2> objective;
     double objectiveHeight = 0;
     double cooldown = 0, impactRemaining = -1, searchDelay = 0, pathDelay = 0, rejectDelay = 0;
     bool managed = false, swinging = false;
     std::uint64_t pathRevision = 0;
+    std::size_t candidateOffset = 0;
 };
 
 enum class MovementStatus {

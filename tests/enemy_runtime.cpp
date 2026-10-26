@@ -215,7 +215,7 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
     auto& session = debug.session();
     auto& system = *session.enemies();
     session.reset(engine);
-    require(system.typeCount() == 11 && system.definition().name == "Chicken", "animal catalog/default missing");
+    require(system.typeCount() == 14 && system.definition().name == "Chicken", "animal catalog/default missing");
     require(session.spawn(engine, 2) == 2, "compact chicken spawn failed");
     const auto chicken = system.enemies()[0];
     const auto chickenRevision = chicken.navigation->revision();
@@ -959,6 +959,25 @@ int main(int argc, char** argv) {
         const auto elevated = debug.session().towerAt({{8, 10, 2}, {0, -1, 0}, 0, 30});
         require(elevated && debug.session().checkTower(engine, *elevated, false).empty(),
                 "Editor rejected an elevated tower preview");
+        navigationControl(engine, id, "Level", "Load Cover Watch");
+        tick(engine, 3);
+        engine.scene()->selectObject(11);
+        require(debug.lines().empty(), "combat debugging was enabled by default");
+        navigationControl(engine, id, "Show Combat Visibility");
+        tick(engine);
+        require(debug.lines().size() >= 192, "Editor did not draw the selected tower's 3D attack sphere");
+        debug.level().startWave(debug.session());
+        debug.update(engine, 0);
+        tick(engine);
+        require(debug.lines().size() > 192, "Editor did not draw visibility rays to spawned targets");
+        navigationControl(engine, id, "Show Combat Visibility");
+        tick(engine);
+        require(debug.lines().empty(), "combat debugging remained visible after disabling it");
+        navigationControl(engine, id, "Level", "Load Rival Watch");
+        tick(engine, 3);
+        require(debug.level().waves() && debug.level().waves()->definition().waves.size() == 4 &&
+                    debug.level().waves()->definition().waves.front().groups.front().enemy == "Grunt",
+                "Editor could not load handcrafted archetype waves");
         std::cout << "PASS enemy controls, edit-only overlay, world destinations, predefined radii, resources and "
                      "animations.\n";
         return 0;

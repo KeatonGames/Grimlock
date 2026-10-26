@@ -249,7 +249,7 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 }
 
-bool EnemySystem::applyDamage(EnemyId id, float damage) {
+bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker) {
     validateDamage(damage);
     for (std::size_t index = 0; index < enemies_.size(); ++index) {
         auto& enemy = enemies_[index];
@@ -257,6 +257,10 @@ bool EnemySystem::applyDamage(EnemyId id, float damage) {
             continue;
         }
         receiveDamage(enemy.health, damage);
+        if (attacker.kind != DefensiveTargetKind::none) {
+            enemy.combat.attacker = attacker;
+            enemy.combat.threatRemaining = definition(enemy.type).combat.threatMemory;
+        }
         enemy.hitFlashRemaining = 0.12;
         engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
         if (enemy.health > 0) {

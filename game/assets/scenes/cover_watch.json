@@ -1,194 +1,27 @@
 {
-    "version":  1,
-    "name":  "Cover Watch | Ridge and valley combat",
-    "cameras":  [
-                    {
-                        "id":  "main",
-                        "position":  [
-                                         12,
-                                         25,
-                                         21
-                                     ],
-                        "target":  [
-                                       2,
-                                       1,
-                                       1
-                                   ],
-                        "vertical_fov_degrees":  50,
-                        "far":  150
-                    }
-                ],
-    "active_camera":  "main",
-    "lighting":  {
-                     "directional":  {
-                                         "direction":  [
-                                                           -0.4,
-                                                           -0.8,
-                                                           -0.5
-                                                       ],
-                                         "color":  [
-                                                       1,
-                                                       0.95,
-                                                       0.85
-                                                   ],
-                                         "intensity":  3
-                                     },
-                     "environment_intensity":  1,
-                     "exposure":  1
-                 },
-    "objects":  [
-                    {
-                        "id":  "1",
-                        "name":  "Handcrafted meadow, ramp, hill and isolated overlook",
-                        "model":  "models/hill_terrain.glb",
-                        "role":  "grimlock.terrain"
-                    },
-                    {
-                        "id":  "100",
-                        "name":  "Lower meadow construction",
-                        "role":  "grimlock.build_zone",
-                        "transform":  {
-                                          "position":  [
-                                                           -2,
-                                                           0,
-                                                           -3.5
-                                                       ],
-                                          "scale":  [
-                                                        2,
-                                                        1,
-                                                        1.5
-                                                    ]
-                                      }
-                    },
-                    {
-                        "id":  "101",
-                        "name":  "Hilltop construction",
-                        "role":  "grimlock.build_zone",
-                        "transform":  {
-                                          "position":  [
-                                                           9,
-                                                           2,
-                                                           0
-                                                       ],
-                                          "scale":  [
-                                                        2,
-                                                        1,
-                                                        4.5
-                                                    ]
-                                      }
-                    },
-                    {
-                        "id":  "102",
-                        "name":  "Isolated overlook construction",
-                        "role":  "grimlock.build_zone",
-                        "transform":  {
-                                          "position":  [
-                                                           -2,
-                                                           3,
-                                                           11
-                                                       ],
-                                          "scale":  [
-                                                        1.5,
-                                                        1,
-                                                        1.5
-                                                    ]
-                                      }
-                    },
-                    {
-                        "id":  "2",
-                        "name":  "Lower approach marker",
-                        "model":  "models/cube.obj",
-                        "role":  "grimlock.decoration",
-                        "tint":  [
-                                     0.1,
-                                     0.65,
-                                     0.6,
-                                     1
-                                 ],
-                        "transform":  {
-                                          "position":  [
-                                                           -6,
-                                                           0.008,
-                                                           0
-                                                       ],
-                                          "scale":  [
-                                                        1,
-                                                        0.008,
-                                                        1
-                                                    ]
-                                      }
-                    },
-                    {
-                        "id":  "3",
-                        "name":  "Hilltop objective marker",
-                        "model":  "models/cube.obj",
-                        "role":  "grimlock.decoration",
-                        "tint":  [
-                                     0.95,
-                                     0.65,
-                                     0.1,
-                                     1
-                                 ],
-                        "transform":  {
-                                          "position":  [
-                                                           10,
-                                                           2.008,
-                                                           0
-                                                       ],
-                                          "scale":  [
-                                                        0.6,
-                                                        0.008,
-                                                        0.6
-                                                    ]
-                                      }
-                    },
-                    {
-                        "id":  "10",
-                        "name":  "Solid mountain ridge",
-                        "tint":  [
-                                     0.43,
-                                     0.39,
-                                     0.33,
-                                     1
-                                 ],
-                        "model":  "models/cover_rock.obj",
-                        "role":  "grimlock.obstacle",
-                        "transform":  {
-                                          "scale":  [
-                                                        0.65,
-                                                        1,
-                                                        1.6
-                                                    ],
-                                          "position":  [
-                                                           4.7,
-                                                           1.35,
-                                                           2.4
-                                                       ]
-                                      }
-                    },
-                    {
-                        "id":  "11",
-                        "name":  "Hill defense tower",
-                        "tint":  [
-                                     0.55,
-                                     0.42,
-                                     0.25,
-                                     1
-                                 ],
-                        "model":  "models/cube.obj",
-                        "role":  "grimlock.tower:wide",
-                        "transform":  {
-                                          "scale":  [
-                                                        0.7,
-                                                        0.6,
-                                                        0.4
-                                                    ],
-                                          "position":  [
-                                                           7.7,
-                                                           2.6,
-                                                           1.2
-                                                       ]
-                                      }
-                    }
-                ]
+  "version": 1,
+  "name": "Cover Watch | Ridge and valley combat",
+  "cameras": [{"id":"main","position":[12,25,21],"target":[2,1,1],"vertical_fov_degrees":50,"far":150}],
+  "active_camera":"main",
+  "lighting": {
+    "directional":{"direction":[-0.4,-0.8,-0.5],"color":[1,0.95,0.85],"intensity":3},
+    "environment_intensity":1,"exposure":1
+  },
+  "objects": [
+    {"id":"1","name":"Handcrafted meadow, ramp, hill and isolated overlook","model":"models/hill_terrain.glb","role":"grimlock.terrain"},
+    {"id":"100","name":"Lower meadow construction","role":"grimlock.build_zone",
+      "transform":{"position":[-2,0,-3.5],"scale":[2,1,1.5]}},
+    {"id":"101","name":"Hilltop construction","role":"grimlock.build_zone",
+      "transform":{"position":[9,2,0],"scale":[2,1,4.5]}},
+    {"id":"102","name":"Isolated overlook construction","role":"grimlock.build_zone",
+      "transform":{"position":[-2,3,11],"scale":[1.5,1,1.5]}},
+    {"id":"2","name":"Lower approach marker","model":"models/cube.obj","role":"grimlock.decoration","tint":[0.1,0.65,0.6,1],
+      "transform":{"position":[-6,0.008,0],"scale":[1,0.008,1]}},
+    {"id":"3","name":"Hilltop objective marker","model":"models/cube.obj","role":"grimlock.decoration","tint":[0.95,0.65,0.1,1],
+      "transform":{"position":[10,2.008,0],"scale":[0.6,0.008,0.6]}},
+    {"id":"10","name":"Solid mountain ridge","model":"models/cover_rock.obj","role":"grimlock.obstacle","tint":[0.43,0.39,0.33,1],
+      "transform":{"position":[4.7,1.35,2.4],"scale":[0.65,1,1.6]}},
+    {"id":"11","name":"Hill defense tower","model":"models/cube.obj","role":"grimlock.tower:wide","tint":[0.55,0.42,0.25,1],
+      "transform":{"position":[7.7,2.6,1.2],"scale":[0.7,0.6,0.4]}}
+  ]
 }

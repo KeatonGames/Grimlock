@@ -85,7 +85,7 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
     if (!hero.combat.abilitySwing) {
         const auto* enemy = hero.combat.target ? enemies.find(*hero.combat.target) : nullptr;
         if (enemy && inRange(heroes, hero, *enemy, stats.range)) {
-            (void)enemies.applyDamage(enemy->id, stats.damage);
+            (void)enemies.applyDamage(enemy->id, stats.damage, {DefensiveTargetKind::hero, hero.id});
         }
         return;
     }
@@ -102,7 +102,7 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
     }
     // Lethal damage compacts enemy storage; never keep references across impacts.
     for (const auto id : victims_) {
-        (void)enemies.applyDamage(id, stats.cleave.damage);
+        (void)enemies.applyDamage(id, stats.cleave.damage, {DefensiveTargetKind::hero, hero.id});
     }
     hero.combat.feedbackRemaining = 0.3;
 }

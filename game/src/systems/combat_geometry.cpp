@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <numeric>
 #include <stdexcept>
 
 namespace grimlock::game {
@@ -211,7 +210,7 @@ std::optional<CombatHit> CombatGeometry::trace(glm::dvec3 start,
         visit(0, start, displacement, radius, closest);
     }
     for (const auto& tower : towers_) {
-        if (tower.object == ignore || tower.object == target) {
+        if ((ignore && tower.object == ignore) || (target && tower.object == target)) {
             continue;
         }
         const auto inverse = glm::inverse(tower.rotation);

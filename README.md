@@ -17,6 +17,8 @@ and development tools. Game does not link Editor or GameDebug.
 - Scene editor with model placement, grouping, duplication/deletion, transform editing, scene saving/loading and animation controls.
 - Optional XZ navigation grid with configurable dimensions/origin/cell size, walkability painting, revision tracking and scene serialization.
 - Imported 3D terrain with elevation-aware Recast navigation, tower placement and combat; see [terrain authoring](docs/terrain.md).
+- Terrain-aware targeting and swept projectile collision, with optional Editor visibility rays; see [combat and cover](docs/combat.md).
+- Data-driven Grunt, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
 
 ## Tech Stack
 

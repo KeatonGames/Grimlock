@@ -67,12 +67,15 @@ It simulates player decisions, not a privileged build path or modified enemy hea
 - **Mixed battery:** Small Tower (-3.3, 0), Large Tower (5, 0), forward hero
   (-0.3, 1.5). Upgrade Small after wave one; buy a rear Small at (3.7, 0) after
   wave two; upgrade Large after waves three and four. Move the hero back before
-  Dogs arrive and use Cleave against groups. Tested victory: 10 objective health.
+  Dogs arrive and use Cleave against groups. Tested victory with solid cover enabled.
 - **Small Tower coverage:** west Small plus Small Towers at (0.1, -2.5) and
   (0.1, 2.5), a central hero, staged upgrades and a rear Small before wave four.
-  Elevation-aware regression result: 2 objective health, with defenders lost during the final wave.
+  Replace lost central towers at the open rear exits (5, -2.5) and (5, 2.5) before
+  later waves when affordable. Walls now block the former cross-map shots.
+  Tested victory with solid cover enabled.
 - **Rear defense:** Small at (4, -2.5), Large at (4, 2.5), hero (4, 0), upgrading
-  available towers between waves. Tested victory: only 2 objective health remaining.
+  the Large Tower before the Small Tower when affordable, and replacing a lost
+  Small Tower during preparation. Tested victory with solid cover enabled.
 - **No construction:** the default hero alone loses in wave two.
 - **No development:** the mixed opening without upgrades, reinforcements or Cleave
   loses in wave four despite unspent gold.
@@ -84,9 +87,9 @@ that every placement wins. Human playtesting is still needed to tune subjective 
 The Assassin still has no animation clips; it uses the established timed static-pose
 fallback. Indicators remain ordinary HUD overlays and are not depth-occluded.
 
-Original playable-level logs are under `out/phase27/`; elevation-aware verification
-and updated playthrough traces are under `out/terrain/`.
-Game and Editor build in Debug and Release; all 33 CTest checks
+Original playable-level logs are under `out/phase27/`; terrain verification is
+under `out/terrain/`, and current solid-cover playthroughs are under `out/phase28/`.
+Game and Editor build in Debug and Release; all 34 CTest checks
 pass in both configurations, including identical win/loss outcomes for the five
 plans above. Vulkan validation reports no errors or synchronization hazards.
 Formatting and whitespace checks pass.

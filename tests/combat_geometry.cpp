@@ -76,7 +76,7 @@ void runtimeChecks(Engine& engine) {
         return enemies.enemies().back().id;
     };
     const auto near = spawn(0, 0);
-    const auto other = spawn(0, 2);
+    const auto other = spawn(0, 0.5);
     CombatGeometry world;
     world.synchronize(engine, towers.towers());
     const auto revision = world.revision();
@@ -92,7 +92,7 @@ void runtimeChecks(Engine& engine) {
     engine.scene()->setRole(blocker, "grimlock.obstacle");
     Transform transform;
     transform.position = {-1, 1, 0};
-    transform.scale = {0.015F, 1, 0.25F};
+    transform.scale = {0.015F, 1, 0.1F};
     engine.scene()->setTransform(blocker, transform);
     world.synchronize(engine, towers.towers());
     require(!world.visible(firingOrigin(tower), combatAim(*enemies.find(near)), source),
@@ -142,6 +142,10 @@ int main() {
         runtime.load(engine, "assets/levels/cover_watch.json");
         require(runtime.navigation().combatGeometry().revision() > 0 && runtime.heroes()->heroes().size() == 1,
                 "terrain combat scene did not load");
+        require(!runtime.navigation().combatGeometry().visible({7.7, 3.3, 1.2}, {3, 0.8, 1.2}, 11),
+                "authored mountain did not shelter the valley");
+        require(runtime.navigation().combatGeometry().visible({7.7, 3.3, 1.2}, {4, 1.3, -1.3}, 11),
+                "mountain blocked the clear southern firing lane");
         runtime.startWave();
         for (int i = 0; i < 1800 && runtime.level().waves()->phase() == LevelPhase::battle; ++i) {
             runtime.update(engine, 0.1);

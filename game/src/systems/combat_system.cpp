@@ -44,8 +44,9 @@ void CombatSystem::update(const TowerSystem& towers,
             attack.cooldown = std::min(attack.cooldown, 1.0 / statistics.fireRate);
             const Enemy* nearest = nullptr;
             const auto origin = firingOrigin(tower);
+            const auto base = tower.position - glm::dvec3{0, tower.halfExtent.y, 0};
             const auto valid = [&](const Enemy& enemy) {
-                const auto offset = enemy.position - (tower.position - glm::dvec3{0, tower.halfExtent.y, 0});
+                const auto offset = enemy.position - base;
                 return enemy.active && enemy.alive &&
                        glm::dot(offset, offset) <= statistics.attackRange * statistics.attackRange &&
                        !geometry->trace(origin, combatAim(enemy), definition.projectileRadius, tower.object);
@@ -58,13 +59,15 @@ void CombatSystem::update(const TowerSystem& towers,
             }
             double nearestDistance = statistics.attackRange * statistics.attackRange;
             attack.searchDelay = std::max(0.0, attack.searchDelay - step);
-            const bool rescan = attack.target || attack.searchDelay <= 0 ||
+            const auto* tracked = nearest;
+            const bool rescan = (attack.target && !tracked) || attack.searchDelay <= 0 || attack.level != level ||
                                 attack.geometryRevision != geometry->revision() ||
                                 attack.enemyCount != enemies.enemies().size();
-            if (!nearest && rescan) {
+            if (rescan) {
+                nearest = nullptr;
                 for (const auto& enemy : enemies.enemies()) {
                     // Range uses terrain-level entity anchors, independent of either model's visual height.
-                    const auto offset = enemy.position - (tower.position - glm::dvec3{0, tower.halfExtent.y, 0});
+                    const auto offset = enemy.position - base;
                     const double distance = glm::dot(offset, offset);
                     if (enemy.active && enemy.alive && distance <= nearestDistance &&
                         (!nearest || distance < nearestDistance || enemy.id < nearest->id) && valid(enemy)) {
@@ -72,8 +75,17 @@ void CombatSystem::update(const TowerSystem& towers,
                         nearestDistance = distance;
                     }
                 }
+                if (tracked && nearest) {
+                    const double oldDistance = glm::length(tracked->position - base);
+                    const double newDistance = glm::length(nearest->position - base);
+                    // Keep near-equal targets stable while still reacting to a meaningfully closer threat.
+                    if (oldDistance - newDistance <= tracked->radius + nearest->radius) {
+                        nearest = tracked;
+                    }
+                }
                 attack.searchDelay = 0.15;
             }
+            attack.level = level;
             attack.geometryRevision = geometry->revision();
             attack.enemyCount = enemies.enemies().size();
             attack.target = nearest ? std::optional{nearest->id} : std::nullopt;

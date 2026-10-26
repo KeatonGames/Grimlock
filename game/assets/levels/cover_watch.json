@@ -1,68 +1,18 @@
 {
-    "version":  1,
-    "name":  "Cover Watch | Ridge and valley combat",
-    "scene":  "scenes/cover_watch.json",
-    "starting_gold":  150,
-    "hero_spawns": [[9, 2, -1]],
-    "objective":  {
-                      "position":  [
-                                       10,
-                                       0
-                                   ],
-                      "height":  2,
-                      "health":  10,
-                      "damage_per_arrival":  1
-                  },
-    "spawns":  [
-                   {
-                       "name":  "Lower approach",
-                       "minimum":  [
-                                       -7,
-                                       -1
-                                   ],
-                       "maximum":  [
-                                       -5,
-                                       1
-                                   ],
-                       "height":  0
-                   }
-               ],
-    "waves":  [
-                  {
-                      "name":  "Up the ramp",
-                      "gold_reward":  30,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Chicken",
-                                         "count":  6,
-                                         "spawn":  "Lower approach",
-                                         "start":  0,
-                                         "batch_size":  2,
-                                         "interval":  3
-                                     }
-                                 ]
-                  },
-                  {
-                      "name":  "Hill defense",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Dog",
-                                         "count":  4,
-                                         "spawn":  "Lower approach",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Black Rat",
-                                         "count":  6,
-                                         "spawn":  "Lower approach",
-                                         "start":  2,
-                                         "batch_size":  2,
-                                         "interval":  3
-                                     }
-                                 ]
-                  }
-              ]
+  "version":1,
+  "name":"Cover Watch | Ridge and valley combat",
+  "scene":"scenes/cover_watch.json",
+  "starting_gold":150,
+  "hero_spawns":[[9,2,-1]],
+  "objective":{"position":[10,0],"height":2,"health":10,"damage_per_arrival":1},
+  "spawns":[{"name":"Lower approach","minimum":[-7,-1],"maximum":[-5,1],"height":0}],
+  "waves":[
+    {"name":"Up the ramp","gold_reward":30,"groups":[
+      {"enemy":"Chicken","count":6,"spawn":"Lower approach","start":0,"batch_size":2,"interval":3}
+    ]},
+    {"name":"Hill defense","gold_reward":0,"groups":[
+      {"enemy":"Dog","count":4,"spawn":"Lower approach","start":0,"batch_size":1,"interval":4},
+      {"enemy":"Black Rat","count":6,"spawn":"Lower approach","start":2,"batch_size":2,"interval":3}
+    ]}
+  ]
 }

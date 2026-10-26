@@ -12,6 +12,9 @@ struct EnemyCombatDefinition {
     double aggressionRange = 4, pursuitRange = 6;
     int heroPriority = 3, towerPriority = 2, objectivePriority = 1;
     std::string attackAnimation = "attack";
+    bool objectiveFirst = false;
+    double obstructionRange = 0.8, threatMemory = 2;
+    float heroDamageModifier = 1, towerDamageModifier = 1;
 };
 
 using EnemyTypeId = std::size_t;

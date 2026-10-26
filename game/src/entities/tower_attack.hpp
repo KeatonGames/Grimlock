@@ -11,6 +11,7 @@ struct TowerAttack {
     double searchDelay = 0;
     std::uint64_t geometryRevision = 0;
     std::size_t enemyCount = 0;
+    std::size_t level = 0;
 };
 
 } // namespace grimlock::game

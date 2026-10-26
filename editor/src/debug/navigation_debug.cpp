@@ -244,24 +244,51 @@ void NavigationDebug::combatDebug(Engine& engine) {
     }
     const Enemy* inspected =
         inspectedEnemy_ && session_.enemies() ? session_.enemies()->find(*inspectedEnemy_) : nullptr;
-    if (!tower && !inspected) {
+    const auto heroPoint = [&](ObjectId id) {
+        const auto& object = engine.scene()->object(id);
+        const auto world = engine.scene()->worldTransform(id);
+        if (!object.model) {
+            return glm::dvec3{world[3]};
+        }
+        const auto info = engine.modelInfo(engine.loadModel(engine.assetRoot() / *object.model));
+        return glm::dvec3{world * glm::vec4{(info.minimum + info.maximum) * 0.5F, 1}};
+    };
+    std::optional<glm::dvec3> heroOrigin;
+    if (selected && engine.scene()->contains(*selected) && engine.scene()->object(*selected).role == "grimlock.hero") {
+        heroOrigin = heroPoint(*selected);
+    }
+    if (!tower && !inspected && !heroOrigin) {
         return;
     }
-    const glm::dvec3 origin = tower ? firingOrigin(*tower) : combatAim(*inspected);
+    const glm::dvec3 origin =
+        tower ? firingOrigin(*tower) : heroOrigin.value_or(inspected ? combatAim(*inspected) : glm::dvec3{0});
     const ObjectId ignore = tower ? tower->object : 0;
     const auto line = [&](glm::dvec3 a, glm::dvec3 b, glm::vec4 color) {
         combatLines_.push_back({a, b, color});
     };
-    for (const auto& enemy : session_.enemies()->enemies()) {
-        if (!enemy.alive || !enemy.active || (&enemy == inspected && !tower)) {
-            continue;
-        }
-        const auto target = combatAim(enemy);
-        const auto hit = session_.combatGeometry().trace(origin, target, 0, ignore);
+    const auto visibility = [&](glm::dvec3 target, ObjectId targetObject = 0) {
+        const double radius = tower ? session_.towers().definition(tower->type).projectileRadius : 0;
+        const auto hit = session_.combatGeometry().trace(origin, target, radius, ignore, targetObject);
         line(origin, target, hit ? glm::vec4{1, 0.25F, 0.2F, 0.7F} : glm::vec4{0.2F, 1, 0.4F, 0.7F});
         if (hit) {
             for (const auto axis : {glm::dvec3{0.08, 0, 0}, glm::dvec3{0, 0.08, 0}, glm::dvec3{0, 0, 0.08}}) {
                 line(hit->position - axis, hit->position + axis, {1, 0.8F, 0.1F, 1});
+            }
+        }
+    };
+    if (tower || heroOrigin) {
+        for (const auto& enemy : session_.enemies()->enemies()) {
+            if (enemy.alive && enemy.active) {
+                visibility(combatAim(enemy));
+            }
+        }
+    } else {
+        for (const auto& target : session_.towers().towers()) {
+            visibility(target.position, target.object);
+        }
+        for (const auto& [id, object] : engine.scene()->objects()) {
+            if (object.role == "grimlock.hero" && engine.scene()->enabledInHierarchy(id)) {
+                visibility(heroPoint(id));
             }
         }
     }
@@ -394,6 +421,14 @@ void NavigationDebug::levelMenu(Engine& engine) {
                 error_ = error.what();
             }
         }
+        if (ImGui::Button("Load Rival Watch")) {
+            try {
+                requestLevelLoad(engine, engine.assetRoot() / "levels/rival_watch.json");
+                error_.clear();
+            } catch (const std::exception& error) {
+                error_ = error.what();
+            }
+        }
         ImGui::TextUnformatted("Handcrafted waves. Level status appears in its own panel.");
         levelDefinitionMenu(engine);
         ImGui::EndMenu();
@@ -446,7 +481,7 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
                 ImGui::PushID(static_cast<int>(groupIndex));
                 auto& group = wave.groups[groupIndex];
                 ImGui::Separator();
-                if (ImGui::BeginCombo("Animal", group.enemy.c_str())) {
+                if (ImGui::BeginCombo("Enemy Type", group.enemy.c_str())) {
                     for (EnemyTypeId type = 0; type < session_.enemies()->typeCount(); ++type) {
                         const auto& name = session_.enemies()->definition(type).name;
                         if (ImGui::Selectable(name.c_str(), name == group.enemy)) {

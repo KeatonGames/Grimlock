@@ -39,6 +39,8 @@ void EnemyCombatSystem::release(EnemySystem& enemies, Enemy& enemy, bool rejecte
     }
     if (rejected) {
         combat.rejected = combat.target;
+        combat.rejectedOrigin = combat.origin;
+        combat.pursuitExhausted = false;
         combat.rejectDelay = 2;
     }
     combat.target = {};
@@ -82,15 +84,32 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         state.searchDelay = std::max(0.0, state.searchDelay - delta);
         state.pathDelay = std::max(0.0, state.pathDelay - delta);
         state.rejectDelay = std::max(0.0, state.rejectDelay - delta);
+        state.threatRemaining = std::max(0.0, state.threatRemaining - delta);
         const auto& mesh = *enemy.navigation;
         // The objective uses the authored arrival damage/removal rule after its melee windup.
         Target goal{{DefensiveTargetKind::objective, 0},
                     {{state.objective->x, state.objectiveHeight, state.objective->y}, 0}};
+        const auto relevant = [&](const Target& candidate) {
+            if (!stats.objectiveFirst || candidate.reference.kind == DefensiveTargetKind::objective) {
+                return true;
+            }
+            const auto offset = candidate.body.position - enemy.position;
+            const auto advance = goal.body.position - enemy.position;
+            const double gap = meleeGap(enemy.position, enemy.radius, candidate.body);
+            const bool obstructing = gap <= stats.obstructionRange && glm::dot(offset, advance) >= 0;
+            bool engaging = state.threatRemaining > 0 && state.attacker == candidate.reference;
+            if (heroes && candidate.reference.kind == DefensiveTargetKind::hero) {
+                const auto* hero = heroes->find(candidate.reference.id);
+                engaging = engaging || (hero && hero->combat.target == enemy.id);
+            }
+            return obstructing || (engaging && gap <= stats.aggressionRange);
+        };
         const Target* target = state.target.kind == DefensiveTargetKind::objective ? &goal : find(state.target);
-        if (state.target.kind != DefensiveTargetKind::none &&
-            (!target || distance(state.origin, target->body.position) > stats.pursuitRange ||
-             distance(state.origin, enemy.position) > stats.pursuitRange)) {
+        const bool pursuitExceeded = target && (distance(state.origin, target->body.position) > stats.pursuitRange ||
+                                                distance(state.origin, enemy.position) > stats.pursuitRange);
+        if (state.target.kind != DefensiveTargetKind::none && (!target || !relevant(*target) || pursuitExceeded)) {
             release(enemies, enemy, true);
+            state.pursuitExhausted = pursuitExceeded;
             target = nullptr;
         }
         if (state.swinging) {
@@ -101,8 +120,11 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             const auto consider = [&](const Target& candidate, std::size_t index) {
                 const int rank = priority(stats, candidate.reference.kind);
                 const double gap = meleeGap(enemy.position, enemy.radius, candidate.body);
-                if (rank > 0 && gap <= stats.aggressionRange &&
-                    !(state.rejected == candidate.reference && state.rejectDelay > 0)) {
+                if (rank > 0 && gap <= stats.aggressionRange && relevant(candidate) &&
+                    !(state.rejected == candidate.reference &&
+                      (state.rejectDelay > 0 ||
+                       (state.pursuitExhausted &&
+                        distance(state.rejectedOrigin, candidate.body.position) > stats.pursuitRange)))) {
                     candidates_.emplace_back(-static_cast<double>(rank), index);
                 }
             };
@@ -124,7 +146,9 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                        meleeGap(enemy.position, enemy.radius, second.body);
             });
             state.searchDelay = 0.4;
-            for (const auto& candidate : candidates_) {
+            const auto attempts = std::min<std::size_t>(4, candidates_.size());
+            for (std::size_t attempt = 0; attempt < attempts; ++attempt) {
+                const auto& candidate = candidates_[(state.candidateOffset + attempt) % candidates_.size()];
                 const auto& option = candidate.second == targets_.size() ? goal : targets_[candidate.second];
                 const bool contact =
                     meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range) &&
@@ -145,6 +169,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                                   enemy.height,
                                   option.reference.kind == DefensiveTargetKind::tower ? option.reference.id : 0)) {
                     state.target = option.reference;
+                    state.candidateOffset = 0;
                     state.origin = enemy.position;
                     state.pathDelay = 0;
                     target = &option;
@@ -162,6 +187,9 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                     }
                     break;
                 }
+            }
+            if (!target && !candidates_.empty()) {
+                state.candidateOffset = (state.candidateOffset + attempts) % candidates_.size();
             }
         }
         if (!target) {
@@ -256,10 +284,10 @@ void EnemyCombatSystem::resolve(Engine& engine,
                     clearStrike(enemy, body, state.target.kind == DefensiveTargetKind::tower ? state.target.id : 0)) {
                     switch (state.target.kind) {
                     case DefensiveTargetKind::hero:
-                        (void)heroes->applyDamage(state.target.id, stats.damage);
+                        (void)heroes->applyDamage(state.target.id, stats.damage * stats.heroDamageModifier);
                         break;
                     case DefensiveTargetKind::tower:
-                        (void)towers.applyDamage(engine, state.target.id, stats.damage);
+                        (void)towers.applyDamage(engine, state.target.id, stats.damage * stats.towerDamageModifier);
                         break;
                     case DefensiveTargetKind::objective:
                         arrivals_.push_back(enemy.id);

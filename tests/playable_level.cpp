@@ -72,6 +72,13 @@ Result play(Engine& engine, Strategy strategy) {
                 upgrade(first);
                 upgrade(second);
                 upgrade(third);
+                // Solid walls remove the old cross-map shots; replace lost central defenses on the open exits.
+                if (wave >= 3 && !navigation.towers().contains(second) && session.economy().gold() >= 30) {
+                    second = build("basic", {5, -2.5});
+                }
+                if (wave >= 3 && !navigation.towers().contains(third) && session.economy().gold() >= 30) {
+                    third = build("basic", {5, 2.5});
+                }
             } else if (strategy == Strategy::mixed) {
                 if (wave == 1) {
                     upgrade(first);
@@ -84,8 +91,13 @@ Result play(Engine& engine, Strategy strategy) {
                     third = build("basic", {3.7, 0});
                 }
             } else {
-                upgrade(first);
+                // The rear battery needs its longer clear firing lane before improving the secondary tower.
                 upgrade(second);
+                upgrade(first);
+                if (!navigation.towers().contains(first) && session.economy().gold() >= 30) {
+                    first = build("basic", {4, -2.5});
+                    upgrade(first);
+                }
             }
             if (((wave == 2 && strategy == Strategy::mixed) || (wave == 3 && strategy == Strategy::small)) &&
                 runtime.heroes()->find(hero)->health > 0) {

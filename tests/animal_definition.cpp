@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 3, "expected asset and fixture directories");
         const auto definitions = loadAnimalDefinitions(argv[1]);
-        require(definitions.size() == 11 && definitions.front().model == "models/chicken.glb" &&
+        require(definitions.size() == 14 && definitions.front().model == "models/chicken.glb" &&
                     definitions.front().radius == 0.195 && definitions.front().visualHeight == 0.36F,
                 "animal catalog/default settings incorrect");
         bool varied = false;
@@ -41,7 +41,21 @@ int main(int argc, char** argv) {
             varied = varied || d.radius != definitions.front().radius;
         }
         require(varied, "animal footprints were not configured per type");
+        const auto& grunt = definitions[11];
+        const auto& siege = definitions[12];
+        const auto& hunter = definitions[13];
+        require(grunt.name == "Grunt" && grunt.combat.objectiveFirst && grunt.model == definitions[0].model &&
+                    siege.name == "Siege" && siege.maximumHealth > grunt.maximumHealth && siege.speed < grunt.speed &&
+                    siege.combat.towerPriority > siege.combat.heroPriority && siege.combat.towerDamageModifier == 2 &&
+                    hunter.name == "Hunter" && hunter.maximumHealth < grunt.maximumHealth &&
+                    hunter.speed > grunt.speed && hunter.combat.heroPriority > hunter.combat.towerPriority,
+                "archetype statistics or independent animal inheritance incorrect");
         auto invalid = definitions.front();
+        invalid.combat.towerDamageModifier = std::numeric_limits<float>::infinity();
+        rejects([&] {
+            validateEnemyDefinition(invalid);
+        });
+        invalid = definitions.front();
         invalid.radius = 0;
         rejects([&] {
             validateEnemyDefinition(invalid);
@@ -77,6 +91,7 @@ int main(int argc, char** argv) {
         const std::filesystem::path fixture{argv[2]};
         std::filesystem::create_directories(fixture / "models");
         std::filesystem::create_directories(fixture / "config");
+        std::filesystem::remove(fixture / "config/enemy_archetypes.json");
         std::ofstream{fixture / "models/chicken.glb"};
         const nlohmann::json entry{{"name", "Chicken"},
                                    {"model", "models/chicken.glb"},
@@ -131,7 +146,42 @@ int main(int argc, char** argv) {
         rejects([&] {
             (void)loadAnimalDefinitions(fixture);
         });
-        std::cout << "PASS animal catalog, defaults, dimensions, availability, duplicates and invalid configuration.\n";
+        save(nlohmann::json::array({entry}));
+        const auto saveArchetypes = [&](const nlohmann::json& entries) {
+            std::ofstream file{fixture / "config/enemy_archetypes.json"};
+            file << entries.dump();
+        };
+        auto archetype = nlohmann::json{{"name", "Test"},
+                                        {"animal", "Chicken"},
+                                        {"maximum_health", 120},
+                                        {"speed", 1.4},
+                                        {"combat", {{"objective_first", true}, {"tower_damage_modifier", 2}}}};
+        saveArchetypes(nlohmann::json::array({archetype}));
+        const auto inherited = loadAnimalDefinitions(fixture);
+        require(inherited.size() == 2 && inherited.back().model == inherited.front().model &&
+                    inherited.back().radius == inherited.front().radius && inherited.back().combat.objectiveFirst &&
+                    inherited.back().combat.towerDamageModifier == 2,
+                "archetype presentation inheritance or policy override failed");
+        archetype["combat"]["tower_damage_modifier"] = -1;
+        saveArchetypes(nlohmann::json::array({archetype}));
+        rejects([&] {
+            (void)loadAnimalDefinitions(fixture);
+        });
+        archetype["combat"]["tower_damage_modifier"] = 2;
+        archetype["animal"] = "Missing";
+        saveArchetypes(nlohmann::json::array({archetype}));
+        rejects([&] {
+            (void)loadAnimalDefinitions(fixture);
+        });
+        archetype["animal"] = "Chicken";
+        archetype["name"] = "Chicken";
+        saveArchetypes(nlohmann::json::array({archetype}));
+        rejects([&] {
+            (void)loadAnimalDefinitions(fixture);
+        });
+        std::filesystem::remove(fixture / "config/enemy_archetypes.json");
+        require(loadAnimalDefinitions(fixture).size() == 1, "legacy catalog requires archetype configuration");
+        std::cout << "PASS animal catalog, archetypes, inherited presentation, modifiers and invalid configuration.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "FAIL animal definitions: " << error.what() << '\n';

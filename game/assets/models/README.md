@@ -1,5 +1,10 @@
 # Sample models
 
+`hill_terrain.glb` is the handcrafted lower meadow, ramp, hill platform and isolated
+overlook used by Hill Watch and Cover Watch. `cover_rock.obj` adds Cover Watch's
+solid mountain ridge. Scene roles classify the terrain and combat blockers; see
+[terrain authoring](../../../docs/terrain.md) and [combat visibility](../../../docs/combat.md).
+
 `cube.obj`, `hierarchy.glb`, and `pbr-comparison.glb` are original geometric assets created for
 Grimlock and dedicated to the public domain under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). No attribution is required.
