@@ -215,7 +215,7 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
     auto& session = debug.session();
     auto& system = *session.enemies();
     session.reset(engine);
-    require(system.typeCount() == 14 && system.definition().name == "Chicken", "animal catalog/default missing");
+    require(system.typeCount() == 15 && system.definition().name == "Chicken", "animal catalog/default missing");
     require(session.spawn(engine, 2) == 2, "compact chicken spawn failed");
     const auto chicken = system.enemies()[0];
     const auto chickenRevision = chicken.navigation->revision();
@@ -264,6 +264,7 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
     std::cout << "Checking every configured animal asset..." << std::endl;
     session.setDestination(std::nullopt);
     for (game::EnemyTypeId type = 0; type < system.typeCount(); ++type) {
+        session.reset(engine);
         session.selectAnimal(engine, type);
         require(session.spawn(engine, 2) == 2, "configured animal did not spawn");
         const auto& a = system.enemies()[system.enemies().size() - 2];
@@ -283,6 +284,8 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
         }),
                 "animal asset render failed");
     }
+    session.selectAnimal(engine, 0);
+    require(session.spawn(engine, 2) == 2, "mixed boss/minion spawn failed");
     const auto oldRevision = chicken.navigation->revision();
     session.rebuild(engine);
     require(chicken.navigation->revision() > oldRevision, "mixed navigation rebuild missed chicken profile");
@@ -978,6 +981,11 @@ int main(int argc, char** argv) {
         require(debug.level().waves() && debug.level().waves()->definition().waves.size() == 4 &&
                     debug.level().waves()->definition().waves.front().groups.front().enemy == "Grunt",
                 "Editor could not load handcrafted archetype waves");
+        navigationControl(engine, id, "Level", "Load Boss Watch");
+        tick(engine, 3);
+        require(debug.level().waves() &&
+                    debug.level().waves()->definition().waves.back().groups.back().enemy == "Iron Stag",
+                "Editor could not load boss wave definition");
         std::cout << "PASS enemy controls, edit-only overlay, world destinations, predefined radii, resources and "
                      "animations.\n";
         return 0;

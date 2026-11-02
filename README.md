@@ -19,6 +19,8 @@ and development tools. Game does not link Editor or GameDebug.
 - Imported 3D terrain with elevation-aware Recast navigation, tower placement and combat; see [terrain authoring](docs/terrain.md).
 - Terrain-aware targeting and swept projectile collision, with optional Editor visibility rays; see [combat and cover](docs/combat.md).
 - Data-driven Grunt, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
+- Boss definitions reuse enemy combat/navigation and add stacked Game HUD health bars; see [boss encounters](docs/bosses.md).
+- Main menu and automatic discovery of Editor-authored levels, with in-game switching and restart; see [level selection](docs/level_selection.md).
 
 ## Tech Stack
 
@@ -72,7 +74,7 @@ git lfs pull
 cmake --preset debug -DGRIMLOCK_BUILD_EDITOR=ON -DGRIMLOCK_BUILD_TESTS=ON
 cmake --build --preset debug --parallel 4
 
-# Play First Watch
+# Open the main menu and choose a level
 .\out\build\debug\Debug\Grimlock.exe
 
 # Scene editor
@@ -94,6 +96,10 @@ to ON; configure with `-DGRIMLOCK_BUILD_EDITOR=OFF` for a Game-only build. The H
 still works in that build. Both applications use the same staged asset directory.
 
 CMake compiles shaders automatically and stages assets beside each executable. GLB files must contain actual model data, not Git LFS pointer text.
+
+Game discovers all valid JSON levels under its active `assets/levels` directory.
+Use `--assets <folder>` to play directly from an authored asset tree; see
+[shared Editor/Game paths and live level reloads](docs/level_selection.md).
 
 Run tests after building:
 

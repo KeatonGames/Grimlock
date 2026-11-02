@@ -429,6 +429,14 @@ void NavigationDebug::levelMenu(Engine& engine) {
                 error_ = error.what();
             }
         }
+        if (ImGui::Button("Load Boss Watch")) {
+            try {
+                requestLevelLoad(engine, engine.assetRoot() / "levels/boss_watch.json");
+                error_.clear();
+            } catch (const std::exception& error) {
+                error_ = error.what();
+            }
+        }
         ImGui::TextUnformatted("Handcrafted waves. Level status appears in its own panel.");
         levelDefinitionMenu(engine);
         ImGui::EndMenu();
@@ -450,6 +458,7 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
     }
     auto& definition = *levelDraft_;
     ImGui::InputText("Level Name", &definition.name);
+    ImGui::InputTextMultiline("Description", &definition.description, {0, 65});
     auto scene = definition.scene.generic_string();
     if (ImGui::InputText("Scene (asset relative)", &scene)) {
         definition.scene = scene;

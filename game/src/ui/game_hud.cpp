@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <glm/gtc/constants.hpp>
 #include <grimlock/input.hpp>
 #include <imgui_impl_sdl3.h>
@@ -15,7 +16,15 @@ constexpr ImGuiWindowFlags hudFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindo
                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
 }
 
-GameHud::GameHud(Engine& engine, LevelRuntime& runtime) : engine_(engine), runtime_(runtime) {
+GameHud::GameHud(Engine& engine, LevelRuntime& runtime, bool startInMenu, const std::filesystem::path& initialLevel)
+    : engine_(engine), runtime_(runtime) {
+    if (startInMenu) {
+        runtime_.unload(engine_);
+        screen_ = Screen::mainMenu;
+        if (!initialLevel.empty()) {
+            requestedLevel_ = initialLevel;
+        }
+    }
     engine_.attachOverlay(*this);
 }
 
@@ -44,15 +53,20 @@ void GameHud::configureUi() {
 
 OverlayInput GameHud::frame() {
     ImGui::SetCurrentContext(context_);
+    transitions();
     if (restart_) {
         restart_ = false;
         upgradedTower_.reset();
         upgradeFlashRemaining_ = 0;
+        bossBars_.clear();
         try {
             runtime_.restart(engine_);
             error_.clear();
         } catch (const std::exception& error) {
             error_ = error.what();
+            runtime_.unload(engine_);
+            screen_ = Screen::levels;
+            refreshLevels();
         }
     }
     const bool relative = SDL_GetWindowRelativeMouseMode(native_.window);
@@ -67,8 +81,16 @@ OverlayInput GameHud::frame() {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+    if (screen_ != Screen::gameplay) {
+        menu();
+        viewportMouse_ = false;
+        commandCursor_.reset();
+        commandGesture_ = {};
+        return {true, true, false, true};
+    }
     upgradeFlashRemaining_ = std::max(0.0, upgradeFlashRemaining_ - io.DeltaTime);
     status();
+    bossHealth();
     const auto* waves = runtime_.level().waves();
     if (waves && (waves->phase() == LevelPhase::victory || waves->phase() == LevelPhase::defeat)) {
         result();
@@ -86,6 +108,140 @@ OverlayInput GameHud::frame() {
             io.WantCaptureKeyboard,
             false,
             runtime_.placing() || runtime_.deployingHero()};
+}
+
+void GameHud::clearFeedback() {
+    restart_ = false;
+    upgradedTower_.reset();
+    upgradeFlashRemaining_ = 0;
+    bossBars_.clear();
+    commandGesture_ = {};
+    commandCursor_.reset();
+    error_.clear();
+}
+
+void GameHud::refreshLevels() {
+    catalog_ = discoverLevels(engine_.assetRoot());
+    if (selectedLevel_ &&
+        std::none_of(catalog_.levels.begin(), catalog_.levels.end(), [&](const AvailableLevel& level) {
+            return level.path == *selectedLevel_;
+        })) {
+        selectedLevel_.reset();
+    }
+    refreshRemaining_ = 2;
+}
+
+void GameHud::transitions() {
+    if (requestedScreen_) {
+        const auto next = *requestedScreen_;
+        requestedScreen_.reset();
+        runtime_.unload(engine_);
+        clearFeedback();
+        screen_ = next;
+        SDL_SetWindowRelativeMouseMode(native_.window, false);
+        if (screen_ == Screen::levels) {
+            refreshLevels();
+        }
+    }
+    if (requestedLevel_) {
+        const auto path = *requestedLevel_;
+        requestedLevel_.reset();
+        clearFeedback();
+        try {
+            runtime_.load(engine_, path);
+            screen_ = Screen::gameplay;
+        } catch (const std::exception& error) {
+            runtime_.unload(engine_);
+            screen_ = Screen::levels;
+            error_ = error.what();
+            refreshLevels();
+        }
+    }
+}
+
+void GameHud::menu() {
+    auto* viewport = ImGui::GetMainViewport();
+    ImGui::GetBackgroundDrawList()->AddRectFilled(
+        viewport->Pos,
+        {viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y},
+        IM_COL32(5, 12, 18, 255));
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + viewport->Size.y * 0.5F},
+                            ImGuiCond_Always,
+                            {0.5F, 0.5F});
+    const bool selecting = screen_ == Screen::levels;
+    ImGui::SetNextWindowSize({std::max(200.0F, std::min(640.0F, viewport->Size.x - 48)),
+                              selecting ? std::max(220.0F, std::min(620.0F, viewport->Size.y - 48)) : 230.0F});
+    if (ImGui::Begin(selecting ? "Level Selection" : "Main Menu",
+                     nullptr,
+                     hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextColored({0.85F, 0.73F, 0.48F, 1}, "GRIMLOCK");
+        ImGui::TextUnformatted(selecting ? "Choose your battlefield" : "Prepare. Defend. Survive.");
+        ImGui::Separator();
+        if (!selecting) {
+            if (ImGui::Button("Choose Level", {-1, 42})) {
+                requestedScreen_ = Screen::levels;
+            }
+            if (ImGui::Button("Quit", {-1, 42})) {
+                quit_ = true;
+            }
+        } else {
+            refreshRemaining_ -= ImGui::GetIO().DeltaTime;
+            if (refreshRemaining_ <= 0) {
+                refreshLevels();
+            }
+            if (ImGui::BeginChild("Available Levels", {0, -130})) {
+                if (catalog_.levels.empty()) {
+                    ImGui::TextWrapped(
+                        "No playable levels found. Save a level in the game's levels folder, then refresh.");
+                }
+                for (const auto& level : catalog_.levels) {
+                    ImGui::PushID(level.path.generic_string().c_str());
+                    if (ImGui::Selectable(level.name.c_str(), selectedLevel_ == level.path)) {
+                        selectedLevel_ = level.path;
+                        error_.clear();
+                    }
+                    if (!level.description.empty()) {
+                        ImGui::TextWrapped("%s", level.description.c_str());
+                    }
+                    ImGui::Spacing();
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndChild();
+            if (!error_.empty()) {
+                ImGui::TextColored({1, 0.55F, 0.45F, 1}, "Unable to load this level. Hover for details.");
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("%s", error_.c_str());
+                }
+            }
+            ImGui::BeginDisabled(!selectedLevel_);
+            if (ImGui::Button("Play", {160, 36})) {
+                requestedLevel_ = selectedLevel_;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Refresh", {100, 36})) {
+                refreshLevels();
+            }
+            if (ImGui::Button("Main Menu")) {
+                requestedScreen_ = Screen::mainMenu;
+            }
+            if (!catalog_.errors.empty()) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("%zu unavailable", catalog_.errors.size());
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::PushTextWrapPos(460);
+                    for (const auto& error : catalog_.errors) {
+                        ImGui::TextWrapped("%s", error.c_str());
+                    }
+                    ImGui::PopTextWrapPos();
+                    ImGui::EndTooltip();
+                }
+            }
+        }
+    }
+    ImGui::End();
 }
 
 void GameHud::status() {
@@ -137,11 +293,78 @@ void GameHud::status() {
         if (ImGui::Button("Restart Level")) {
             restart_ = true;
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Choose Level")) {
+            requestedScreen_ = Screen::levels;
+        }
         if (!error_.empty()) {
             ImGui::TextWrapped("%s", error_.c_str());
         }
     }
+    statusSize_ = {ImGui::GetWindowSize().x, ImGui::GetWindowSize().y};
     ImGui::End();
+}
+
+void GameHud::bossHealth() {
+    const auto* waves = runtime_.level().waves();
+    const auto* enemies = runtime_.navigation().enemies();
+    if (!waves || waves->phase() != LevelPhase::battle || !enemies) {
+        bossBars_.clear();
+        return;
+    }
+    const auto activeBoss = [&](const Enemy* enemy) {
+        return enemy && enemy->active && enemy->alive && enemy->health > 0 && enemies->definition(enemy->type).boss;
+    };
+    std::erase_if(bossBars_, [&](const BossBar& bar) {
+        return !activeBoss(enemies->find(bar.enemy));
+    });
+    const float blend = 1 - std::exp(-8.0F * ImGui::GetIO().DeltaTime);
+    for (const auto& enemy : enemies->enemies()) {
+        if (!activeBoss(&enemy)) {
+            continue;
+        }
+        const float fraction = std::clamp(enemy.health / enemy.maximumHealth, 0.0F, 1.0F);
+        const auto found = std::find_if(bossBars_.begin(), bossBars_.end(), [&](const BossBar& bar) {
+            return bar.enemy == enemy.id;
+        });
+        if (found == bossBars_.end()) {
+            bossBars_.push_back({enemy.id, fraction});
+        } else {
+            found->fraction += (fraction - found->fraction) * blend;
+        }
+    }
+    if (bossBars_.empty()) {
+        return;
+    }
+    auto* viewport = ImGui::GetMainViewport();
+    const float width = std::max(100.0F, std::min(560.0F, viewport->Size.x - 36));
+    const float left = (viewport->Size.x - width) * 0.5F;
+    // Keep the status controls usable on smaller windows while retaining a centered boss panel.
+    const float top = left < 18 + statusSize_.x + 12 ? 30 + statusSize_.y : 18;
+    const float rowHeight = ImGui::GetTextLineHeightWithSpacing() + 32 + ImGui::GetStyle().ItemSpacing.y;
+    const float height =
+        std::min(24 + rowHeight * static_cast<float>(bossBars_.size()), std::max(64.0F, viewport->Size.y * 0.4F));
+    ImGui::SetNextWindowPos({viewport->Pos.x + left, viewport->Pos.y + top});
+    ImGui::SetNextWindowSize({width, height});
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, {0.055F, 0.018F, 0.027F, 0.96F});
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, IM_COL32(180, 48, 72, 255));
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(35, 20, 28, 255));
+    const auto flags = (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar)) |
+                       ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("Boss Health", nullptr, flags)) {
+        for (const auto& bar : bossBars_) {
+            const auto* enemy = enemies->find(bar.enemy);
+            const auto& name = enemies->definition(enemy->type).name;
+            const float textWidth = ImGui::CalcTextSize(name.c_str()).x;
+            ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), (ImGui::GetWindowSize().x - textWidth) * 0.5F));
+            ImGui::TextColored({0.95F, 0.78F, 0.48F, 1}, "%s", name.c_str());
+            char health[80];
+            std::snprintf(health, sizeof(health), "%.0f / %.0f", enemy->health, enemy->maximumHealth);
+            ImGui::ProgressBar(bar.fraction, {-1, 32}, health);
+        }
+    }
+    ImGui::End();
+    ImGui::PopStyleColor(3);
 }
 
 void GameHud::construction() {
@@ -266,6 +489,9 @@ void GameHud::result() {
         if (ImGui::Button("Play Again")) {
             restart_ = true;
         }
+        if (ImGui::Button("Choose Level")) {
+            requestedScreen_ = Screen::levels;
+        }
     }
     ImGui::End();
 }
@@ -324,6 +550,10 @@ void GameHud::heroControls() {
 
 void GameHud::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
+    if (screen_ != Screen::gameplay) {
+        ImGui::Render();
+        return;
+    }
     glm::ivec2 logical{}, drawable{};
     SDL_GetWindowSize(native_.window, &logical.x, &logical.y);
     SDL_GetWindowSizeInPixels(native_.window, &drawable.x, &drawable.y);

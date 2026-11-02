@@ -97,6 +97,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     }
     LevelDefinition result;
     result.name = document.at("name").get<std::string>();
+    result.description = document.value("description", std::string{});
     result.scene = document.at("scene").get<std::string>();
     result.startingGold = document.contains("starting_gold") ? gold(document.at("starting_gold")) : 0;
     if (document.contains("hero_spawns")) {
@@ -153,6 +154,9 @@ void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinitio
                               {"damage_per_arrival", definition.damagePerArrival}}},
                             {"spawns", nlohmann::json::array()},
                             {"waves", nlohmann::json::array()}};
+    if (!definition.description.empty()) {
+        document["description"] = definition.description;
+    }
     for (const auto& spawn : definition.spawns) {
         document["spawns"].push_back({{"name", spawn.name},
                                       {"minimum", {spawn.area.minimum.x, spawn.area.minimum.y}},

@@ -13,6 +13,7 @@ namespace grimlock::game {
 class LevelRuntime final {
 public:
     void load(Engine& engine, const std::filesystem::path& level);
+    void unload(Engine& engine);
     void restart(Engine& engine);
     void update(Engine& engine, double delta);
     void startWave();

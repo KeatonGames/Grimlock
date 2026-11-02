@@ -25,5 +25,16 @@
       "hero_priority": 3, "tower_priority": 2, "objective_priority": 1,
       "hero_damage_modifier": 1.5
     }
+  },
+  {
+    "name": "Iron Stag", "animal": "Deer", "boss": true,
+    "maximum_health": 1600, "speed": 0.85,
+    "radius": 1.0, "height": 2.0, "visual_height": 1.8,
+    "combat": {
+      "damage": 45, "range": 0.65, "attack_interval": 1.5, "impact_time": 0.4,
+      "aggression_range": 5, "pursuit_range": 7,
+      "hero_priority": 2, "tower_priority": 3, "objective_priority": 1,
+      "tower_damage_modifier": 1.5
+    }
   }
 ]

@@ -1,16 +1,17 @@
 #include "game.hpp"
 
 namespace grimlock::game {
-Game::Game(const std::filesystem::path& level, const std::filesystem::path& environment)
+Game::Game(const std::filesystem::path& level,
+           const std::filesystem::path& environment,
+           const std::filesystem::path& assets)
     : engine_(EngineConfig{.windowTitle = "Grimlock Game",
                            .environmentFolder = environment,
-                           .assetRoot = assetRootForLevel(level)}) {
-    runtime_.load(engine_, level.empty() ? std::filesystem::path{"assets/levels/first_watch.json"} : level);
-    hud_ = std::make_unique<GameHud>(engine_, runtime_);
+                           .assetRoot = assets.empty() ? assetRootForLevel(level) : assets}) {
+    hud_ = std::make_unique<GameHud>(engine_, runtime_, true, level);
 }
 
 void Game::run() {
-    while (engine_.update([&](double delta) {
+    while (!hud_->quitRequested() && engine_.update([&](double delta) {
         runtime_.update(engine_, delta);
     })) {
     }

@@ -39,6 +39,7 @@ struct LevelDefinition {
     std::uint64_t startingGold = 0;
     std::vector<glm::dvec3> heroSpawns;
     double objectiveHeight = 0;
+    std::string description;
 };
 
 // Scene paths are relative to the asset root; spawn/objective coordinates are world X/Z.

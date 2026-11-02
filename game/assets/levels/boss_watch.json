@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "name": "Boss Watch | The Iron Stag",
+  "scene": "scenes/hill_watch.json",
+  "starting_gold": 200,
+  "hero_spawns": [[9, 2, -1]],
+  "objective": {"position": [10, 0], "height": 2, "health": 20, "damage_per_arrival": 1},
+  "spawns": [
+    {"name": "Lower approach", "minimum": [-7, -1], "maximum": [-5, 1], "height": 0},
+    {"name": "Stag approach", "minimum": [-6, 0], "maximum": [-6, 0], "height": 0}
+  ],
+  "waves": [
+    {"name": "Scouts", "gold_reward": 30, "groups": [
+      {"enemy": "Grunt", "count": 4, "spawn": "Lower approach", "start": 0, "batch_size": 2, "interval": 3}
+    ]},
+    {"name": "The Iron Stag", "gold_reward": 0, "groups": [
+      {"enemy": "Grunt", "count": 6, "spawn": "Lower approach", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Iron Stag", "count": 1, "spawn": "Stag approach", "start": 3, "batch_size": 1, "interval": 1}
+    ]}
+  ]
+}

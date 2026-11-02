@@ -80,6 +80,7 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
         d.speed = entry.value("speed", d.speed);
         d.maximumHealth = entry.value("maximum_health", d.maximumHealth);
         d.showHealthBar = entry.value("show_health_bar", d.showHealthBar);
+        d.boss = entry.value("boss", d.boss);
         d.acceleration = entry.value("acceleration", d.acceleration);
         d.deceleration = entry.value("deceleration", d.deceleration);
         d.stoppingDistance = entry.value("stopping_distance", d.stoppingDistance);
@@ -131,6 +132,9 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
             d.maximumHealth = entry.at("maximum_health").get<float>();
             d.speed = entry.at("speed").get<double>();
             d.radius = entry.value("radius", d.radius);
+            d.height = entry.value("height", d.height);
+            d.visualHeight = entry.value("visual_height", d.visualHeight);
+            d.boss = entry.value("boss", false);
             d.showHealthBar = true;
             const auto attackAnimation = d.combat.attackAnimation;
             d.combat = {};

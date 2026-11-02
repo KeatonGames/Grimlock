@@ -18,6 +18,30 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     const auto path = level.is_absolute() ? level : engine.assetRoot().parent_path() / level;
     auto definition = loadLevelDefinition(path);
     auto scene = engine.loadScene(engine.assetRoot() / definition.scene);
+    unload(engine);
+    try {
+        engine.setScene(std::move(scene));
+        level_.begin(engine, navigation_, std::move(definition));
+        engine_ = &engine;
+        heroes_ = std::make_unique<HeroSystem>(engine);
+        heroes_->shareCombatGeometry(navigation_.combatGeometry());
+        heroes_->synchronize(navigation_.towers());
+        for (const auto& position : level_.waves()->definition().heroSpawns) {
+            (void)heroes_->deploy(position);
+        }
+        levelPath_ = path;
+        engine.setObjectSelectionEnabled(false);
+        engine.setCameraNavigationEnabled();
+        auto camera = engine.cameraNavigationConfig();
+        camera.panDragThreshold = GroundCommandGesture::dragThreshold;
+        engine.configureCameraNavigation(camera);
+    } catch (...) {
+        unload(engine);
+        throw;
+    }
+}
+
+void LevelRuntime::unload(Engine& engine) {
     cancelPlacement();
     heroes_.reset();
     selectedHero_.reset();
@@ -25,22 +49,13 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     heroError_.clear();
     inspectedTower_.reset();
     navigation_.shutdown();
-    engine.setScene(std::move(scene));
-    level_.begin(engine, navigation_, std::move(definition));
-    engine_ = &engine;
-    heroes_ = std::make_unique<HeroSystem>(engine);
-    heroes_->shareCombatGeometry(navigation_.combatGeometry());
-    heroes_->synchronize(navigation_.towers());
-    for (const auto& position : level_.waves()->definition().heroSpawns) {
-        (void)heroes_->deploy(position);
-    }
-    levelPath_ = path;
+    heroCombat_ = {};
+    levelPath_.clear();
+    engine_ = nullptr;
     selectedTower_ = "basic";
+    engine.setScene(nullptr);
     engine.setObjectSelectionEnabled(false);
-    engine.setCameraNavigationEnabled();
-    auto camera = engine.cameraNavigationConfig();
-    camera.panDragThreshold = GroundCommandGesture::dragThreshold;
-    engine.configureCameraNavigation(camera);
+    engine.setCameraNavigationEnabled(false);
 }
 
 void LevelRuntime::restart(Engine& engine) {
@@ -53,6 +68,9 @@ void LevelRuntime::restart(Engine& engine) {
 void LevelRuntime::update(Engine& engine, double delta) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Level delta must be finite and nonnegative.");
+    }
+    if (!level_.waves()) {
+        return;
     }
     do {
         const double step = std::min(delta, 1.0 / 30);

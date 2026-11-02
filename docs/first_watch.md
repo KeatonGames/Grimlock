@@ -1,7 +1,8 @@
 # First Watch: Meadow Gates
 
-Run `Grimlock.exe` to play. In Editor, use **Navigation > Level > Load First Watch**.
-The default level is `game/assets/levels/first_watch.json`; the hand-authored engine
+Run `Grimlock.exe`, choose **Choose Level**, then select **First Watch** and press
+**Play**. In Editor, use **Navigation > Level > Load First Watch**.
+The level is `game/assets/levels/first_watch.json`; the hand-authored engine
 scene is `game/assets/scenes/first_watch.json`. The technical `demo.json` is unchanged.
 
 ## The battlefield

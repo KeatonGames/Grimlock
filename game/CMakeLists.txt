@@ -12,6 +12,7 @@ add_library(GameLogic STATIC
     src/systems/level_session.cpp
     src/systems/economy_system.cpp
     src/runtime/level_runtime.cpp
+    src/runtime/level_catalog.cpp
     src/navigation/navigation_geometry.cpp
     src/navigation/level_geometry.cpp
     src/navigation/nav_mesh.cpp

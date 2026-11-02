@@ -38,6 +38,7 @@ struct EnemyDefinition {
     bool despawnOnArrival = true;
     EnemyCombatDefinition combat;
     bool showHealthBar = false;
+    bool boss = false;
 };
 
 void validateEnemyDefinition(const EnemyDefinition& definition);

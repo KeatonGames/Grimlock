@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 3, "expected asset and fixture directories");
         const auto definitions = loadAnimalDefinitions(argv[1]);
-        require(definitions.size() == 14 && definitions.front().model == "models/chicken.glb" &&
+        require(definitions.size() == 15 && definitions.front().model == "models/chicken.glb" &&
                     definitions.front().radius == 0.195 && definitions.front().visualHeight == 0.36F,
                 "animal catalog/default settings incorrect");
         bool varied = false;
@@ -44,6 +44,10 @@ int main(int argc, char** argv) {
         const auto& grunt = definitions[11];
         const auto& siege = definitions[12];
         const auto& hunter = definitions[13];
+        const auto& boss = definitions[14];
+        require(boss.boss && !grunt.boss && boss.maximumHealth > siege.maximumHealth && boss.radius > siege.radius &&
+                    boss.height > siege.height && boss.visualHeight > siege.visualHeight,
+                "boss marker/statistics/independent dimensions missing");
         require(grunt.name == "Grunt" && grunt.combat.objectiveFirst && grunt.model == definitions[0].model &&
                     siege.name == "Siege" && siege.maximumHealth > grunt.maximumHealth && siege.speed < grunt.speed &&
                     siege.combat.towerPriority > siege.combat.heroPriority && siege.combat.towerDamageModifier == 2 &&
@@ -162,6 +166,21 @@ int main(int argc, char** argv) {
                     inherited.back().radius == inherited.front().radius && inherited.back().combat.objectiveFirst &&
                     inherited.back().combat.towerDamageModifier == 2,
                 "archetype presentation inheritance or policy override failed");
+        archetype["boss"] = true;
+        archetype["radius"] = 1.0;
+        archetype["height"] = 2.0;
+        archetype["visual_height"] = 1.8;
+        saveArchetypes(nlohmann::json::array({archetype}));
+        const auto configuredBoss = loadAnimalDefinitions(fixture).back();
+        require(configuredBoss.boss && configuredBoss.radius == 1 && configuredBoss.height == 2 &&
+                    configuredBoss.visualHeight == 1.8F,
+                "boss marker or independent collision/visual dimensions not loaded");
+        archetype["height"] = -1;
+        saveArchetypes(nlohmann::json::array({archetype}));
+        rejects([&] {
+            (void)loadAnimalDefinitions(fixture);
+        });
+        archetype["height"] = 2;
         archetype["combat"]["tower_damage_modifier"] = -1;
         saveArchetypes(nlohmann::json::array({archetype}));
         rejects([&] {

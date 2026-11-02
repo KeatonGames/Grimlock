@@ -8,7 +8,9 @@ namespace grimlock::game {
 
 class Game final {
 public:
-    explicit Game(const std::filesystem::path& level = {}, const std::filesystem::path& environment = {});
+    explicit Game(const std::filesystem::path& level = {},
+                  const std::filesystem::path& environment = {},
+                  const std::filesystem::path& assets = {});
     void run();
 
 private:

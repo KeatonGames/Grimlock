@@ -13,6 +13,8 @@ reference to use another existing animal without changing the targeting policy.
 An optional `radius` overrides the inherited physical footprint independently of
 visual scale. Definitions are loaded once; existing instances retain their type.
 Model/GPU resources are cached by Engine and shared across types and instances.
+Archetypes also support independent `height` and `visual_height` overrides; see
+[boss configuration and the dedicated Game health display](bosses.md).
 
 | Type | Animal | Health | Speed | Damage | Interval | Range | Detection / pursuit | Preference |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
@@ -73,8 +75,8 @@ Run the same scenario in Game:
 Rival Watch reuses Cover Watch's mountain, ramp, elevated build zones, tower and hero.
 Its four waves are Grunts; Grunts/Hunters; Grunts/Siege; all three. It has 150 starting
 gold and fixed rewards of 35, 45, 55 and 0. Its deliberately forgiving 50-health
-objective allows all four diagnostic waves to run; First Watch remains the default
-playable level and its balancing is unchanged. Start each wave from the normal HUD.
+objective allows all four diagnostic waves to run; First Watch remains available
+in level selection and its balancing is unchanged. Start each wave from the normal HUD.
 
 The existing `Enemies.Definitions` and `Combat.Battle` checks cover archetype data,
 legacy compatibility, invalid input, target preferences, interception/disengagement,
