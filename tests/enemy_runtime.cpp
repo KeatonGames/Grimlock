@@ -753,6 +753,16 @@ int main(int argc, char** argv) {
         require(SDL_PushEvent(&focus), SDL_GetError());
         tick(engine);
 
+        navigationControl(engine, id, "Show Performance");
+        const auto* performance = ImGui::FindWindowByName("Performance");
+        require(performance && performance->Active && engine.performance().frameMilliseconds > 0,
+                "Editor performance diagnostics did not start");
+        navigationControl(engine, id, "Show Performance");
+        const auto lastSample = engine.performance().frameMilliseconds;
+        tick(engine);
+        require(!performance->Active && engine.performance().frameMilliseconds == lastSample,
+                "Hidden performance diagnostics continued sampling");
+
         require(ImGui::GetBackgroundDrawList(ImGui::GetMainViewport())->VtxBuffer.empty(),
                 "grid visible during normal viewing");
         navigationControl(engine, id, "Edit Walkability");

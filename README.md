@@ -21,6 +21,8 @@ and development tools. Game does not link Editor or GameDebug.
 - Data-driven Grunt, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
 - Boss definitions reuse enemy combat/navigation and add stacked Game HUD health bars; see [boss encounters](docs/bosses.md).
 - Main menu and automatic discovery of Editor-authored levels, with in-game switching and restart; see [level selection](docs/level_selection.md).
+- Persistent attempts, victories, completion records and last played in user data; see [progression](docs/progression.md).
+- Responsive Game HUD, shared visual components, contextual command cards and pause/settings; see [Game UI](docs/game_ui.md).
 
 ## Tech Stack
 
@@ -109,4 +111,7 @@ ctest --test-dir out/build/release -C Release --output-on-failure
 ```
 
 Runtime tests require a working Vulkan display and the supplied assets.
+
+For Editor profiling, reproducible combat stress tests, and measured results, see
+[combat performance](docs/combat_performance.md).
 

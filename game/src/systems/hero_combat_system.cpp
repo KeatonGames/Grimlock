@@ -31,6 +31,7 @@ void HeroCombatSystem::abandon(HeroSystem& heroes, Hero& hero) {
 
 bool HeroCombatSystem::inRange(const HeroSystem& heroes, const Hero& hero, const Enemy& enemy, double range) {
     return enemy.alive && enemy.active && enemy.health > 0 &&
+           meleeGap(hero.position, heroes.definition_.radius, {enemy.position, enemy.radius}) <= range + 1e-6 &&
            heroes.combatGeometry().visible(hero.position + glm::dvec3{0, heroes.definition_.height * 0.5, 0},
                                            combatAim(enemy)) &&
            meleeContact(heroes.navigation_,
@@ -208,22 +209,22 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
     const auto& stats = heroes.definition_.combat;
     state.retryDelay = 0.4;
     candidates_.clear();
-    for (const auto& candidate : enemies.enemies()) {
+    enemies.visitNearby(hero.position, stats.acquisitionRange, [&](const Enemy& candidate) {
         if (!candidate.alive || !candidate.active ||
             distance(hero.defensivePosition, candidate.position) > stats.pursuitRange ||
             (state.unreachableTarget == candidate.id && state.unreachableRetry > 0 &&
              state.failedRevision == heroes.navigation_.revision())) {
-            continue;
+            return;
         }
         if (state.excludedTarget == candidate.id &&
             distance(state.excludedOrigin, candidate.position) > stats.acquisitionRange) {
-            continue;
+            return;
         }
         const double separation = distance(hero.position, candidate.position);
         if (separation <= stats.acquisitionRange) {
             candidates_.emplace_back(separation, candidate.id);
         }
-    }
+    });
     std::sort(candidates_.begin(), candidates_.end());
     for (const auto& [separation, id] : candidates_) {
         const auto& enemy = *enemies.find(id);

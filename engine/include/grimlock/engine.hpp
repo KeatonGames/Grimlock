@@ -1,8 +1,8 @@
 #pragma once
-
 #include "grimlock/camera.hpp"
 #include "grimlock/lighting.hpp"
 #include "grimlock/orbit_camera.hpp"
+#include "grimlock/performance.hpp"
 #include "grimlock/scene.hpp"
 #include "grimlock/transform.hpp"
 
@@ -129,6 +129,11 @@ public:
     [[nodiscard]] bool cameraNavigationEnabled() const noexcept;
     [[nodiscard]] const OrbitCameraConfig& cameraNavigationConfig() const noexcept;
     void configureCameraNavigation(const OrbitCameraConfig& config);
+    // Pauses scene and standalone animation clocks without affecting rendering or input.
+    void setAnimationsPaused(bool paused) noexcept;
+    // Disabled by default. Samples remain valid until the next enabled update.
+    void setPerformanceEnabled(bool enabled) noexcept;
+    [[nodiscard]] const FramePerformance& performance() const noexcept;
 
     // Polls events, advances animations/lights and renders. False only when closing;
     // a minimized window still updates, but rendering is deferred.

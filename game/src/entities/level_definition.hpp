@@ -40,7 +40,11 @@ struct LevelDefinition {
     std::vector<glm::dvec3> heroSpawns;
     double objectiveHeight = 0;
     std::string description;
+    std::string id;
 };
+
+[[nodiscard]] std::string createLevelId();
+[[nodiscard]] bool validLevelId(const std::string& id) noexcept;
 
 // Scene paths are relative to the asset root; spawn/objective coordinates are world X/Z.
 [[nodiscard]] LevelDefinition loadLevelDefinition(const std::filesystem::path& path);

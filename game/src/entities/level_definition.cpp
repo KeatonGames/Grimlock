@@ -1,9 +1,11 @@
 #include "entities/level_definition.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <random>
 #include <set>
 #include <stdexcept>
 
@@ -38,7 +40,37 @@ std::uint64_t gold(const nlohmann::json& value) {
 
 } // namespace
 
+std::string createLevelId() {
+    std::random_device random;
+    constexpr char digits[] = "0123456789abcdef";
+    std::string id;
+    for (int byte = 0; byte < 16; ++byte) {
+        if (byte == 4 || byte == 6 || byte == 8 || byte == 10) {
+            id += '-';
+        }
+        unsigned value = random() & 255U;
+        if (byte == 6) {
+            value = (value & 15U) | 64U;
+        }
+        if (byte == 8) {
+            value = (value & 63U) | 128U;
+        }
+        id += digits[value >> 4];
+        id += digits[value & 15U];
+    }
+    return id;
+}
+
+bool validLevelId(const std::string& id) noexcept {
+    return !id.empty() && id.size() <= 128 && std::all_of(id.begin(), id.end(), [](unsigned char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
+    });
+}
+
 void validateLevelDefinition(const LevelDefinition& definition) {
+    if (!definition.id.empty() && !validLevelId(definition.id)) {
+        throw std::invalid_argument("Invalid stable level ID.");
+    }
     if (definition.name.empty() || definition.scene.empty() || definition.scene.is_absolute() ||
         definition.scene.has_root_name() || definition.scene.extension() != ".json" ||
         !finite(definition.objectivePosition) || !std::isfinite(definition.objectiveHeight) ||
@@ -97,6 +129,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     }
     LevelDefinition result;
     result.name = document.at("name").get<std::string>();
+    result.id = document.value("id", std::string{});
     result.description = document.value("description", std::string{});
     result.scene = document.at("scene").get<std::string>();
     result.startingGold = document.contains("starting_gold") ? gold(document.at("starting_gold")) : 0;
@@ -143,7 +176,15 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
 
 void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinition& definition) {
     validateLevelDefinition(definition);
+    auto id = definition.id;
+    if (id.empty() && std::filesystem::is_regular_file(path)) {
+        id = loadLevelDefinition(path).id;
+    }
+    if (id.empty()) {
+        id = createLevelId();
+    }
     nlohmann::json document{{"version", 1},
+                            {"id", id},
                             {"name", definition.name},
                             {"scene", definition.scene.generic_string()},
                             {"starting_gold", definition.startingGold},

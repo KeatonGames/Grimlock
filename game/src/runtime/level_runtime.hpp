@@ -1,5 +1,6 @@
 #pragma once
 
+#include "runtime/player_progress.hpp"
 #include "systems/hero_combat_system.hpp"
 #include "systems/hero_system.hpp"
 #include "systems/level_session.hpp"
@@ -17,6 +18,34 @@ public:
     void restart(Engine& engine);
     void update(Engine& engine, double delta);
     void startWave();
+    void setPaused(bool paused);
+
+    [[nodiscard]] bool paused() const noexcept {
+        return paused_;
+    }
+
+    [[nodiscard]] bool selectHero(HeroId id);
+
+    void attachProgress(PlayerProgress& progress) noexcept {
+        progress_ = &progress;
+    }
+
+    [[nodiscard]] const PlayerProgress* progress() const noexcept {
+        return progress_;
+    }
+
+    [[nodiscard]] double completionSeconds() const noexcept {
+        return elapsed_;
+    }
+
+    [[nodiscard]] bool personalRecord() const noexcept {
+        return personalRecord_;
+    }
+
+    [[nodiscard]] const std::filesystem::path& path() const noexcept {
+        return levelPath_;
+    }
+
     void beginPlacement(const std::string& type);
     void cancelPlacement() noexcept;
     void updatePlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
@@ -81,6 +110,10 @@ private:
     std::optional<Tower> preview_, rejectedTower_;
     std::uint64_t rejectedRevision_ = 0;
     std::optional<ObjectId> inspectedTower_;
+    PlayerProgress* progress_ = nullptr; // Game-owned; Editor previews never attach player saves.
+    double elapsed_ = 0;
+    bool resultRecorded_ = false, personalRecord_ = false;
+    bool paused_ = false;
 };
 
 } // namespace grimlock::game

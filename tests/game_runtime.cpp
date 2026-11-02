@@ -62,6 +62,10 @@ void control(Engine& engine,
              const char* panelName,
              const char* label,
              const char* scope = nullptr) {
+    if (std::string_view{panelName} == "Game Status" && std::string_view{label} == "Start Wave") {
+        control(engine, runtime, window, "Build Towers", label, scope);
+        return;
+    }
     auto* panel = ImGui::FindWindowByName(panelName);
     require(panel && panel->Active, "game HUD panel missing");
     const auto seed = scope ? ImHashStr(scope, 0, panel->ID) : panel->ID;
@@ -70,7 +74,14 @@ void control(Engine& engine,
     mouse(window, SDL_EVENT_MOUSE_MOTION, {1, 1});
     tick(engine, runtime);
     for (float y = panel->InnerClipRect.Min.y + 4; y < panel->InnerClipRect.Max.y; y += 4) {
-        const glm::vec2 point{panel->DC.CursorStartPos.x + 50, y};
+        float x = panel->DC.CursorStartPos.x + 50;
+        if (std::string_view{label} == "Large Tower") {
+            x = panel->DC.CursorStartPos.x + 200 * ImGui::GetStyle().FontScaleMain;
+        }
+        if (std::string_view{label} == "Deploy Hero") {
+            x = panel->DC.CursorStartPos.x + 150 * ImGui::GetStyle().FontScaleMain;
+        }
+        const glm::vec2 point{x, y};
         mouse(window, SDL_EVENT_MOUSE_MOTION, point);
         tick(engine, runtime, 1);
         if (ImGui::GetHoveredID() == id) {
@@ -123,6 +134,7 @@ int main() {
         Engine engine{EngineConfig{.windowTitle = "Game runtime checks"}};
         const auto assetRoot = engine.assetRoot();
         auto definition = loadLevelDefinition(assetRoot / "levels/first_watch.json");
+        definition.id = createLevelId();
         auto scene = Scene::load(assetRoot / definition.scene);
         scene->setName("Editor-authored runtime fixture");
         auto zone = PlacementSystem{};
@@ -393,7 +405,7 @@ int main() {
                 "Game victory, reward or result HUD failed");
         require(contents(levelPath) == levelBefore && contents(assetRoot / definition.scene) == sceneBefore,
                 "gameplay overwrote authored files");
-        control(engine, runtime, id, "Level Result", "Play Again");
+        control(engine, runtime, id, "Level Result", "Retry");
         require(
             runtime.level().economy().gold() == 200 && runtime.level().waves()->health() == 30 &&
                 runtime.navigation().towers().towers().empty() && runtime.navigation().enemies()->enemies().empty() &&

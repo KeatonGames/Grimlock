@@ -34,7 +34,9 @@ public:
         return zoneQuads_;
     }
 
-    void shutdown(Engine&) noexcept override {
+    void shutdown(Engine& engine) noexcept override {
+        engine.setPerformanceEnabled(false);
+        level_.setPerformanceEnabled(false);
         placingTower_ = showPreview_ = false;
         level_.stop(session_);
         session_.shutdown();
@@ -73,6 +75,8 @@ private:
     std::string error_;
     bool showNavMesh_ = false;
     bool showCombat_ = false;
+    bool showPerformance_ = false;
+    double updateMilliseconds_ = 0;
     std::vector<editor::DebugLine> combatLines_;
     bool placingTower_ = false, showPreview_ = false, sceneChanged_ = false;
     bool gameplayPlacement_ = false;

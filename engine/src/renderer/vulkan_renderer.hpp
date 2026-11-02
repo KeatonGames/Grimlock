@@ -1,5 +1,4 @@
 #pragma once
-
 #include "assets/environment.hpp"
 #include "grimlock/assets/animation.hpp"
 #include "grimlock/camera.hpp"
@@ -16,6 +15,7 @@
 #include "renderer/vulkan_context.hpp"
 
 #include <cstddef>
+#include <grimlock/performance.hpp>
 #include <memory>
 #include <optional>
 #include <span>
@@ -58,6 +58,14 @@ public:
     void requestSwapchainRecreation() noexcept;
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
+
+    void setPerformanceEnabled(bool enabled) noexcept {
+        performanceEnabled_ = enabled;
+    }
+
+    [[nodiscard]] const FramePerformance& performance() const noexcept {
+        return performance_;
+    }
 
 private:
     void createCommandPool();
@@ -112,12 +120,13 @@ private:
         std::uint32_t deformation;
     };
 
-    [[nodiscard]] std::vector<PrimitiveDraw> preparePrimitiveDraws(const Camera& camera,
-                                                                   std::span<const ModelDraw> draws);
+    [[nodiscard]] std::span<PrimitiveDraw> preparePrimitiveDraws(const Camera& camera,
+                                                                 std::span<const ModelDraw> draws);
     static void sortPrimitiveDraws(std::span<PrimitiveDraw> primitives);
     void recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives);
 
     std::vector<std::unique_ptr<GpuModel>> models_;
+    std::vector<PrimitiveDraw> primitiveDraws_;
     std::optional<Deformation> deformation_;
     GridInstances gridInstances_;
     const Grid* cachedGrid_ = nullptr;
@@ -156,6 +165,12 @@ private:
     bool framebufferResized_ = false;
     RenderOverlay* overlay_ = nullptr;
     std::uint32_t minimumImages_ = 2;
+    bool performanceEnabled_ = false, timestampPending_ = false;
+    bool timestampsChecked_ = false;
+    FramePerformance performance_;
+    VkQueryPool timestamps_ = VK_NULL_HANDLE;
+    std::uint32_t timestampBits_ = 0;
+    float timestampPeriod_ = 0;
 };
 
 } // namespace grimlock::renderer

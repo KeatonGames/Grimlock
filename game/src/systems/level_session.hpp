@@ -8,9 +8,23 @@
 
 namespace grimlock::game {
 
+struct BattlePerformance {
+    double enemyAiMilliseconds = 0;
+    double navigationMilliseconds = 0;
+    double combatMilliseconds = 0;
+};
+
 // Binds an authored schedule to the existing scene/navigation/enemy systems.
 class LevelSession final {
 public:
+    void setPerformanceEnabled(bool enabled) noexcept {
+        performanceEnabled_ = enabled;
+    }
+
+    [[nodiscard]] const BattlePerformance& performance() const noexcept {
+        return performance_;
+    }
+
     void begin(Engine& engine, NavigationSession& navigation, LevelDefinition definition);
     void stop(NavigationSession& navigation);
     void startWave(NavigationSession& navigation);
@@ -46,6 +60,8 @@ private:
     std::uint64_t arrivals_ = 0;
     EconomySystem economy_;
     std::optional<std::uint64_t> lastWaveReward_;
+    bool performanceEnabled_ = false;
+    BattlePerformance performance_;
 };
 
 } // namespace grimlock::game

@@ -65,7 +65,7 @@ void CombatSystem::update(const TowerSystem& towers,
                                 attack.enemyCount != enemies.enemies().size();
             if (rescan) {
                 nearest = nullptr;
-                for (const auto& enemy : enemies.enemies()) {
+                enemies.visitNearby(base, statistics.attackRange, [&](const Enemy& enemy) {
                     // Range uses terrain-level entity anchors, independent of either model's visual height.
                     const auto offset = enemy.position - base;
                     const double distance = glm::dot(offset, offset);
@@ -74,7 +74,7 @@ void CombatSystem::update(const TowerSystem& towers,
                         nearest = &enemy;
                         nearestDistance = distance;
                     }
-                }
+                });
                 if (tracked && nearest) {
                     const double oldDistance = glm::length(tracked->position - base);
                     const double newDistance = glm::length(nearest->position - base);

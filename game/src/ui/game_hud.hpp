@@ -32,6 +32,7 @@ private:
     void menu();
     void refreshLevels();
     void clearFeedback();
+    void progressNotice();
     void status();
     void bossHealth();
     void construction();
@@ -39,6 +40,10 @@ private:
     void heroControls();
     void result();
     void placementOverlay(const Camera& camera);
+    void pauseMenu();
+    void settings();
+    void notifications();
+    void updateLayout();
     Engine& engine_;
     LevelRuntime& runtime_;
     bool viewportMouse_ = false, restart_ = false;
@@ -66,6 +71,20 @@ private:
     LevelCatalog catalog_;
     double refreshRemaining_ = 0;
     bool quit_ = false;
+    bool resultCatalogReady_ = false;
+
+    struct Layout {
+        float scale = 1, gap = 16, top = 92;
+        float dockWidth = 760, dockHeight = 212, contextWidth = 320, contextHeight = 270;
+    } layout_;
+
+    float uiScale_ = 1, entrance_ = 0;
+    bool settingsOpen_ = false, worldHealthBars_ = true;
+    std::optional<LevelPhase> displayedPhase_;
+    std::size_t displayedWave_ = 0;
+    std::string notification_;
+    float notificationRemaining_ = 0;
+    bool modalFrame_ = false;
 };
 
 } // namespace grimlock::game

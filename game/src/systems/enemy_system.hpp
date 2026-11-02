@@ -2,6 +2,10 @@
 
 #include "systems/crowd_movement.hpp"
 
+#include <cmath>
+#include <stdexcept>
+#include <unordered_map>
+
 namespace grimlock::game {
 
 struct EnemyMetrics {
@@ -38,6 +42,31 @@ public:
     void setDestinationHeight(double height);
     [[nodiscard]] bool setDestination(EnemyId id, std::optional<glm::dvec2> destination);
     [[nodiscard]] const Enemy* find(EnemyId id) const noexcept;
+
+    // Conservative X/Z candidates; callers retain exact range, elevation and visibility tests.
+    // Visitors must not mutate the system while walking its packed storage.
+    template <class Visitor> void visitNearby(glm::dvec3 position, double range, Visitor visitor) const {
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z) ||
+            !std::isfinite(range) || range < 0) {
+            throw std::invalid_argument("Nearby query requires a finite position and nonnegative range.");
+        }
+        const double binsAcross = range * 0.5 + 2;
+        // Broad queries and small populations are cheaper to scan than to visit mostly empty buckets.
+        if (enemies_.size() <= 32 || binsAcross * binsAcross >= enemies_.size() || std::abs(position.x) > 1e7 ||
+            std::abs(position.z) > 1e7) {
+            for (const auto& enemy : enemies_) {
+                visitor(enemy);
+            }
+            return;
+        }
+        if (neighborsDirty_) {
+            queryNeighbors_.build(enemies_, 4, glm::dvec3{0});
+            neighborsDirty_ = false;
+        }
+        queryNeighbors_.visit(position, range, [&](std::size_t index) {
+            visitor(enemies_[index]);
+        });
+    }
 
     [[nodiscard]] std::optional<glm::dvec2> sharedDestination() const noexcept {
         return sharedDestination_;
@@ -84,6 +113,9 @@ private:
     Engine& engine_;
     std::vector<AnimalType> types_;
     std::vector<Enemy> enemies_;
+    std::unordered_map<EnemyId, std::size_t> indices_;
+    mutable EnemyNeighbors queryNeighbors_;
+    mutable bool neighborsDirty_ = true;
     std::vector<DeathEffect> deaths_;
     EnemyId nextId_ = 1;
     CrowdMovement movement_;

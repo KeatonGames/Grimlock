@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -216,10 +217,53 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     }
 
     const VkDevice device = context_.device();
+    const auto waitStart =
+        performanceEnabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     {
         diagnostics::StartupSpan waitProfile{"wait.frame.fence"};
         checkVk(vkWaitForFences(device, 1, &inFlight_, VK_TRUE, UINT64_MAX), "vkWaitForFences");
     }
+    if (performanceEnabled_) {
+        performance_.fenceWaitMilliseconds =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - waitStart).count();
+        performance_.gpuMilliseconds.reset();
+        if (!timestampsChecked_) {
+            std::uint32_t count = 0;
+            vkGetPhysicalDeviceQueueFamilyProperties(context_.physicalDevice(), &count, nullptr);
+            std::vector<VkQueueFamilyProperties> families(count);
+            vkGetPhysicalDeviceQueueFamilyProperties(context_.physicalDevice(), &count, families.data());
+            timestampBits_ = families.at(context_.graphicsFamily()).timestampValidBits;
+            VkPhysicalDeviceProperties properties{};
+            vkGetPhysicalDeviceProperties(context_.physicalDevice(), &properties);
+            timestampPeriod_ = properties.limits.timestampPeriod;
+            if (timestampBits_ > 0) {
+                VkQueryPoolCreateInfo info{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
+                info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+                info.queryCount = 2;
+                checkVk(vkCreateQueryPool(device, &info, nullptr, &timestamps_), "vkCreateQueryPool(frame timestamps)");
+            }
+            timestampsChecked_ = true;
+        }
+        if (timestamps_ && timestampPending_) {
+            std::array<std::uint64_t, 2> values{};
+            const auto result = vkGetQueryPoolResults(device,
+                                                      timestamps_,
+                                                      0,
+                                                      2,
+                                                      sizeof(values),
+                                                      values.data(),
+                                                      sizeof(values[0]),
+                                                      VK_QUERY_RESULT_64_BIT);
+            if (result == VK_SUCCESS) {
+                const auto mask = timestampBits_ == 64 ? UINT64_MAX : ((std::uint64_t{1} << timestampBits_) - 1);
+                performance_.gpuMilliseconds =
+                    ((values[1] - values[0]) & mask) * static_cast<double>(timestampPeriod_) / 1e6;
+            } else if (result != VK_NOT_READY) {
+                checkVk(result, "vkGetQueryPoolResults(frame timestamps)");
+            }
+        }
+    }
+    timestampPending_ = false;
 
     updateGrid(grid); // The single frame in flight has finished using the instance buffer.
 
@@ -267,6 +311,7 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     submit.signalSemaphoreInfoCount = 1;
     submit.pSignalSemaphoreInfos = &signal;
     checkVk(vkQueueSubmit2(context_.graphicsQueue(), 1, &submit, inFlight_), "vkQueueSubmit2");
+    timestampPending_ = performanceEnabled_ && timestamps_;
 
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
@@ -274,11 +319,17 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     present.swapchainCount = 1;
     present.pSwapchains = &swapchain_;
     present.pImageIndices = &imageIndex;
+    const auto presentStart =
+        performanceEnabled_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     const VkResult result = [&] {
         diagnostics::StartupSpan waitProfile{"wait.frame.present_return"};
 
         return vkQueuePresentKHR(context_.presentQueue(), &present);
     }();
+    if (performanceEnabled_) {
+        performance_.presentMilliseconds =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - presentStart).count();
+    }
 
     if (result != VK_ERROR_OUT_OF_DATE_KHR && result != VK_SUBOPTIMAL_KHR) {
         checkVk(result, "vkQueuePresentKHR");
@@ -573,10 +624,10 @@ void VulkanRenderer::allocateCommandBuffers() {
     commandBuffers_.swap(buffers);
 }
 
-std::vector<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(
-    const Camera& camera,
-    const std::span<const ModelDraw> draws) {
-    std::vector<PrimitiveDraw> primitives;
+std::span<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(const Camera& camera,
+                                                                               const std::span<const ModelDraw> draws) {
+    auto& primitives = primitiveDraws_;
+    primitives.clear();
     deformation_->begin();
     const auto view = camera.view();
 
@@ -785,6 +836,10 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     checkVk(vkBeginCommandBuffer(command, &begin), "vkBeginCommandBuffer");
+    if (performanceEnabled_ && timestamps_) {
+        vkCmdResetQueryPool(command, timestamps_, 0, 2);
+        vkCmdWriteTimestamp2(command, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, timestamps_, 0);
+    }
 
     std::array<VkImageMemoryBarrier2, 2> barriers{};
     auto& color = barriers[0];
@@ -866,6 +921,9 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     }
 
     auto primitives = preparePrimitiveDraws(camera, draws);
+    if (performanceEnabled_) {
+        performance_.primitiveDraws = primitives.size();
+    }
     sortPrimitiveDraws(primitives);
     recordPrimitiveDraws(command, primitives);
 
@@ -927,6 +985,9 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     dependency.imageMemoryBarrierCount = 1;
     dependency.pImageMemoryBarriers = &present;
     vkCmdPipelineBarrier2(command, &dependency);
+    if (performanceEnabled_ && timestamps_) {
+        vkCmdWriteTimestamp2(command, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, timestamps_, 1);
+    }
     checkVk(vkEndCommandBuffer(command), "vkEndCommandBuffer");
 }
 
@@ -1045,6 +1106,8 @@ void VulkanRenderer::destroySwapchainResources() noexcept {
 void VulkanRenderer::destroy() noexcept {
     const auto device = context_.device();
     vkDeviceWaitIdle(device);
+    vkDestroyQueryPool(device, timestamps_, nullptr);
+    timestamps_ = VK_NULL_HANDLE;
     detachOverlay();
 
     destroySwapchainResources();

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -103,6 +104,10 @@ void NavigationDebug::menu(Engine& engine) {
     ImGui::TextUnformatted("NavMesh");
     ImGui::Checkbox("Show NavMesh", &showNavMesh_);
     ImGui::Checkbox("Show Combat Visibility", &showCombat_);
+    if (ImGui::Checkbox("Show Performance", &showPerformance_)) {
+        engine.setPerformanceEnabled(showPerformance_);
+        level_.setPerformanceEnabled(showPerformance_);
+    }
     if (ImGui::Button("Rebuild NavMesh")) {
         session_.rebuild(engine);
     }
@@ -367,7 +372,12 @@ void NavigationDebug::enemyInspector(EnemySystem& enemies) {
 }
 
 void NavigationDebug::update(Engine& engine, double delta) {
+    const auto start = showPerformance_ ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     level_.update(engine, session_, delta);
+    if (showPerformance_) {
+        updateMilliseconds_ =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    }
 }
 
 void NavigationDebug::requestLevel(Engine& engine, LevelDefinition definition) {
@@ -457,6 +467,13 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
         return;
     }
     auto& definition = *levelDraft_;
+    ImGui::TextWrapped("Level ID: %s", definition.id.empty() ? "Assigned on save" : definition.id.c_str());
+    if (ImGui::Button("Assign New Level ID")) {
+        definition.id = createLevelId();
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Use for an independent copy. Keep the ID when renaming or moving a level.");
+    }
     ImGui::InputText("Level Name", &definition.name);
     ImGui::InputTextMultiline("Description", &definition.description, {0, 65});
     auto scene = definition.scene.generic_string();
@@ -525,6 +542,9 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
     ImGui::InputText("Level File", &levelSavePath_);
     if (ImGui::Button("Save Level Definition")) {
         try {
+            if (definition.id.empty()) {
+                definition.id = createLevelId();
+            }
             saveLevelDefinition(std::filesystem::path{std::u8string{levelSavePath_.begin(), levelSavePath_.end()}},
                                 definition);
             error_.clear();
@@ -545,6 +565,54 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
 }
 
 void NavigationDebug::panel(Engine& engine) {
+    if (showPerformance_) {
+        const auto* viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowPos(ImVec2{viewport->WorkPos.x + viewport->WorkSize.x - 16, viewport->WorkPos.y + 16},
+                                ImGuiCond_FirstUseEver,
+                                ImVec2{1, 0});
+        if (ImGui::Begin("Performance", &showPerformance_, ImGuiWindowFlags_AlwaysAutoResize)) {
+            const auto& frame = engine.performance();
+            ImGui::Text("%.0f FPS | frame CPU %.3f ms", ImGui::GetIO().Framerate, frame.frameMilliseconds);
+            if (frame.gpuMilliseconds) {
+                ImGui::Text("GPU %.3f ms (previous submitted frame)", *frame.gpuMilliseconds);
+            } else {
+                ImGui::TextDisabled("GPU timestamps unavailable");
+            }
+            const auto* enemies = session_.enemies();
+            const auto* combat = level_.combat();
+            const auto& battle = level_.performance();
+            ImGui::Text("AI %.3f ms | navigation %.3f ms | combat/projectiles %.3f ms",
+                        battle.enemyAiMilliseconds,
+                        battle.navigationMilliseconds,
+                        battle.combatMilliseconds);
+            ImGui::Text("Enemies %zu | Towers %zu | Projectiles %zu",
+                        enemies ? enemies->enemies().size() : 0,
+                        session_.towers().towers().size(),
+                        combat ? combat->projectiles().projectiles().size() : 0);
+            ImGui::Text("Gameplay %.3f ms | movement %.3f ms",
+                        updateMilliseconds_,
+                        enemies ? enemies->metrics().updateMilliseconds : 0);
+            ImGui::Text("Preparation %.3f ms (animation %.3f ms)",
+                        frame.preparationMilliseconds,
+                        frame.animationMilliseconds);
+            ImGui::Text("Render %.3f ms | fence %.3f ms | present %.3f ms",
+                        frame.renderMilliseconds,
+                        frame.fenceWaitMilliseconds,
+                        frame.presentMilliseconds);
+            ImGui::Text("Model draws %zu | primitives %zu | instances %zu | cached models %zu",
+                        frame.modelDraws,
+                        frame.primitiveDraws,
+                        frame.instances,
+                        frame.models);
+            ImGui::Text("Selected profile path queries %llu",
+                        static_cast<unsigned long long>(session_.navigation().statistics().pathQueries));
+        }
+        ImGui::End();
+        if (!showPerformance_) {
+            engine.setPerformanceEnabled(false);
+            level_.setPerformanceEnabled(false);
+        }
+    }
     const auto* waves = level_.waves();
     if (!waves) {
         return;

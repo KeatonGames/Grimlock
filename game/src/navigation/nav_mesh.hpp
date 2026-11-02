@@ -84,6 +84,7 @@ public:
     [[nodiscard]] std::vector<glm::vec3> corners(glm::dvec3 position, const NavigationPath& path) const;
 
 private:
+    [[nodiscard]] bool visibleFrom(const NavigationPoint& from, glm::dvec3 destination) const;
     struct Data;
     std::unique_ptr<Data> data_;
     NavMeshConfiguration configuration_;

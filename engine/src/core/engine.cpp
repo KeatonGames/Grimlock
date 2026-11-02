@@ -233,7 +233,13 @@ struct Engine::Impl {
             gridCubeAsset.reset();
         }
 
-        activeScene->updateAnimations(delta);
+        const auto animationStart =
+            performanceEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+        activeScene->updateAnimations(animationsPaused ? 0 : delta);
+        if (performanceEnabled) {
+            performance.animationMilliseconds +=
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - animationStart).count();
+        }
         sceneDraws.clear();
         sceneDraws.reserve(activeScene->objects_.size());
         frameCamera = activeScene->resolvedCamera();
@@ -404,17 +410,23 @@ struct Engine::Impl {
     }
 
     void standaloneFrame(double delta, Lighting& frameLighting) {
+        const auto animationStart =
+            performanceEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         bool imported = false;
         for (std::size_t i = 0; i < instances.size(); ++i) {
             if (!instances[i] || (activeScene && !sceneInstances[i])) {
                 continue;
             }
-            instances[i]->update(delta);
+            instances[i]->update(animationsPaused ? 0 : delta);
             for (const auto node : instances[i]->pose().activeNodes) {
                 imported = imported || instances[i]->model().nodes[node].light.has_value();
             }
         }
 
+        if (performanceEnabled) {
+            performance.animationMilliseconds +=
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - animationStart).count();
+        }
         if (!imported) {
             return;
         }
@@ -438,6 +450,9 @@ struct Engine::Impl {
     }
 
     bool update(const std::function<void(double)>& gameUpdate) {
+        const bool measureFrame = performanceEnabled;
+        const auto frameStart =
+            measureFrame ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         pollEvents();
 
         if (!running) {
@@ -469,9 +484,14 @@ struct Engine::Impl {
         if (overlay) {
             overlay->finishFrame(frameCamera);
         }
+        const auto gameStart =
+            performanceEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         if (gameUpdate) {
             gameUpdate(delta);
         }
+        performance.animationMilliseconds = 0;
+        const auto preparationStart =
+            performanceEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 
         if (activeScene) {
             sceneFrame(delta, frameCamera, frameLighting);
@@ -495,10 +515,33 @@ struct Engine::Impl {
             gridDraw.emplace(gridCubeGpuModel, *activeScene->navigationGrid());
         }
 
+        const auto renderStart =
+            performanceEnabled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
         if (renderer.drawFrame(frameCamera, sceneDraws, frameLighting, gridDraw ? &*gridDraw : nullptr)) {
             startup.firstPresent();
         } else {
             SDL_Delay(16);
+        }
+
+        // The overlay can enable profiling mid-frame; publish only samples with a measured start.
+        if (performanceEnabled && measureFrame) {
+            const auto end = std::chrono::steady_clock::now();
+            const auto animationMilliseconds = performance.animationMilliseconds;
+            performance = renderer.performance();
+            performance.animationMilliseconds = animationMilliseconds;
+            const auto milliseconds = [](auto begin, auto finish) {
+                return std::chrono::duration<double, std::milli>(finish - begin).count();
+            };
+            performance.frameMilliseconds = milliseconds(frameStart, end);
+            performance.gameMilliseconds = milliseconds(gameStart, preparationStart);
+            performance.preparationMilliseconds = milliseconds(preparationStart, renderStart);
+            performance.renderMilliseconds = milliseconds(renderStart, end);
+            performance.modelDraws = sceneDraws.size();
+            performance.instances = instances.size() - freeInstances.size();
+            performance.models =
+                static_cast<std::size_t>(std::count_if(resources.begin(), resources.end(), [](const auto& resource) {
+                    return resource != nullptr;
+                }));
         }
 
         return true;
@@ -512,6 +555,9 @@ struct Engine::Impl {
     renderer::VulkanRenderer renderer;
 
     std::filesystem::path assetRoot;
+    bool animationsPaused = false;
+    bool performanceEnabled = false;
+    FramePerformance performance;
     Camera camera;
     Lighting lighting;
     OrbitCameraController navigation;
@@ -549,6 +595,15 @@ Engine::Engine(const EngineConfig& config) : impl_(std::make_unique<Impl>(config
 }
 
 Engine::~Engine() = default;
+
+void Engine::setPerformanceEnabled(bool enabled) noexcept {
+    impl_->performanceEnabled = enabled;
+    impl_->renderer.setPerformanceEnabled(enabled);
+}
+
+const FramePerformance& Engine::performance() const noexcept {
+    return impl_->performance;
+}
 
 ModelId Engine::loadModel(const std::filesystem::path& path) {
     return ModelId{impl_->load(path, true)};
@@ -816,6 +871,10 @@ void Engine::setCameraNavigationEnabled(bool enabled) {
         impl_->navigationCameraId = impl_->activeScene ? impl_->activeScene->activeCamera() : std::string{};
         impl_->navigationSynchronized = true;
     }
+}
+
+void Engine::setAnimationsPaused(bool paused) noexcept {
+    impl_->animationsPaused = paused;
 }
 
 bool Engine::cameraNavigationEnabled() const noexcept {

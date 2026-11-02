@@ -142,6 +142,8 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
     const auto before = enemies_.size();
     const auto limit = std::min(maximumEnemies, before + count);
     enemies_.reserve(limit);
+    indices_.reserve(limit);
+    neighborsDirty_ = true;
     double maximumRadius = definition.radius;
     for (const auto& enemy : enemies_) {
         maximumRadius = std::max(maximumRadius, enemy.radius);
@@ -188,6 +190,12 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             EnemyAi::setDestination(enemy, sharedDestination_);
             enemy.maximumHealth = enemy.health = definition.maximumHealth;
             enemy.instance = engine_.createInstance(*animal.model, true);
+            try {
+                indices_.emplace(enemy.id, enemies_.size());
+            } catch (...) {
+                engine_.removeInstance(*enemy.instance);
+                throw;
+            }
             enemies_.push_back(std::move(enemy));
             spawnNeighbors_.insert(enemies_.size() - 1, position);
             auto& playback = engine_.animation(*enemies_.back().instance);
@@ -233,6 +241,7 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
     if (destination != sharedDestination_) {
         setSharedDestination(destination);
     }
+    neighborsDirty_ = true;
     movement_.update(navigation, enemies_, delta);
     metrics_.crowd = movement_.metrics();
     for (std::size_t index = 0; index < enemies_.size();) {
@@ -251,43 +260,45 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
 
 bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker) {
     validateDamage(damage);
-    for (std::size_t index = 0; index < enemies_.size(); ++index) {
-        auto& enemy = enemies_[index];
-        if (enemy.id != id || !enemy.active || !enemy.alive || damage == 0) {
-            continue;
-        }
-        receiveDamage(enemy.health, damage);
-        if (attacker.kind != DefensiveTargetKind::none) {
-            enemy.combat.attacker = attacker;
-            enemy.combat.threatRemaining = definition(enemy.type).combat.threatMemory;
-        }
-        enemy.hitFlashRemaining = 0.12;
-        engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
-        if (enemy.health > 0) {
-            return true;
-        }
-
-        enemy.active = enemy.alive = false;
-        enemy.velocity = enemy.desiredVelocity = {0, 0};
-        enemy.path.valid = false;
-        auto& playback = engine_.animation(*enemy.instance);
-        double duration = 0.25;
-        if (const auto clip = types_[enemy.type].deathClip) {
-            playback.setSpeed(1);
-            playback.play(*clip, false);
-            const auto& animation = playback.model().animations[*clip];
-            duration = std::max(duration, static_cast<double>(animation.end - animation.start));
-        } else {
-            playback.pause();
-        }
-        // The render-only effect retains the instance; dead enemies leave navigation and targeting immediately.
-        deaths_.push_back({*enemy.instance, duration});
-        enemy.instance.reset();
-        ++metrics_.defeated;
-        removeAt(index);
+    const auto found = indices_.find(id);
+    if (found == indices_.end() || damage == 0) {
+        return false;
+    }
+    const auto index = found->second;
+    auto& enemy = enemies_[index];
+    if (!enemy.active || !enemy.alive) {
+        return false;
+    }
+    receiveDamage(enemy.health, damage);
+    if (attacker.kind != DefensiveTargetKind::none) {
+        enemy.combat.attacker = attacker;
+        enemy.combat.threatRemaining = definition(enemy.type).combat.threatMemory;
+    }
+    enemy.hitFlashRemaining = 0.12;
+    engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
+    if (enemy.health > 0) {
         return true;
     }
-    return false;
+
+    enemy.active = enemy.alive = false;
+    enemy.velocity = enemy.desiredVelocity = {0, 0};
+    enemy.path.valid = false;
+    auto& playback = engine_.animation(*enemy.instance);
+    double duration = 0.25;
+    if (const auto clip = types_[enemy.type].deathClip) {
+        playback.setSpeed(1);
+        playback.play(*clip, false);
+        const auto& animation = playback.model().animations[*clip];
+        duration = std::max(duration, static_cast<double>(animation.end - animation.start));
+    } else {
+        playback.pause();
+    }
+    // The render-only effect retains the instance; dead enemies leave navigation and targeting immediately.
+    deaths_.push_back({*enemy.instance, duration});
+    enemy.instance.reset();
+    ++metrics_.defeated;
+    removeAt(index);
+    return true;
 }
 
 void EnemySystem::updateEffects(double delta) {
@@ -316,23 +327,24 @@ void EnemySystem::updateEffects(double delta) {
 }
 
 void EnemySystem::removeAt(std::size_t index) noexcept {
+    neighborsDirty_ = true;
+    indices_.erase(enemies_[index].id);
     if (enemies_[index].instance) {
         engine_.removeInstance(*enemies_[index].instance);
     }
     if (index != enemies_.size() - 1) {
         enemies_[index] = std::move(enemies_.back());
+        indices_.find(enemies_[index].id)->second = index;
     }
     enemies_.pop_back();
 }
 
 bool EnemySystem::remove(EnemyId id) noexcept {
-    const auto found = std::find_if(enemies_.begin(), enemies_.end(), [&](const Enemy& enemy) {
-        return enemy.id == id;
-    });
-    if (found == enemies_.end()) {
+    const auto found = indices_.find(id);
+    if (found == indices_.end()) {
         return false;
     }
-    removeAt(static_cast<std::size_t>(found - enemies_.begin()));
+    removeAt(found->second);
     return true;
 }
 
@@ -388,20 +400,17 @@ void EnemySystem::setDestinationHeight(double height) {
 }
 
 bool EnemySystem::setDestination(EnemyId id, std::optional<glm::dvec2> destination) {
-    for (auto& enemy : enemies_) {
-        if (enemy.id == id) {
-            EnemyAi::setDestination(enemy, destination);
-            return true;
-        }
+    const auto found = indices_.find(id);
+    if (found == indices_.end()) {
+        return false;
     }
-    return false;
+    EnemyAi::setDestination(enemies_[found->second], destination);
+    return true;
 }
 
 const Enemy* EnemySystem::find(EnemyId id) const noexcept {
-    const auto found = std::find_if(enemies_.begin(), enemies_.end(), [id](const Enemy& enemy) {
-        return enemy.id == id;
-    });
-    return found == enemies_.end() ? nullptr : &*found;
+    const auto found = indices_.find(id);
+    return found == indices_.end() ? nullptr : &enemies_[found->second];
 }
 
 } // namespace grimlock::game

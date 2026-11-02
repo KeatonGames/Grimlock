@@ -30,6 +30,9 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
             (void)heroes_->deploy(position);
         }
         levelPath_ = path;
+        if (progress_) {
+            progress_->startAttempt(level_.waves()->definition().id);
+        }
         engine.setObjectSelectionEnabled(false);
         engine.setCameraNavigationEnabled();
         auto camera = engine.cameraNavigationConfig();
@@ -42,6 +45,13 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
 }
 
 void LevelRuntime::unload(Engine& engine) {
+    paused_ = false;
+    engine.setAnimationsPaused(false);
+    if (progress_) {
+        progress_->abandonAttempt();
+    }
+    elapsed_ = 0;
+    resultRecorded_ = personalRecord_ = false;
     cancelPlacement();
     heroes_.reset();
     selectedHero_.reset();
@@ -69,11 +79,15 @@ void LevelRuntime::update(Engine& engine, double delta) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Level delta must be finite and nonnegative.");
     }
-    if (!level_.waves()) {
+    if (!level_.waves() || paused_) {
         return;
     }
     do {
         const double step = std::min(delta, 1.0 / 30);
+        const auto phase = level_.waves()->phase();
+        if (phase == LevelPhase::preparation || phase == LevelPhase::battle) {
+            elapsed_ += step;
+        }
         level_.update(engine, navigation_, step, heroes_.get());
         if (heroes_) {
             heroes_->synchronize(navigation_.towers());
@@ -83,6 +97,14 @@ void LevelRuntime::update(Engine& engine, double delta) {
                                level_.waves() && level_.waves()->phase() == LevelPhase::battle);
         }
         delta -= step;
+        const auto current = level_.waves()->phase();
+        if (!resultRecorded_ && (current == LevelPhase::victory || current == LevelPhase::defeat)) {
+            resultRecorded_ = true;
+            if (progress_) {
+                personalRecord_ =
+                    progress_->finishAttempt(level_.waves()->definition().id, current == LevelPhase::victory, elapsed_);
+            }
+        }
     } while (delta > 1e-10);
     if (!level_.waves() || level_.waves()->phase() != LevelPhase::preparation) {
         cancelPlacement();
@@ -92,6 +114,27 @@ void LevelRuntime::update(Engine& engine, double delta) {
 void LevelRuntime::startWave() {
     level_.startWave(navigation_);
     cancelPlacement();
+}
+
+void LevelRuntime::setPaused(bool paused) {
+    paused_ = paused && level_.waves();
+    if (engine_) {
+        engine_->setAnimationsPaused(paused_);
+        engine_->setCameraNavigationEnabled(!paused_);
+    }
+}
+
+bool LevelRuntime::selectHero(HeroId id) {
+    const auto* hero = heroes_ ? heroes_->find(id) : nullptr;
+    if (!hero || !engine_ || paused_) {
+        return false;
+    }
+    cancelPlacement();
+    heroError_.clear();
+    inspectedTower_.reset();
+    selectedHero_ = id;
+    engine_->scene()->selectObject(hero->object);
+    return true;
 }
 
 void LevelRuntime::beginPlacement(const std::string& type) {

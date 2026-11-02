@@ -1,6 +1,7 @@
 #include "systems/level_session.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <stdexcept>
 
@@ -75,6 +76,7 @@ void LevelSession::startWave(NavigationSession& navigation) {
 }
 
 void LevelSession::update(Engine& engine, NavigationSession& navigation, double delta, HeroSystem* heroes) {
+    performance_ = {};
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Level delta must be finite and nonnegative.");
     }
@@ -103,6 +105,8 @@ void LevelSession::update(Engine& engine, NavigationSession& navigation, double 
 }
 
 void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, double delta, HeroSystem* heroes) {
+    using Clock = std::chrono::steady_clock;
+    const auto start = performanceEnabled_ ? Clock::now() : Clock::time_point{};
     navigation.synchronize(engine);
     enemyCombat_.prepare(*navigation.enemies(),
                          navigation.towers(),
@@ -110,11 +114,23 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
                          waves_->definition().objectivePosition,
                          delta,
                          &navigation.combatGeometry());
+    const auto movementStart = performanceEnabled_ ? Clock::now() : Clock::time_point{};
     navigation.update(engine, delta);
+    const auto resolveStart = performanceEnabled_ ? Clock::now() : Clock::time_point{};
     enemyCombat_.resolve(engine, *navigation.enemies(), navigation.towers(), heroes, delta);
     navigation.synchronize(engine);
     navigation.towers().updateEffects(engine, delta);
+    const auto combatStart = performanceEnabled_ ? Clock::now() : Clock::time_point{};
     combat_->update(navigation.towers(), *navigation.enemies(), delta, &navigation.combatGeometry());
+    if (performanceEnabled_) {
+        const auto milliseconds = [](auto begin, auto end) {
+            return std::chrono::duration<double, std::milli>(end - begin).count();
+        };
+        performance_.enemyAiMilliseconds +=
+            milliseconds(start, movementStart) + milliseconds(resolveStart, combatStart);
+        performance_.navigationMilliseconds += milliseconds(movementStart, resolveStart);
+        performance_.combatMilliseconds += milliseconds(combatStart, Clock::now());
+    }
     const auto arrived = navigation.enemies()->metrics().arrived;
     const auto newArrivals = arrived >= arrivals_ ? arrived - arrivals_ : 0;
     arrivals_ = arrived;

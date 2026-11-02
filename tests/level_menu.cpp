@@ -58,6 +58,12 @@ void control(Engine& engine,
              const char* panelName,
              const char* label,
              const std::filesystem::path& scope = {}) {
+    if (std::string_view{panelName} == "Game Status" &&
+        (std::string_view{label} == "Restart Level" || std::string_view{label} == "Choose Level")) {
+        control(engine, runtime, window, "Game Status", "Pause");
+        control(engine, runtime, window, "Pause Menu", label);
+        return;
+    }
     auto* panel = ImGui::FindWindowByName(panelName);
     require(panel && panel->Active, "menu panel missing");
     if (!scope.empty()) {
@@ -68,15 +74,17 @@ void control(Engine& engine,
             }
         }
     }
-    const auto seed = scope.empty() ? panel->ID : ImHashStr(scope.generic_string().c_str(), 0, panel->ID);
+    const auto seed = std::string_view{label} == "Pause" ? ImHashStr("Status metrics", 0, panel->ID)
+                      : scope.empty()                    ? panel->ID
+                                                         : ImHashStr(scope.generic_string().c_str(), 0, panel->ID);
     const auto id = ImHashStr(label, 0, seed);
     mouse(window, SDL_EVENT_MOUSE_MOTION, {1, 1});
     tick(engine, runtime);
     for (float y = panel->InnerClipRect.Min.y + 3; y < panel->InnerClipRect.Max.y; y += 3) {
-        const bool secondColumn =
-            std::string_view{label} == "Refresh" ||
-            (std::string_view{panelName} == "Game Status" && std::string_view{label} == "Choose Level");
-        const glm::vec2 point{panel->DC.CursorStartPos.x + (secondColumn ? 200 : 50), y};
+        const bool secondColumn = std::string_view{label} == "Refresh";
+        const float x = std::string_view{label} == "Pause" ? panel->InnerClipRect.Max.x - 35
+                                                           : panel->DC.CursorStartPos.x + (secondColumn ? 200 : 50);
+        const glm::vec2 point{x, y};
         mouse(window, SDL_EVENT_MOUSE_MOTION, point);
         tick(engine, runtime, 1);
         if (ImGui::GetHoveredID() == id) {
@@ -103,15 +111,27 @@ int main() {
         const auto a = folder / "a.json", b = folder / "b.json", bad = folder / "bad.json";
         auto first = loadLevelDefinition(root / "levels/first_watch.json");
         first.name = "A menu fixture";
+        first.id = createLevelId();
         first.description = "Handcrafted menu description";
         first.startingGold = 123;
         saveLevelDefinition(a, first);
         auto second = loadLevelDefinition(root / "levels/boss_watch.json");
         second.name = "B menu fixture";
+        second.id = createLevelId();
         second.startingGold = 99;
         second.waves = {{"Boss encounter", {second.waves.back().groups.back()}, 0}};
         second.waves.front().groups.front().start = 0;
         saveLevelDefinition(b, second);
+        const auto duplicate = folder / "duplicate.json";
+        saveLevelDefinition(duplicate, second);
+        const auto ambiguous = discoverLevels(root);
+        require(std::none_of(ambiguous.levels.begin(),
+                             ambiguous.levels.end(),
+                             [&](const AvailableLevel& entry) {
+                                 return entry.id == second.id;
+                             }),
+                "duplicate IDs mixed independent level records");
+        std::filesystem::remove(duplicate);
         std::ofstream{bad} << "{";
         auto incomplete = first;
         incomplete.scene = "scenes/missing-menu-scene.json";
@@ -127,6 +147,10 @@ int main() {
                 "valid levels, descriptions or graceful invalid-file discovery failed");
         require(!discoverLevels(root / "missing-assets").errors.empty(), "missing asset directory was accepted");
         LevelRuntime runtime;
+        const auto progressPath = root.parent_path() / "menu-progress-check.json";
+        std::filesystem::remove(progressPath);
+        PlayerProgress progress{progressPath};
+        runtime.attachProgress(progress);
         GameHud hud{engine, runtime, true};
         tick(engine, runtime, 3);
         require(!engine.scene() && !runtime.level().waves() && !runtime.navigation().enemies(),
@@ -144,12 +168,18 @@ int main() {
                     runtime.heroes()->heroes().size() == first.heroSpawns.size() && engine.scene()->navigationGrid() &&
                     !runtime.navigation().placement().zones().empty(),
                 "selected level was incompletely initialized");
+        runtime.update(engine, 1.25);
+        require(std::abs(runtime.completionSeconds() - 1.25) < 1e-8 && progress.find(first.id)->attempts == 1,
+                "active preparation time or attempt count failed");
         runtime.startWave();
         runtime.update(engine, 0.2);
         require(!runtime.navigation().enemies()->enemies().empty(), "selected level did not spawn its wave");
         control(engine, runtime, window, "Game Status", "Restart Level");
         require(runtime.level().economy().gold() == 123 && runtime.navigation().enemies()->enemies().empty(),
                 "restart leaked state");
+        require(progress.find(first.id)->attempts == 2 && progress.find(first.id)->victories == 0 &&
+                    runtime.completionSeconds() == 0,
+                "restart did not start an independent attempt");
         auto tower = runtime.navigation().towers().definition("basic").instance();
         tower.position = {4, tower.halfExtent.y, -2.5};
         (void)runtime.navigation().towers().create(engine, tower);
@@ -181,7 +211,23 @@ int main() {
         runtime.update(engine, 0);
         tick(engine, runtime);
         require(runtime.level().waves()->phase() == LevelPhase::victory, "menu-loaded level did not complete");
-        control(engine, runtime, window, "Level Result", "Choose Level");
+        require(progress.find(second.id)->victories == 1 && runtime.personalRecord(), "victory was not recorded");
+        const auto completion = runtime.completionSeconds();
+        runtime.update(engine, 5);
+        require(runtime.completionSeconds() == completion && progress.find(second.id)->victories == 1,
+                "result screen time or duplicate updates changed the record");
+        const auto ordering = discoverLevels(root);
+        const auto current =
+            std::find_if(ordering.levels.begin(), ordering.levels.end(), [&](const AvailableLevel& entry) {
+                return entry.id == second.id;
+            });
+        require(current != ordering.levels.end() && std::next(current) != ordering.levels.end(),
+                "next level fixture missing");
+        const auto nextId = std::next(current)->id;
+        control(engine, runtime, window, "Level Result", "Next Level");
+        require(runtime.level().waves()->definition().id == nextId && progress.lastPlayed() == nextId,
+                "Next Level did not follow the current ordering");
+        control(engine, runtime, window, "Game Status", "Choose Level");
         first.startingGold = 321;
         saveLevelDefinition(a, first);
         control(engine, runtime, window, "Level Selection", "Refresh");
@@ -193,6 +239,7 @@ int main() {
         control(engine, runtime, window, "Game Status", "Choose Level");
         auto invalid = second;
         invalid.name = "C unreachable fixture";
+        invalid.id = createLevelId();
         invalid.objectivePosition = {100000, 100000};
         const auto c = folder / "c.json";
         saveLevelDefinition(c, invalid);
@@ -210,6 +257,11 @@ int main() {
         require(ImGui::FindWindowByName("Main Menu")->Active, "return to main menu failed");
         control(engine, runtime, window, "Main Menu", "Quit");
         require(hud.quitRequested(), "quit request failed");
+        PlayerProgress reopened{progressPath};
+        require(reopened.error().empty() && reopened.find(second.id)->completed &&
+                    reopened.find(second.id)->victories == 1,
+                "gameplay progress did not survive reopening");
+        std::filesystem::remove(progressPath);
         std::filesystem::remove_all(folder);
         std::cout << "PASS discovery, descriptions, live edits, menus, complete loading, switching, restart and "
                      "failed-load cleanup.\n";

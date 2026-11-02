@@ -25,6 +25,14 @@ double horizontalDistance(glm::dvec3 a, glm::dvec3 b) {
     return glm::length(glm::dvec2{a.x - b.x, a.z - b.z});
 }
 
+bool onSurface(glm::dvec3 position,
+               const NavigationPoint& nearest,
+               double tolerance,
+               const NavMeshConfiguration& configuration) {
+    return horizontalDistance(nearest.position, position) <= tolerance &&
+           std::abs(nearest.position.y - position.y) <= configuration.stepHeight + configuration.cellHeight * 2;
+}
+
 void check(bool success, const char* operation) {
     if (!success) {
         throw std::runtime_error(operation);
@@ -269,8 +277,7 @@ bool NavMesh::contains(glm::dvec3 position, double tolerance) const {
         return false;
     }
     const auto nearest = project(position, tolerance);
-    return nearest && horizontalDistance(nearest->position, position) <= tolerance &&
-           std::abs(nearest->position.y - position.y) <= configuration_.stepHeight + configuration_.cellHeight * 2;
+    return nearest && onSurface(position, *nearest, tolerance, configuration_);
 }
 
 bool NavMesh::findPath(glm::dvec3 start, glm::dvec3 destination, NavigationPath& path) const {
@@ -279,7 +286,7 @@ bool NavMesh::findPath(glm::dvec3 start, glm::dvec3 destination, NavigationPath&
     path.revision = revision_;
     ++statistics_.pathQueries;
     const auto from = project(start, 0.05), to = project(destination);
-    if (!from || !to || !contains(start, 0.05)) {
+    if (!from || !to || !onSurface(start, *from, 0.05, configuration_)) {
         return false;
     }
     const glm::vec3 a{from->position}, b{to->position};
@@ -300,16 +307,20 @@ bool NavMesh::findPath(glm::dvec3 start, glm::dvec3 destination, NavigationPath&
 
 bool NavMesh::visible(glm::dvec3 start, glm::dvec3 destination) const {
     const auto from = project(start, 0.03);
+    return from && visibleFrom(*from, destination);
+}
+
+bool NavMesh::visibleFrom(const NavigationPoint& from, glm::dvec3 destination) const {
     const auto to = project(destination, 0.03);
-    if (!from || !to || !contains(destination, 0.03)) {
+    if (!to || !onSurface(destination, *to, 0.03, configuration_)) {
         return false;
     }
-    const glm::vec3 a{from->position}, b{destination};
+    const glm::vec3 a{from.position}, b{destination};
     float fraction = 0;
     glm::vec3 normal{0};
     std::array<dtPolyRef, maximumPath> visited{};
     int count = 0;
-    const auto status = data_->query->raycast(from->polygon,
+    const auto status = data_->query->raycast(from.polygon,
                                               &a.x,
                                               &b.x,
                                               &data_->filter,
@@ -335,11 +346,11 @@ std::optional<glm::dvec3> NavMesh::steering(glm::dvec3 position, NavigationPath&
         return {};
     }
     const auto from = project(position, 0.03);
-    if (!from || !contains(position, 0.03)) {
+    if (!from || !onSurface(position, *from, 0.03, configuration_)) {
         path.valid = false;
         return {};
     }
-    if (visible(position, path.destination)) {
+    if (visibleFrom(*from, path.destination)) {
         if (remaining) {
             *remaining = horizontalDistance(position, path.destination);
         }
@@ -386,7 +397,7 @@ std::optional<glm::dvec3> NavMesh::steering(glm::dvec3 position, NavigationPath&
 glm::dvec3 NavMesh::move(glm::dvec3 position, glm::dvec2 displacement) const {
     const auto target = position + glm::dvec3{displacement.x, 0, displacement.y};
     const auto from = project(position, 0.03);
-    if (!from || !contains(position, 0.03) || !finite(target)) {
+    if (!from || !onSurface(position, *from, 0.03, configuration_) || !finite(target)) {
         return position;
     }
     const glm::vec3 a{from->position}, b{target};

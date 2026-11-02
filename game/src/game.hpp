@@ -15,6 +15,7 @@ public:
 
 private:
     Engine engine_;
+    PlayerProgress progress_;
     LevelRuntime runtime_;
     std::unique_ptr<GameHud> hud_;
 };

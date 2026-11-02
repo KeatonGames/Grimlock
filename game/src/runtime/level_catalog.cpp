@@ -47,8 +47,10 @@ LevelCatalog discoverLevels(const std::filesystem::path& assetRoot) {
                         }
                     }
                 }
-                result.levels.push_back(
-                    {std::filesystem::absolute(path), std::move(definition.name), std::move(definition.description)});
+                result.levels.push_back({std::filesystem::absolute(path),
+                                         std::move(definition.name),
+                                         std::move(definition.description),
+                                         std::move(definition.id)});
             } catch (const std::exception& failure) {
                 result.errors.push_back(path.filename().string() + ": " + failure.what());
             }
@@ -59,6 +61,20 @@ LevelCatalog discoverLevels(const std::filesystem::path& assetRoot) {
             break;
         }
     }
+    std::set<std::string> ids, duplicates;
+    for (const auto& level : result.levels) {
+        if (!level.id.empty() && !ids.insert(level.id).second) {
+            duplicates.insert(level.id);
+        }
+    }
+    std::erase_if(result.levels, [&](const AvailableLevel& level) {
+        if (!duplicates.contains(level.id)) {
+            return false;
+        }
+        result.errors.push_back(level.path.filename().string() +
+                                ": duplicate level ID; assign a new ID to independent copies.");
+        return true;
+    });
     std::sort(result.levels.begin(), result.levels.end(), [](const AvailableLevel& a, const AvailableLevel& b) {
         return a.name != b.name ? a.name < b.name : a.path < b.path;
     });

@@ -13,6 +13,7 @@ add_library(GameLogic STATIC
     src/systems/economy_system.cpp
     src/runtime/level_runtime.cpp
     src/runtime/level_catalog.cpp
+    src/runtime/player_progress.cpp
     src/navigation/navigation_geometry.cpp
     src/navigation/level_geometry.cpp
     src/navigation/nav_mesh.cpp
@@ -28,11 +29,11 @@ target_include_directories(GameLogic PUBLIC src)
 target_link_libraries(GameLogic PUBLIC Engine PRIVATE RecastNavigation::Recast RecastNavigation::Detour nlohmann_json::nlohmann_json)
 set_target_properties(GameLogic PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(GameUi STATIC src/ui/game_hud.cpp)
+add_library(GameUi STATIC src/ui/game_hud.cpp src/ui/game_style.cpp)
 target_link_libraries(GameUi PUBLIC GameLogic ImGuiSupport PRIVATE SDL3::SDL3 Vulkan::Vulkan)
 set_target_properties(GameUi PROPERTIES CXX_EXTENSIONS OFF)
 add_executable(Game src/main.cpp src/game.cpp)
-target_link_libraries(Game PRIVATE GameUi)
+target_link_libraries(Game PRIVATE GameUi SDL3::SDL3)
 # Preserve the established executable/VS Code paths while exposing the Game target.
 set_target_properties(Game PROPERTIES
     OUTPUT_NAME Grimlock

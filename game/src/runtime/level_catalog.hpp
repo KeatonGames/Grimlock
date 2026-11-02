@@ -9,6 +9,7 @@ namespace grimlock::game {
 struct AvailableLevel {
     std::filesystem::path path;
     std::string name, description;
+    std::string id;
 };
 
 struct LevelCatalog {

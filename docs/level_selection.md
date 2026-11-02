@@ -13,6 +13,11 @@ Game and Editor use the same version-1 level JSON and scene files. No export,
 alternate Game format or list of hardcoded levels is required. The active asset
 root contains `levels/`, `scenes/`, `models/` and `config/`.
 
+Levels now have stable IDs for [player progression](progression.md), independent
+of names and paths. Editor assigns IDs on save; preserve an ID for a rename, and
+assign a new one for an independent copy. Game keeps legacy ID-less levels playable
+without changing their files.
+
 By default both executables use the staged `assets` directory beside the executable,
 independent of the shell's working directory. Game discovers JSON files recursively
 under that root's `levels` directory. Saving a new Editor level there makes it
