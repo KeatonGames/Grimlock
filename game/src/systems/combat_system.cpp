@@ -70,7 +70,8 @@ void CombatSystem::update(const TowerSystem& towers,
                     const auto offset = enemy.position - base;
                     const double distance = glm::dot(offset, offset);
                     if (enemy.active && enemy.alive && distance <= nearestDistance &&
-                        (!nearest || distance < nearestDistance || enemy.id < nearest->id) && valid(enemy)) {
+                        (!nearest || distance < nearestDistance || enemyOrder(enemy) < enemyOrder(*nearest)) &&
+                        valid(enemy)) {
                         nearest = &enemy;
                         nearestDistance = distance;
                     }

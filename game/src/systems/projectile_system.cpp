@@ -14,31 +14,40 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                              EnemyId target,
                              const TowerDefinition& definition,
                              std::size_t level,
-                             ObjectId source) {
+                             ObjectId source,
+                             double lifetime) {
     const auto& statistics = definition.statistics(level);
     if (!std::isfinite(glm::length(origin)) || !std::isfinite(statistics.damage) || statistics.damage <= 0 ||
         !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
-        !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0) {
+        !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0 || std::isnan(lifetime) ||
+        lifetime <= 0) {
         throw std::invalid_argument("Invalid projectile origin or statistics.");
     }
     if (!model_) {
         model_ = engine_.loadModel(engine_.assetRoot() / "models/cube.obj");
     }
-    const auto instance = engine_.createInstance(*model_, true);
+    const auto entity = registry_.create();
+    std::optional<InstanceId> instance;
     try {
-        engine_.setTint(instance, definition.projectileTint);
-        engine_.setTransform(instance,
+        instance = engine_.createInstance(*model_, true);
+        engine_.setTint(*instance, definition.projectileTint);
+        engine_.setTransform(*instance,
                              glm::translate(glm::mat4{1}, glm::vec3{origin}) *
                                  glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.projectileRadius)}));
-        projectiles_.push_back({target,
-                                origin,
-                                definition.projectileSpeed,
-                                definition.projectileRadius,
-                                statistics.damage,
-                                instance,
-                                source});
+        registry_.emplace<Projectile>(entity,
+                                      Projectile{target,
+                                                 origin,
+                                                 definition.projectileSpeed,
+                                                 definition.projectileRadius,
+                                                 statistics.damage,
+                                                 *instance,
+                                                 source});
+        registry_.emplace<ProjectileLifetimeComponent>(entity, ProjectileLifetimeComponent{0, lifetime});
     } catch (...) {
-        engine_.removeInstance(instance);
+        if (instance) {
+            engine_.removeInstance(*instance);
+        }
+        registry_.destroy(entity);
         throw;
     }
 }
@@ -53,6 +62,12 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
     }
     for (std::size_t index = 0; index < projectiles_.size();) {
         auto& projectile = projectiles_[index];
+        auto& lifetime = *lifetimes_.get(projectiles_.entities()[index]);
+        lifetime.elapsed += delta;
+        if (std::isfinite(lifetime.maximum) && lifetime.elapsed >= lifetime.maximum) {
+            removeAt(index);
+            continue;
+        }
         const auto* target = enemies.find(projectile.target);
         if (!target || !target->active || !target->alive) {
             removeAt(index);
@@ -61,6 +76,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         const auto center = combatAim(*target);
         const auto offset = center - projectile.position;
         const auto distance = glm::length(offset);
+        projectile.velocity = distance > 1e-10 ? offset * (projectile.speed / distance) : glm::dvec3{0};
         const auto travel = projectile.speed * delta;
         const double hitDistance = std::max(0.0, distance - projectile.radius - target->radius);
         const double segmentLength = std::min(travel, hitDistance);
@@ -89,9 +105,9 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
 }
 
 void ProjectileSystem::removeAt(std::size_t index) noexcept {
+    const auto entity = projectiles_.entities()[index];
     engine_.removeInstance(projectiles_[index].instance);
-    projectiles_[index] = projectiles_.back();
-    projectiles_.pop_back();
+    registry_.destroy(entity);
 }
 
 void ProjectileSystem::clear() noexcept {

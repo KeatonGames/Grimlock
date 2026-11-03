@@ -56,7 +56,9 @@ std::optional<std::size_t> movementClip(const std::vector<std::string>& names, c
 
 } // namespace
 
-EnemySystem::EnemySystem(Engine& engine, EnemyDefinition definition) : engine_(engine) {
+EnemySystem::EnemySystem(Engine& engine, EnemyDefinition definition)
+    : engine_(engine), enemies_(registry_.storage<Enemy>()) {
+    registry_.reserveEntities(maximumEnemies);
     (void)addDefinition(std::move(definition));
 }
 
@@ -141,8 +143,8 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
     }
     const auto before = enemies_.size();
     const auto limit = std::min(maximumEnemies, before + count);
-    enemies_.reserve(limit);
-    indices_.reserve(limit);
+    registry_.reserve<Enemy>(limit);
+    registry_.reserve<TeamComponent>(limit);
     neighborsDirty_ = true;
     double maximumRadius = definition.radius;
     for (const auto& enemy : enemies_) {
@@ -174,7 +176,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             loadModel(type);
             const auto& animal = types_[type];
             Enemy enemy;
-            enemy.id = nextId_++;
+            enemy.spawnOrder = nextSpawnOrder_++;
             enemy.type = type;
             enemy.navigation = &navigation;
             enemy.despawnOnArrival = definition.despawnOnArrival;
@@ -189,21 +191,29 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             enemy.stuckTimeout = definition.stuckTimeout;
             EnemyAi::setDestination(enemy, sharedDestination_);
             enemy.maximumHealth = enemy.health = definition.maximumHealth;
-            enemy.instance = engine_.createInstance(*animal.model, true);
+            const auto entity = registry_.create();
+            enemy.id = entity;
+            std::optional<InstanceId> instance;
             try {
-                indices_.emplace(enemy.id, enemies_.size());
+                instance = engine_.createInstance(*animal.model, true);
+                enemy.instance = instance;
+                registry_.emplace<Enemy>(entity, std::move(enemy));
+                registry_.emplace<TeamComponent>(entity);
             } catch (...) {
-                engine_.removeInstance(*enemy.instance);
+                if (instance) {
+                    engine_.removeInstance(*instance);
+                }
+                registry_.destroy(entity);
                 throw;
             }
-            enemies_.push_back(std::move(enemy));
             spawnNeighbors_.insert(enemies_.size() - 1, position);
             auto& playback = engine_.animation(*enemies_.back().instance);
             playback.setSpeed(definition.animationSpeed);
             if (animal.movementClip) {
                 playback.play(*animal.movementClip);
                 const auto& clip = playback.model().animations[*animal.movementClip];
-                playback.seek(clip.start + (clip.end - clip.start) * static_cast<float>((enemy.id * 37) % 100) / 100);
+                playback.seek(clip.start + (clip.end - clip.start) *
+                                               static_cast<float>((enemyOrder(enemies_.back()) * 37) % 100) / 100);
                 playback.pause();
             }
             updateModel(enemies_.back());
@@ -260,12 +270,12 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
 
 bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker) {
     validateDamage(damage);
-    const auto found = indices_.find(id);
-    if (found == indices_.end() || damage == 0) {
+    auto* found = enemies_.get(id);
+    if (!found || damage == 0) {
         return false;
     }
-    const auto index = found->second;
-    auto& enemy = enemies_[index];
+    const auto index = static_cast<std::size_t>(found - enemies_.data());
+    auto& enemy = *found;
     if (!enemy.active || !enemy.alive) {
         return false;
     }
@@ -305,14 +315,14 @@ void EnemySystem::updateEffects(double delta) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Enemy effects delta must be finite and nonnegative.");
     }
-    for (auto& enemy : enemies_) {
+    registry_.each<Enemy, TeamComponent>([&](ecs::Entity, Enemy& enemy, const TeamComponent&) {
         if (enemy.hitFlashRemaining > 0) {
             enemy.hitFlashRemaining = std::max(0.0, enemy.hitFlashRemaining - delta);
             if (enemy.hitFlashRemaining == 0) {
                 engine_.setTint(*enemy.instance, glm::vec4{1});
             }
         }
-    }
+    });
     for (std::size_t index = 0; index < deaths_.size();) {
         auto& death = deaths_[index];
         death.remaining -= delta;
@@ -328,23 +338,19 @@ void EnemySystem::updateEffects(double delta) {
 
 void EnemySystem::removeAt(std::size_t index) noexcept {
     neighborsDirty_ = true;
-    indices_.erase(enemies_[index].id);
+    const auto entity = enemies_.entities()[index];
     if (enemies_[index].instance) {
         engine_.removeInstance(*enemies_[index].instance);
     }
-    if (index != enemies_.size() - 1) {
-        enemies_[index] = std::move(enemies_.back());
-        indices_.find(enemies_[index].id)->second = index;
-    }
-    enemies_.pop_back();
+    registry_.destroy(entity);
 }
 
 bool EnemySystem::remove(EnemyId id) noexcept {
-    const auto found = indices_.find(id);
-    if (found == indices_.end()) {
+    const auto* found = enemies_.get(id);
+    if (!found) {
         return false;
     }
-    removeAt(found->second);
+    removeAt(static_cast<std::size_t>(found - enemies_.data()));
     return true;
 }
 
@@ -400,17 +406,16 @@ void EnemySystem::setDestinationHeight(double height) {
 }
 
 bool EnemySystem::setDestination(EnemyId id, std::optional<glm::dvec2> destination) {
-    const auto found = indices_.find(id);
-    if (found == indices_.end()) {
+    auto* found = enemies_.get(id);
+    if (!found) {
         return false;
     }
-    EnemyAi::setDestination(enemies_[found->second], destination);
+    EnemyAi::setDestination(*found, destination);
     return true;
 }
 
 const Enemy* EnemySystem::find(EnemyId id) const noexcept {
-    const auto found = indices_.find(id);
-    return found == indices_.end() ? nullptr : &enemies_[found->second];
+    return enemies_.get(id);
 }
 
 } // namespace grimlock::game

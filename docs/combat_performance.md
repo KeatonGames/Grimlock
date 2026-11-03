@@ -1,5 +1,8 @@
 # Combat performance
 
+Enemy/projectile ownership now uses the [incremental ECS](ecs.md). The Phase 34
+comparison below records the architecture before that migration.
+
 Enable **Navigation > Show Performance** in Grimlock Editor to inspect CPU frame,
 GPU, animation preparation, movement, AI, navigation, combat/projectile timings,
 entity counts, cached models, model primitives, and path-query counts. Battle

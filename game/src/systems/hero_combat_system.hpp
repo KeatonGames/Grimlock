@@ -26,7 +26,14 @@ private:
     static void abandon(HeroSystem& heroes, Hero& hero);
     static bool inRange(const HeroSystem& heroes, const Hero& hero, const Enemy& enemy, double range);
     std::vector<EnemyId> victims_;
-    std::vector<std::pair<double, EnemyId>> candidates_;
+
+    struct Candidate {
+        double distance;
+        EnemyId id;
+        std::uint64_t order;
+    };
+
+    std::vector<Candidate> candidates_;
     NavigationPath approachPath_;
 };
 

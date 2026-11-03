@@ -222,11 +222,14 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
         }
         const double separation = distance(hero.position, candidate.position);
         if (separation <= stats.acquisitionRange) {
-            candidates_.emplace_back(separation, candidate.id);
+            candidates_.push_back({separation, candidate.id, enemyOrder(candidate)});
         }
     });
-    std::sort(candidates_.begin(), candidates_.end());
-    for (const auto& [separation, id] : candidates_) {
+    std::sort(candidates_.begin(), candidates_.end(), [](const Candidate& first, const Candidate& second) {
+        return first.distance != second.distance ? first.distance < second.distance : first.order < second.order;
+    });
+    for (const auto& candidate : candidates_) {
+        const auto id = candidate.id;
         const auto& enemy = *enemies.find(id);
         const bool contact = inRange(heroes, hero, enemy, stats.range);
         if (!contact && !approachMelee(heroes.navigation_,

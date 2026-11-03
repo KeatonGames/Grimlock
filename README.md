@@ -115,3 +115,6 @@ Runtime tests require a working Vulkan display and the supplied assets.
 For Editor profiling, reproducible combat stress tests, and measured results, see
 [combat performance](docs/combat_performance.md).
 
+For ECS ownership, generation handles, mutation rules, migration scope, and checks,
+see [incremental ECS](docs/ecs.md).
+

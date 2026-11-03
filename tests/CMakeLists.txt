@@ -1,4 +1,17 @@
 # A real Engine consumer: only its public headers and link interface are available.
+add_executable(EcsChecks ecs.cpp)
+target_link_libraries(EcsChecks PRIVATE Engine)
+add_test(NAME Ecs.Core COMMAND EcsChecks)
+add_executable(EcsRuntimeChecks ecs_runtime.cpp)
+target_link_libraries(EcsRuntimeChecks PRIVATE GameLogic)
+set_target_properties(EcsRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(EcsRuntimeChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET EcsRuntimeChecks POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:EcsRuntimeChecks> VERBATIM)
+endif()
+add_test(NAME Ecs.Runtime COMMAND EcsRuntimeChecks)
+set_tests_properties(Ecs.Runtime PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
 add_executable(CombatStressChecks combat_stress.cpp)
 target_link_libraries(CombatStressChecks PRIVATE GameLogic)
 set_target_properties(CombatStressChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)

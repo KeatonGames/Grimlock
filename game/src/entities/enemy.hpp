@@ -3,13 +3,14 @@
 #include "entities/enemy_definition.hpp"
 #include "navigation/nav_mesh.hpp"
 
+#include <grimlock/ecs.hpp>
 #include <grimlock/engine.hpp>
 #include <optional>
 #include <string>
 
 namespace grimlock::game {
 
-using EnemyId = std::uint64_t; // Monotonic within an EnemySystem, independent of packed storage indices.
+using EnemyId = ecs::Entity; // Generation-checked handle belonging to the owning EnemySystem registry.
 
 enum class DefensiveTargetKind {
     none,
@@ -55,9 +56,10 @@ enum class EnemyState {
 
 [[nodiscard]] const char* enemyStateName(EnemyState state) noexcept;
 
-struct Enemy {
+struct EnemyRuntimeComponent {
     EnemyCombatState combat;
     EnemyId id = 0;
+    std::uint64_t spawnOrder = 0; // Deterministic gameplay ordering is independent of recycled ECS handle bits.
     EnemyTypeId type = 0;
     const NavMesh* navigation = nullptr; // Borrowed; the owning session outlives all its enemies.
     std::optional<InstanceId> instance;
@@ -84,6 +86,13 @@ struct Enemy {
     bool retryPath = false;
     bool destinationAssigned = false;
 };
+
+// Keep existing movement/AI and read-only packed-span consumers on the same authoritative component data.
+using Enemy = EnemyRuntimeComponent;
+
+inline std::uint64_t enemyOrder(const Enemy& enemy) noexcept {
+    return enemy.spawnOrder ? enemy.spawnOrder : enemy.id; // Standalone CPU fixtures may use unregistered records.
+}
 
 struct SpawnArea {
     glm::dvec2 minimum{0}, maximum{1}; // World X/Z rectangle, including its boundary.

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "entities/components.hpp"
 #include "systems/crowd_movement.hpp"
 
 #include <cmath>
 #include <stdexcept>
-#include <unordered_map>
 
 namespace grimlock::game {
 
@@ -42,6 +42,10 @@ public:
     void setDestinationHeight(double height);
     [[nodiscard]] bool setDestination(EnemyId id, std::optional<glm::dvec2> destination);
     [[nodiscard]] const Enemy* find(EnemyId id) const noexcept;
+
+    [[nodiscard]] const ecs::Registry& registry() const noexcept {
+        return registry_;
+    }
 
     // Conservative X/Z candidates; callers retain exact range, elevation and visibility tests.
     // Visitors must not mutate the system while walking its packed storage.
@@ -112,12 +116,12 @@ private:
 
     Engine& engine_;
     std::vector<AnimalType> types_;
-    std::vector<Enemy> enemies_;
-    std::unordered_map<EnemyId, std::size_t> indices_;
+    ecs::Registry registry_;
+    ecs::Storage<Enemy>& enemies_;
     mutable EnemyNeighbors queryNeighbors_;
     mutable bool neighborsDirty_ = true;
     std::vector<DeathEffect> deaths_;
-    EnemyId nextId_ = 1;
+    std::uint64_t nextSpawnOrder_ = 1;
     CrowdMovement movement_;
     EnemyNeighbors spawnNeighbors_;
     EnemyMetrics metrics_;

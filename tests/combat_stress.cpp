@@ -38,6 +38,10 @@ void verifyQueries(const EnemySystem& enemies) {
             }
         });
         for (const auto& enemy : enemies.enemies()) {
+            if (enemies.registry().get<EnemyRuntimeComponent>(enemy.id) != &enemy ||
+                !enemies.registry().has<TeamComponent>(enemy.id)) {
+                throw std::runtime_error("Packed enemy view is not backed by ECS components");
+            }
             if (enemies.find(enemy.id) != &enemy) {
                 throw std::runtime_error("Packed enemy index returned a stale reference");
             }
@@ -88,7 +92,8 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
     }
     for (std::size_t index = 0; index < count; ++index) {
         const auto type = index == 0 && boss ? *boss : types[index % types.size()];
-        if (navigation.spawnAt(engine, type, {{-15, -4}, {15, 4}, 0}, 1) != 1) {
+        const double depth = count > 200 ? 12 : 4;
+        if (navigation.spawnAt(engine, type, {{-15, -depth}, {15, depth}, 0}, 1) != 1) {
             throw std::runtime_error("Stress fixture could not spawn its exact enemy count");
         }
     }
@@ -186,7 +191,10 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
               << combatTime / samples << ',' << preparation / samples << ',' << render / samples << ','
               << (gpuSamples ? gpu / gpuSamples : -1) << ',' << privateMb << ',' << workingMb << ',' << peakProjectiles
               << ',' << towers.projectiles().impacts() + volley.impacts() << ',' << enemies.metrics().defeated << ','
-              << enemies.enemies().size() << ',' << checksum << ',' << animation / samples << std::endl;
+              << enemies.enemies().size() << ',' << checksum << ',' << animation / samples << ','
+              << enemies.registry().capacityBytes() + towers.projectiles().registry().capacityBytes() +
+                     volley.registry().capacityBytes()
+              << std::endl;
     towers.clear();
     volley.clear();
     verifyQueries(enemies);
@@ -221,17 +229,21 @@ int main(int argc, char** argv) {
         engine.setPerformanceEnabled(true);
         const int samples = argc > 1 ? std::stoi(argv[1]) : 180;
         const bool animated = argc > 2 && std::string_view{argv[2]} == "--animated";
-        if (argc > 3 || (argc > 2 && !animated)) {
-            throw std::invalid_argument("Usage: CombatStressChecks [samples] [--animated]");
+        const bool large = argc > 2 && std::string_view{argv[2]} == "--large";
+        if (argc > 3 || (argc > 2 && !animated && !large)) {
+            throw std::invalid_argument("Usage: CombatStressChecks [samples] [--animated|--large]");
         }
         if (samples < 1 || samples > 3600) {
             throw std::invalid_argument("Sample count must be between 1 and 3600");
         }
         std::cout << "scenario,enemies,fps,mean_ms,p50_ms,p95_ms,p99_ms,max_ms,ai_ms,movement_ms,hero_ms,combat_ms,"
                      "preparation_ms,render_ms,gpu_ms,private_mb,working_mb,peak_projectiles,impacts,defeated,alive,"
-                     "checksum,animation_ms\n";
+                     "checksum,animation_ms,ecs_capacity_bytes\n";
         for (const auto count : {50, 100, 200}) {
             scenario(engine, count, samples, animated);
+        }
+        if (large) {
+            scenario(engine, 500, samples, false);
         }
         return 0;
     } catch (const std::exception& error) {

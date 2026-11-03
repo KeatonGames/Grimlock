@@ -209,9 +209,9 @@ glm::dvec2 CrowdMovement::separation(std::size_t index, std::span<const Enemy> e
         if (distance > 1e-10 && distance < comfort) {
             const double footprint = enemy.radius + enemies[otherIndex].radius;
             const double weight = std::clamp((comfort - distance) / (comfort - footprint), 0.0, 1.0);
-            const bool yield =
-                remaining_[otherIndex] < remaining_[index] - 1e-6 ||
-                (std::abs(remaining_[otherIndex] - remaining_[index]) <= 1e-6 && enemies[otherIndex].id < enemy.id);
+            const bool yield = remaining_[otherIndex] < remaining_[index] - 1e-6 ||
+                               (std::abs(remaining_[otherIndex] - remaining_[index]) <= 1e-6 &&
+                                enemyOrder(enemies[otherIndex]) < enemyOrder(enemy));
             force += away / distance * weight * (yield ? 3.0 : 0.2);
         }
     });
@@ -281,8 +281,9 @@ void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> 
                 const double distance = glm::length(offset);
                 const double overlap = enemy.radius + enemies[other].radius - distance;
                 if (overlap > 1e-8) {
-                    const auto normal =
-                        distance > 1e-10 ? offset / distance : glm::dvec2{enemy.id < enemies[other].id ? 1 : -1, 0};
+                    const auto normal = distance > 1e-10
+                                            ? offset / distance
+                                            : glm::dvec2{enemyOrder(enemy) < enemyOrder(enemies[other]) ? 1 : -1, 0};
                     correction += normal * (overlap + 1e-6);
                 }
             });
