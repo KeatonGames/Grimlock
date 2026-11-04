@@ -57,6 +57,7 @@ void GameHud::updateLayout() {
 OverlayInput GameHud::frame() {
     ImGui::SetCurrentContext(context_);
     modalFrame_ = false;
+    cancelWorldInput_ = false;
     transitions();
     if (restart_) {
         clearFeedback();
@@ -93,13 +94,17 @@ OverlayInput GameHud::frame() {
     }
     const auto* waves = runtime_.level().waves();
     const bool terminal = waves && (waves->phase() == LevelPhase::victory || waves->phase() == LevelPhase::defeat);
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape) && !terminal) {
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && !terminal) {
+        cancelWorldInput_ = true;
         if (settingsOpen_) {
             settingsOpen_ = false;
         } else if (runtime_.paused()) {
             runtime_.setPaused(false);
         } else if (runtime_.placing() || runtime_.deployingHero()) {
             runtime_.cancelPlacement();
+        } else if (runtime_.selectedHero() || runtime_.inspectedTower()) {
+            runtime_.clearSelection();
+            orderPosition_.reset();
         } else {
             runtime_.setPaused(!runtime_.paused());
         }
@@ -127,6 +132,7 @@ OverlayInput GameHud::frame() {
     ImGui_ImplSDL3_SetMouseCaptureMode(relative ? ImGui_ImplSDL3_MouseCaptureMode_Disabled
                                                 : ImGui_ImplSDL3_MouseCaptureMode_Enabled);
     upgradeFlashRemaining_ = std::max(0.0, upgradeFlashRemaining_ - io.DeltaTime);
+    orderRemaining_ = std::max(0.0F, orderRemaining_ - io.DeltaTime);
     status();
     if (waves) {
         construction();
@@ -136,12 +142,16 @@ OverlayInput GameHud::frame() {
     bossHealth();
     notifications();
     const bool overUi = io.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
-    viewportMouse_ = !runtime_.paused() && !relative && !overUi;
-    commandCursor_ = commandGesture_.update(engine_.input(), relative || !overUi);
+    viewportMouse_ = !runtime_.paused() && !relative && !overUi && !cancelWorldInput_;
+    const bool commandsAllowed = !cancelWorldInput_ && !runtime_.placing() && !runtime_.deployingHero();
+    commandCursor_ = commandGesture_.update(engine_.input(), commandsAllowed && (relative || !overUi));
     return {!relative && overUi, io.WantCaptureKeyboard, false, runtime_.placing() || runtime_.deployingHero()};
 }
 
 void GameHud::clearFeedback() {
+    hoveredObject_.reset();
+    orderPosition_.reset();
+    orderRemaining_ = 0;
     settingsOpen_ = false;
     entrance_ = 0;
     displayedPhase_.reset();
@@ -375,7 +385,7 @@ void GameHud::settings() {
         ImGui::TextDisabled("Boss health is always visible during an encounter.");
         ImGui::Separator();
         ImGui::TextWrapped("Right-click: hero command\nRight drag: pan\nMiddle drag: orbit\nWheel: zoom\nEscape: "
-                           "cancel placement or pause");
+                           "cancel placement/selection, then pause");
         if (presentation::action("Back", {-1, 36 * s}) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             settingsOpen_ = false;
         }
@@ -860,8 +870,9 @@ void GameHud::finishFrame(const Camera& camera) {
     };
     std::optional<Ray> ray;
     bool confirm = false;
-    if (viewportMouse_ && input.focused && !busy(MouseButton::right) && !busy(MouseButton::middle) &&
-        input.mouseWheel == glm::vec2{0}) {
+    const bool worldPointer = viewportMouse_ && input.focused && !busy(MouseButton::right) &&
+                              !busy(MouseButton::middle) && input.mouseWheel == glm::vec2{0};
+    if (worldPointer) {
         ray = mouseRay(camera, input.mousePosition, logical, drawable);
         if (input.button(MouseButton::left).pressed && input.leftPressPosition) {
             ray = mouseRay(camera, *input.leftPressPosition, logical, drawable);
@@ -871,11 +882,29 @@ void GameHud::finishFrame(const Camera& camera) {
     if (!runtime_.placing() && !runtime_.deployingHero() && confirm) {
         runtime_.selectObject(engine_, ray);
     }
-    runtime_.updatePlacement(engine_, ray, confirm);
-    runtime_.updateHeroPlacement(engine_, ray, confirm);
+    hoveredObject_.reset();
+    if (ray && !runtime_.placing() && !runtime_.deployingHero()) {
+        const auto object = engine_.pickObject(*ray);
+        if (object && ((runtime_.heroes() && runtime_.heroes()->fromObject(*object)) ||
+                       runtime_.navigation().towers().contains(*object))) {
+            hoveredObject_ = object;
+        }
+    }
+    // UI hover and camera gestures retain the last preview instead of recreating it.
+    if (worldPointer) {
+        runtime_.updatePlacement(engine_, ray, confirm);
+        runtime_.updateHeroPlacement(engine_, ray, confirm);
+    }
     if (commandCursor_ && !runtime_.placing() && !runtime_.deployingHero()) {
         if (const auto commandRay = mouseRay(camera, *commandCursor_, logical, drawable)) {
-            (void)runtime_.commandHero(*commandRay);
+            if (runtime_.commandHero(*commandRay)) {
+                const auto* hero = runtime_.selectedHero();
+                const auto* enemy =
+                    hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr;
+                orderAttack_ = enemy != nullptr;
+                orderPosition_ = enemy ? std::optional{enemy->position} : hero->destination;
+                orderRemaining_ = 0.8F;
+            }
         }
     }
     placementOverlay(camera);
@@ -959,13 +988,46 @@ void GameHud::placementOverlay(const Camera& camera) {
             }
         }
     };
-    if (const auto* hero = runtime_.selectedHero(); hero && hero->destination) {
-        const auto center = *hero->destination + glm::dvec3{0, 0.03, 0};
+    const auto ring = [&](glm::dvec3 position, double radius, ImU32 color) {
+        const auto center = position + glm::dvec3{0, 0.04, 0};
+        for (int i = 0; i < 32; ++i) {
+            const double first = glm::two_pi<double>() * i / 32;
+            const double second = glm::two_pi<double>() * (i + 1) / 32;
+            const glm::dvec3 a{std::cos(first), 0, std::sin(first)};
+            const glm::dvec3 b{std::cos(second), 0, std::sin(second)};
+            const std::array<glm::dvec3, 4> vertices{center + a * radius,
+                                                     center + b * radius,
+                                                     center + b * (radius - 0.045),
+                                                     center + a * (radius - 0.045)};
+            polygon(vertices, color, false);
+        }
+    };
+    if (runtime_.heroes()) {
+        for (const auto& hero : runtime_.heroes()->heroes()) {
+            const bool selectedHero = runtime_.selectedHero() && runtime_.selectedHero()->id == hero.id;
+            if (selectedHero || hoveredObject_ == hero.object) {
+                ring(hero.position,
+                     runtime_.heroes()->definition(hero).radius + 0.12,
+                     selectedHero ? IM_COL32(90, 220, 180, 190) : IM_COL32(225, 210, 160, 130));
+            }
+        }
+    }
+    for (const auto& tower : runtime_.navigation().towers().towers()) {
+        const bool selectedTower = runtime_.inspectedTower() && runtime_.inspectedTower()->object == tower.object;
+        if (selectedTower || hoveredObject_ == tower.object) {
+            const auto center = tower.position - glm::dvec3{0, tower.halfExtent.y, 0};
+            ring(center,
+                 std::max(tower.halfExtent.x, tower.halfExtent.z) + 0.12,
+                 selectedTower ? IM_COL32(90, 220, 180, 190) : IM_COL32(225, 210, 160, 130));
+        }
+    }
+    if (orderPosition_ && orderRemaining_ > 0) {
+        const auto center = *orderPosition_ + glm::dvec3{0, 0.03, 0};
         const std::array<glm::dvec3, 4> marker{center + glm::dvec3{-0.12, 0, 0},
                                                center + glm::dvec3{0, 0, 0.12},
                                                center + glm::dvec3{0.12, 0, 0},
                                                center + glm::dvec3{0, 0, -0.12}};
-        polygon(marker, IM_COL32(70, 200, 185, 120));
+        polygon(marker, orderAttack_ ? IM_COL32(240, 90, 65, 180) : IM_COL32(70, 200, 185, 180));
     }
     if (const auto* hero = runtime_.selectedHero()) {
         const auto* enemy = hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr;

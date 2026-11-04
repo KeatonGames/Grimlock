@@ -12,6 +12,7 @@ namespace {
 double distance(glm::dvec3 first, glm::dvec3 second) {
     return glm::length(first - second);
 }
+
 } // namespace
 
 void HeroCombatSystem::stop(Hero& hero) {
@@ -47,6 +48,14 @@ bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, He
     if (!hero || !hero->controllable || hero->health <= 0 || !enemy || !enemy->alive || !enemy->active ||
         distance(hero->position, enemy->position) > heroes.definition(*hero).combat.pursuitRange) {
         return false;
+    }
+    if (hero->combat.target == target && !hero->combat.playerMoving) {
+        if (!hero->combat.explicitTarget) {
+            hero->combat.pursuitOrigin = hero->position;
+        }
+        hero->combat.explicitTarget = true;
+        hero->combat.excludedTarget.reset();
+        return true;
     }
     heroes.finishAttack(*hero);
     stop(*hero);

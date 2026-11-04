@@ -187,6 +187,14 @@ int main() {
         mouse(id, SDL_EVENT_MOUSE_MOTION, point);
         tick(engine, runtime);
         require(runtime.preview() && runtime.placementError().empty(), "game placement preview is not valid");
+        const auto previewBeforeUi = runtime.preview();
+        mouse(id, SDL_EVENT_MOUSE_MOTION, {50, 40});
+        tick(engine, runtime);
+        require(runtime.preview() == previewBeforeUi && runtime.navigation().towers().towers().empty() &&
+                    runtime.level().economy().gold() == 200,
+                "UI hover removed the placement preview or triggered construction");
+        mouse(id, SDL_EVENT_MOUSE_MOTION, point);
+        tick(engine, runtime);
         click(engine, runtime, id, point);
         expectedGold -= runtime.navigation().towers().definition("basic").constructionCost;
         require(runtime.navigation().towers().towers().size() == 1 &&

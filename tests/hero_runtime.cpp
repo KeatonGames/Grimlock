@@ -39,6 +39,34 @@ void gestures() {
     require(!gesture.update(input, false), "UI click issued a command");
     input.focused = false;
     require(!gesture.update(input, true), "unfocused click issued a command");
+    input.focused = true;
+    right = {true, true, false};
+    require(!gesture.update(input, true), "right press issued an early command");
+    input.mouseButtons[static_cast<std::size_t>(MouseButton::left)].pressed = true;
+    right = {false, false, true};
+    require(!gesture.update(input, true), "simultaneous selection issued a hero order");
+}
+
+void turningChecks(Engine& engine) {
+    auto scene = std::make_unique<Scene>("Hero facing and attack timing");
+    scene->setNavigationGrid(GridConfiguration{16, 16, 1, {-8, 0, -8}});
+    engine.setScene(std::move(scene));
+    TowerSystem towers;
+    towers.synchronize(engine);
+    HeroSystem heroes{engine};
+    heroes.synchronize(towers);
+    EnemySystem enemies{engine, EnemyDefinition{.despawnOnArrival = false}};
+    require(enemies.spawn(heroes.navigation(), {{-1, 0}, {-1, 0}, 0}, 1) == 1, "turning fixture spawn failed");
+    const auto target = enemies.enemies().front().id;
+    const auto id = heroes.deploy({0, 0, 0});
+    HeroCombatSystem combat;
+    combat.update(heroes, enemies, 0.05, true);
+    const auto* hero = heroes.find(id);
+    require(std::isfinite(hero->visualYaw) && hero->visualYaw < 0 && hero->visualYaw > hero->yaw &&
+                enemies.find(target)->health == 100,
+            "hero visual rotation snapped or damaged before windup");
+    combat.update(heroes, enemies, 0.3, true);
+    require(enemies.find(target)->health == 75, "visual rotation changed logical attack timing/damage");
 }
 
 void combatChecks(Engine& engine) {
@@ -63,6 +91,10 @@ void combatChecks(Engine& engine) {
     combat.update(heroes, enemies, 0.1, true);
     require(heroes.find(hero)->combat.target == target && enemies.find(target)->health == 100,
             "hero failed to acquire target or damaged before windup");
+    const auto windup = heroes.find(hero)->combat.impactRemaining;
+    require(combat.attack(heroes, enemies, hero, target) && combat.attack(heroes, enemies, hero, target) &&
+                heroes.find(hero)->combat.swinging && heroes.find(hero)->combat.impactRemaining == windup,
+            "repeated attack commands restarted the attack animation/timing");
     combat.update(heroes, enemies, 0.3, true);
     require(enemies.find(target)->health == 75, "hero impact timing/damage incorrect");
     combat.update(heroes, enemies, 0.2, true);
@@ -341,6 +373,7 @@ int main() {
     try {
         gestures();
         Engine engine{EngineConfig{.windowTitle = "Hero runtime checks"}};
+        turningChecks(engine);
         combatChecks(engine);
         heroTypeChecks(engine);
         heroDeploymentChecks(engine);
@@ -385,6 +418,13 @@ int main() {
         }
         (void)heroes.deploy({-4, 0, -2}, id);
         require(heroes.command(id, {4, 0, -2}), "retarget setup failed");
+        const auto queries = heroes.navigation().statistics().pathQueries;
+        require(heroes.command(id, {4, 0, -2}) && heroes.navigation().statistics().pathQueries == queries,
+                "repeated move order rebuilt an unchanged path");
+        const auto originalDestination = heroes.find(id)->destination;
+        require(!heroes.command(id, {1000, 0, 1000}) && heroes.find(id)->state == HeroState::moving &&
+                    heroes.find(id)->destination == originalDestination && heroes.find(id)->combat.playerMoving,
+                "invalid move command cancelled a valid order");
         heroes.update(0.1, true);
         require(heroes.command(id, {-6, 0, -3}) && heroes.find(id)->destination->x < -5,
                 "new hero command did not replace old destination");
@@ -392,11 +432,20 @@ int main() {
             heroes.update(1.0 / 60, true);
         }
         require(heroes.find(id)->state == HeroState::reached, "retargeted hero failed to arrive");
+        require(heroes.command(id, {-6, 0, -1}), "cancel order fixture failed");
+        heroes.update(0.1, true);
+        require(heroes.cancelCommand(id), "cancel move failed");
+        const auto cancelledAt = heroes.find(id)->position;
+        EnemySystem emptyEnemies{engine};
+        HeroCombatSystem idleCombat;
+        idleCombat.update(heroes, emptyEnemies, 1, true);
+        require(heroes.find(id)->position == cancelledAt && heroes.find(id)->defensivePosition == cancelledAt,
+                "autonomous defense resumed the cancelled movement order");
         for (std::uint32_t row = 0; row < 12; ++row) {
             engine.scene()->navigationGrid()->setWalkable({8, row}, false);
         }
         heroes.synchronize(towers);
-        require(!heroes.command(id, {4, 0, -2}) && heroes.find(id)->state == HeroState::blocked,
+        require(!heroes.command(id, {4, 0, -2}) && heroes.find(id)->state == HeroState::idle,
                 "unreachable hero destination accepted");
         const auto stopped = heroes.find(id)->position;
         heroes.update(2, true);

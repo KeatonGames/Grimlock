@@ -16,7 +16,8 @@ public:
         }
         if (!viewport || !input.focused || input.button(MouseButton::middle).held ||
             input.button(MouseButton::middle).pressed || input.mouseWheel != glm::vec2{0} ||
-            input.rightDragDistance > dragThreshold) {
+            input.button(MouseButton::left).pressed || input.button(MouseButton::left).held ||
+            input.button(MouseButton::left).released || input.rightDragDistance > dragThreshold) {
             armed_ = false;
         }
         if (right.released) {

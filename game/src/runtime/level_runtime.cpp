@@ -255,6 +255,18 @@ void LevelRuntime::cancelHeroOrder() {
     }
 }
 
+void LevelRuntime::clearSelection() {
+    if (const auto* hero = selectedHero(); hero && (hero->combat.playerMoving || hero->combat.explicitTarget)) {
+        cancelHeroOrder();
+    }
+    selectedHero_.reset();
+    inspectedTower_.reset();
+    heroError_.clear();
+    if (engine_) {
+        engine_->clearSelection();
+    }
+}
+
 const Tower* LevelRuntime::inspectedTower() const noexcept {
     return inspectedTower_ ? navigation_.towers().find(*inspectedTower_) : nullptr;
 }

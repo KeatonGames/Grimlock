@@ -53,6 +53,10 @@ private:
     double upgradeFlashRemaining_ = 0;
     GroundCommandGesture commandGesture_;
     std::optional<glm::vec2> commandCursor_;
+    std::optional<ObjectId> hoveredObject_;
+    std::optional<glm::dvec3> orderPosition_;
+    float orderRemaining_ = 0;
+    bool orderAttack_ = false, cancelWorldInput_ = false;
 
     struct BossBar {
         EnemyId enemy;

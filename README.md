@@ -125,3 +125,6 @@ Hero/tower ownership, Scene bridges, and migration verification are documented i
 For Assassin, Ranger, and Warrior deployment, models, and combat configuration,
 see [hero types](docs/hero_types.md).
 
+See [gameplay controls](docs/gameplay_controls.md) for selection, orders, cancellation,
+and interaction priorities. Camera controls remain right-drag pan, middle-drag orbit, and wheel zoom.
+

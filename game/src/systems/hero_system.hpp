@@ -104,6 +104,7 @@ private:
     const CombatGeometry* sharedGeometry_ = nullptr;
     std::uint64_t geometryRevision_ = 0, towerRevision_ = 0;
     std::optional<InstanceId> preview_;
+    NavigationPath commandPath_;
     std::size_t previewType_ = 0;
 };
 

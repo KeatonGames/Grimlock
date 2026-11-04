@@ -77,6 +77,7 @@ struct HeroRuntimeComponent : HealthComponent {
     std::optional<EnemyId> avoidanceEnemy;
     glm::dvec3 avoidancePoint{0};
     double yaw = 0, speed = 0, stuckTime = 0;
+    double visualYaw = 0;
     bool controllable = true;
     HeroState state = HeroState::idle;
     std::optional<glm::dvec3> destination;

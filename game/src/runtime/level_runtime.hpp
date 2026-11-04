@@ -55,6 +55,7 @@ public:
     [[nodiscard]] bool commandHero(const Ray& ray);
     [[nodiscard]] bool activateHeroAbility(HeroAbility ability);
     void cancelHeroOrder();
+    void clearSelection();
     [[nodiscard]] const Hero* selectedHero() const noexcept;
 
     [[nodiscard]] HeroSystem* heroes() noexcept {

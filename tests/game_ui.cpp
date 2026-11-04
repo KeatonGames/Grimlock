@@ -178,6 +178,9 @@ int main(int argc, char**) {
         require(!runtime.paused() && engine.cameraNavigationEnabled() && runtime.completionSeconds() > elapsed,
                 "resume did not restore gameplay");
         escape(engine, runtime, id);
+        require(!runtime.paused() && !runtime.selectedHero() && !runtime.inspectedTower(),
+                "Escape did not clear selection before pausing");
+        escape(engine, runtime, id);
         require(runtime.paused(), "Escape did not pause");
         control(engine, runtime, id, "Pause Menu", "Restart Level");
         require(!runtime.paused() && runtime.level().waves()->phase() == LevelPhase::preparation,

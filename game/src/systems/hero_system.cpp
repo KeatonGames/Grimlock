@@ -214,6 +214,7 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, s
         hero = &heroes_.back();
     }
     hero->position = position;
+    hero->visualYaw = hero->yaw;
     hero->avoidanceEnemy.reset();
     hero->defensivePosition = position;
     hero->combat = {};
@@ -230,16 +231,26 @@ bool HeroSystem::command(HeroId id, glm::dvec3 destination) {
     if (!hero || !hero->controllable || hero->health <= 0) {
         return false;
     }
+    const auto& mesh = navigation(hero->type);
+    if (hero->combat.playerMoving && hero->destination && hero->path.revision == mesh.revision() &&
+        glm::length(destination - *hero->destination) <= definition(*hero).stoppingDistance) {
+        return true;
+    }
+    // Reject invalid orders before interrupting the current move or attack.
+    if (!mesh.contains(destination) || !mesh.findPath(hero->position, destination, commandPath_)) {
+        return false;
+    }
     finishAttack(*hero);
     hero->combat.target.reset();
     hero->combat.excludedTarget.reset();
     hero->combat.playerMoving = true;
     hero->combat.returning = false;
-    const bool accepted = navigate(*hero, destination);
-    if (accepted) {
-        hero->defensivePosition = *hero->destination;
-    }
-    return accepted;
+    std::swap(hero->path, commandPath_);
+    hero->destination = hero->path.destination;
+    hero->defensivePosition = *hero->destination;
+    hero->state = HeroState::moving;
+    hero->stuckTime = 0;
+    return true;
 }
 
 bool HeroSystem::cancelCommand(HeroId id) {
@@ -251,6 +262,7 @@ bool HeroSystem::cancelCommand(HeroId id) {
     hero->combat.target.reset();
     hero->combat.playerMoving = hero->combat.explicitTarget = hero->combat.returning = false;
     hero->combat.retryDelay = 0;
+    hero->defensivePosition = hero->position;
     stop(*hero, HeroState::idle);
     return true;
 }
@@ -331,7 +343,7 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
     hero.speed = std::clamp(desired,
                             std::max(0.0, hero.speed - config.deceleration * delta),
                             hero.speed + config.acceleration * delta);
-    auto displacement = direction * std::min(remaining, hero.speed * delta);
+    auto displacement = direction * std::min({remaining, distance, hero.speed * delta});
     auto next = hero.position;
     for (int contact = 0; contact < 4 && glm::length(displacement) > 1e-10; ++contact) {
         const auto surface = mesh.move(next, displacement);
@@ -442,7 +454,7 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
 
 void HeroSystem::updateModel(Hero& hero) {
     const auto& type = *types_.at(hero.type);
-    engine_.scene()->setTransform(hero.object, transform(hero.position, hero.yaw, hero.type));
+    engine_.scene()->setTransform(hero.object, transform(hero.position, hero.visualYaw, hero.type));
     if (hero.combat.swinging || hero.health <= 0) {
         return;
     }
@@ -504,6 +516,8 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
             step(hero, stepTime, enemies);
             remaining -= stepTime;
         }
+        hero.visualYaw += std::remainder(hero.yaw - hero.visualYaw, 2 * std::acos(-1.0)) *
+                          (1 - std::exp(-config.turningSpeed * delta));
         updateModel(hero);
     }
 }
