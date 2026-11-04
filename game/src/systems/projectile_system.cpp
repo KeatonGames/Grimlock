@@ -18,10 +18,26 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                              double lifetime,
                              ecs::Entity sourceEntity) {
     const auto& statistics = definition.statistics(level);
-    if (!std::isfinite(glm::length(origin)) || !std::isfinite(statistics.damage) || statistics.damage <= 0 ||
-        !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
-        !std::isfinite(definition.projectileRadius) || definition.projectileRadius <= 0 || std::isnan(lifetime) ||
-        lifetime <= 0) {
+    spawn(origin,
+          target,
+          ProjectileDefinition{statistics.damage,
+                               definition.projectileSpeed,
+                               definition.projectileRadius,
+                               definition.projectileTint},
+          source,
+          {DefensiveTargetKind::tower, sourceEntity},
+          lifetime);
+}
+
+void ProjectileSystem::spawn(glm::dvec3 origin,
+                             EnemyId target,
+                             const ProjectileDefinition& definition,
+                             ObjectId source,
+                             DefensiveTarget attacker,
+                             double lifetime) {
+    if (!std::isfinite(glm::length(origin)) || !std::isfinite(definition.damage) || definition.damage <= 0 ||
+        !std::isfinite(definition.speed) || definition.speed <= 0 || !std::isfinite(definition.radius) ||
+        definition.radius <= 0 || std::isnan(lifetime) || lifetime <= 0) {
         throw std::invalid_argument("Invalid projectile origin or statistics.");
     }
     if (!model_) {
@@ -31,20 +47,16 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
     std::optional<InstanceId> instance;
     try {
         instance = engine_.createInstance(*model_, true);
-        engine_.setTint(*instance, definition.projectileTint);
+        engine_.setTint(*instance, definition.tint);
         engine_.setTransform(*instance,
                              glm::translate(glm::mat4{1}, glm::vec3{origin}) *
-                                 glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.projectileRadius)}));
-        registry_.emplace<Projectile>(entity,
-                                      Projectile{target,
-                                                 origin,
-                                                 definition.projectileSpeed,
-                                                 definition.projectileRadius,
-                                                 statistics.damage,
-                                                 *instance,
-                                                 source});
+                                 glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.radius)}));
+        registry_.emplace<Projectile>(
+            entity,
+            Projectile{target, origin, definition.speed, definition.radius, definition.damage, *instance, source});
         registry_.emplace<ProjectileLifetimeComponent>(entity, ProjectileLifetimeComponent{0, lifetime});
-        projectiles_.back().sourceEntity = sourceEntity;
+        projectiles_.back().sourceEntity = attacker.id;
+        projectiles_.back().sourceKind = attacker.kind;
     } catch (...) {
         if (instance) {
             engine_.removeInstance(*instance);
@@ -91,7 +103,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         // Sweeping the entire homing segment prevents tunneling, even when one frame crosses the target.
         if (distance <= travel + projectile.radius + target->radius) {
             const DefensiveTarget attacker = projectile.sourceEntity
-                                                 ? DefensiveTarget{DefensiveTargetKind::tower, projectile.sourceEntity}
+                                                 ? DefensiveTarget{projectile.sourceKind, projectile.sourceEntity}
                                                  : DefensiveTarget{};
             if (enemies.applyDamage(projectile.target, projectile.damage, attacker)) {
                 ++impacts_;

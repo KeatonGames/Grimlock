@@ -31,21 +31,21 @@ void HeroCombatSystem::abandon(HeroSystem& heroes, Hero& hero) {
 
 bool HeroCombatSystem::inRange(const HeroSystem& heroes, const Hero& hero, const Enemy& enemy, double range) {
     return enemy.alive && enemy.active && enemy.health > 0 &&
-           meleeGap(hero.position, heroes.definition_.radius, {enemy.position, enemy.radius}) <= range + 1e-6 &&
-           heroes.combatGeometry().visible(hero.position + glm::dvec3{0, heroes.definition_.height * 0.5, 0},
+           meleeGap(hero.position, heroes.definition(hero).radius, {enemy.position, enemy.radius}) <= range + 1e-6 &&
+           heroes.combatGeometry().visible(hero.position + glm::dvec3{0, heroes.definition(hero).height * 0.5, 0},
                                            combatAim(enemy)) &&
-           meleeContact(heroes.navigation_,
-                        hero.position,
-                        heroes.definition_.radius,
-                        {enemy.position, enemy.radius},
-                        range);
+           (heroes.definition(hero).combat.attack == HeroAttack::ranged || meleeContact(heroes.navigation(hero.type),
+                                                                                        hero.position,
+                                                                                        heroes.definition(hero).radius,
+                                                                                        {enemy.position, enemy.radius},
+                                                                                        range));
 }
 
 bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, HeroId id, EnemyId target) {
     auto* hero = heroes.findMutable(id);
     const auto* enemy = enemies.find(target);
     if (!hero || !hero->controllable || hero->health <= 0 || !enemy || !enemy->alive || !enemy->active ||
-        distance(hero->position, enemy->position) > heroes.definition_.combat.pursuitRange) {
+        distance(hero->position, enemy->position) > heroes.definition(*hero).combat.pursuitRange) {
         return false;
     }
     heroes.finishAttack(*hero);
@@ -64,7 +64,8 @@ bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, He
 bool HeroCombatSystem::activate(HeroSystem& heroes, HeroId id, HeroAbility ability, bool battle) {
     auto* hero = heroes.findMutable(id);
     if (!battle || ability != HeroAbility::cleave || !hero || !hero->controllable || hero->health <= 0 ||
-        hero->combat.cleaveCooldown > 1e-10 || (hero->combat.swinging && hero->combat.abilitySwing)) {
+        heroes.definition(*hero).combat.attack != HeroAttack::melee || hero->combat.cleaveCooldown > 1e-10 ||
+        (hero->combat.swinging && hero->combat.abilitySwing)) {
         return false;
     }
     // A deliberate ability command takes priority over the automatic basic attack.
@@ -74,15 +75,38 @@ bool HeroCombatSystem::activate(HeroSystem& heroes, HeroId id, HeroAbility abili
     state.playerMoving = false;
     state.returning = false;
     state.swinging = state.abilitySwing = true;
-    state.impactRemaining = heroes.definition_.combat.impactTime;
-    state.cooldown = heroes.definition_.combat.interval;
-    state.cleaveCooldown = heroes.definition_.combat.cleave.cooldown;
+    state.impactRemaining = heroes.definition(*hero).combat.impactTime;
+    state.cooldown = heroes.definition(*hero).combat.interval;
+    state.cleaveCooldown = heroes.definition(*hero).combat.cleave.cooldown;
     heroes.playAttack(*hero);
     return true;
 }
 
 void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& hero) {
-    const auto& stats = heroes.definition_.combat;
+    const auto& stats = heroes.definition(hero).combat;
+    if (!hero.combat.abilitySwing && stats.attack == HeroAttack::ranged) {
+        const auto* enemy = hero.combat.target ? enemies.find(*hero.combat.target) : nullptr;
+        if (enemy && inRange(heroes, hero, *enemy, stats.range)) {
+            heroes.projectiles_.spawn(hero.position + glm::dvec3{0, heroes.definition(hero).height * 0.5, 0},
+                                      enemy->id,
+                                      ProjectileDefinition{stats.damage, stats.projectileSpeed, stats.projectileRadius},
+                                      hero.object,
+                                      {DefensiveTargetKind::hero, hero.id});
+        }
+        return;
+    }
+    if (!hero.combat.abilitySwing && stats.attack == HeroAttack::area) {
+        victims_.clear();
+        for (const auto& enemy : enemies.enemies()) {
+            if (inRange(heroes, hero, enemy, stats.range) && hostile(heroes.team(hero.id), enemies.team(enemy.id))) {
+                victims_.push_back(enemy.id);
+            }
+        }
+        for (const auto id : victims_) {
+            (void)enemies.applyDamage(id, stats.damage, {DefensiveTargetKind::hero, hero.id});
+        }
+        return;
+    }
     if (!hero.combat.abilitySwing) {
         const auto* enemy = hero.combat.target ? enemies.find(*hero.combat.target) : nullptr;
         if (enemy && inRange(heroes, hero, *enemy, stats.range)) {
@@ -110,7 +134,7 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
 
 void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero, double delta) {
     auto& state = hero.combat;
-    const auto& stats = heroes.definition_.combat;
+    const auto& stats = heroes.definition(hero).combat;
     state.cooldown = std::max(0.0, state.cooldown - delta);
     state.cleaveCooldown = std::max(0.0, state.cleaveCooldown - delta);
     state.feedbackRemaining = std::max(0.0, state.feedbackRemaining - delta);
@@ -175,15 +199,15 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         }
         return;
     }
-    const bool changed =
-        distance(state.pathTarget, enemy->position) > 0.35 || hero.path.revision != heroes.navigation_.revision();
+    const bool changed = distance(state.pathTarget, enemy->position) > 0.35 ||
+                         hero.path.revision != heroes.navigation(hero.type).revision();
     if (state.pathDelay > 0 || (!changed && hero.state == HeroState::moving)) {
         return;
     }
     state.pathDelay = 0.4;
-    if (!approachMelee(heroes.navigation_,
+    if (!approachMelee(heroes.navigation(hero.type),
                        hero.position,
-                       heroes.definition_.radius,
+                       heroes.definition(hero).radius,
                        {enemy->position, enemy->radius},
                        stats.range,
                        hero.path,
@@ -191,10 +215,10 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
                        enemies.enemies(),
                        enemy->id,
                        &heroes.combatGeometry(),
-                       heroes.definition_.height)) {
+                       heroes.definition(hero).height)) {
         state.unreachableTarget = enemy->id;
         state.unreachableRetry = 2;
-        state.failedRevision = heroes.navigation_.revision();
+        state.failedRevision = heroes.navigation(hero.type).revision();
         abandon(heroes, hero);
     } else {
         state.pathTarget = enemy->position;
@@ -206,14 +230,14 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
 
 void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, Hero& hero) {
     auto& state = hero.combat;
-    const auto& stats = heroes.definition_.combat;
+    const auto& stats = heroes.definition(hero).combat;
     state.retryDelay = 0.4;
     candidates_.clear();
     enemies.visitNearby(hero.position, stats.acquisitionRange, [&](const Enemy& candidate) {
         if (!candidate.alive || !candidate.active || !hostile(heroes.team(hero.id), enemies.team(candidate.id)) ||
             distance(hero.defensivePosition, candidate.position) > stats.pursuitRange ||
             (state.unreachableTarget == candidate.id && state.unreachableRetry > 0 &&
-             state.failedRevision == heroes.navigation_.revision())) {
+             state.failedRevision == heroes.navigation(hero.type).revision())) {
             return;
         }
         if (state.excludedTarget == candidate.id &&
@@ -232,9 +256,9 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
         const auto id = candidate.id;
         const auto& enemy = *enemies.find(id);
         const bool contact = inRange(heroes, hero, enemy, stats.range);
-        if (!contact && !approachMelee(heroes.navigation_,
+        if (!contact && !approachMelee(heroes.navigation(hero.type),
                                        hero.position,
-                                       heroes.definition_.radius,
+                                       heroes.definition(hero).radius,
                                        {enemy.position, enemy.radius},
                                        stats.range,
                                        approachPath_,
@@ -242,7 +266,7 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
                                        enemies.enemies(),
                                        enemy.id,
                                        &heroes.combatGeometry(),
-                                       heroes.definition_.height)) {
+                                       heroes.definition(hero).height)) {
             continue;
         }
         state.target = id;
@@ -261,12 +285,12 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
 
 void HeroCombatSystem::returnToDefense(HeroSystem& heroes, Hero& hero) {
     auto& state = hero.combat;
-    if (distance(hero.position, hero.defensivePosition) <= heroes.definition_.stoppingDistance + 0.03) {
+    if (distance(hero.position, hero.defensivePosition) <= heroes.definition(hero).stoppingDistance + 0.03) {
         state.returning = false;
         return;
     }
-    if (state.pathDelay > 0 ||
-        (state.returning && hero.state == HeroState::moving && hero.path.revision == heroes.navigation_.revision())) {
+    if (state.pathDelay > 0 || (state.returning && hero.state == HeroState::moving &&
+                                hero.path.revision == heroes.navigation(hero.type).revision())) {
         return;
     }
     state.pathDelay = 0.5;
@@ -278,6 +302,7 @@ void HeroCombatSystem::update(HeroSystem& heroes, EnemySystem& enemies, double d
         throw std::invalid_argument("Hero combat delta must be finite and nonnegative.");
     }
     if (!battle) {
+        heroes.projectiles_.clear();
         for (auto& hero : heroes.heroes_) {
             abandon(heroes, hero);
             hero.combat.playerMoving = false;
@@ -293,6 +318,7 @@ void HeroCombatSystem::update(HeroSystem& heroes, EnemySystem& enemies, double d
             step(heroes, enemies, hero, time);
         }
         heroes.update(time, true, enemies.enemies());
+        heroes.projectiles_.update(enemies, time, &heroes.combatGeometry());
         delta -= time;
     } while (delta > 1e-10);
 }

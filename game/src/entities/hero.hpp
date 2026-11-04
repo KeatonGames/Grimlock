@@ -7,12 +7,20 @@
 
 namespace grimlock::game {
 
+enum class HeroAttack {
+    melee,
+    ranged,
+    area
+};
+
 struct CleaveDefinition {
     float damage = 45;
     double radius = 2, angle = 100, cooldown = 6;
 };
 
 struct HeroCombatDefinition {
+    HeroAttack attack = HeroAttack::melee;
+    double projectileSpeed = 12, projectileRadius = 0.06;
     float damage = 25;
     double range = 1.2, interval = 0.8, impactTime = 0.25;
     double acquisitionRange = 5, pursuitRange = 8;
@@ -44,6 +52,7 @@ enum class HeroState {
 };
 
 struct HeroDefinition {
+    std::string id = "assassin";
     HeroCombatDefinition combat;
     std::string name = "Assassin";
     std::filesystem::path model = "models/assassin.glb";
@@ -55,8 +64,10 @@ struct HeroDefinition {
 };
 
 [[nodiscard]] HeroDefinition loadHeroDefinition(const std::filesystem::path& assets);
+[[nodiscard]] std::vector<HeroDefinition> loadHeroDefinitions(const std::filesystem::path& assets);
 
 struct HeroRuntimeComponent : HealthComponent {
+    std::size_t type = 0;
     HeroCombatState combat;
     HeroId id = 0;
     std::uint64_t spawnOrder = 0;

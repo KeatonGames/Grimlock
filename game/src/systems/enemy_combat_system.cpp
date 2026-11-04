@@ -69,7 +69,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         for (const auto& hero : heroes->heroes()) {
             if (hero.health > 0 && heroes->find(hero.id)) {
                 targets_.push_back({{DefensiveTargetKind::hero, hero.id},
-                                    {hero.position, heroes->definition().radius},
+                                    {hero.position, heroes->definition(hero).radius},
                                     0,
                                     heroes->team(hero.id)->team});
             }
@@ -267,7 +267,7 @@ void EnemyCombatSystem::resolve(Engine& engine,
                     const auto* hero = heroes->find(state.target.id);
                     valid = hero && hero->health > 0;
                     if (valid) {
-                        body = {hero->position, heroes->definition().radius};
+                        body = {hero->position, heroes->definition(*hero).radius};
                     }
                 } else if (state.target.kind == DefensiveTargetKind::tower) {
                     const auto* found = towers.find(state.target.id);

@@ -27,6 +27,7 @@ public:
     }
 
 private:
+    std::size_t heroType_ = 0;
     void configureUi() override;
     void transitions();
     void menu();

@@ -589,10 +589,15 @@ void GameHud::construction() {
         }
         if (runtime_.heroes()) {
             for (const auto& hero : runtime_.heroes()->heroes()) {
+                if (ImGui::GetContentRegionAvail().x < 130 * s) {
+                    ImGui::NewLine();
+                }
                 ImGui::PushID(static_cast<int>(hero.id));
                 ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.85F, 0.5F});
                 const bool selected = runtime_.selectedHero() && runtime_.selectedHero()->id == hero.id;
-                if (presentation::action(runtime_.heroes()->definition().name.c_str(), {130 * s, 30 * s}, selected)) {
+                if (presentation::action(runtime_.heroes()->definition(hero).name.c_str(),
+                                         {130 * s, 30 * s},
+                                         selected)) {
                     (void)runtime_.selectHero(hero.id);
                 }
                 ImGui::PopStyleVar();
@@ -609,8 +614,24 @@ void GameHud::construction() {
             }
         }
         ImGui::BeginDisabled(!preparing);
+        if (ImGui::GetContentRegionAvail().x < 248 * s) {
+            ImGui::NewLine();
+        }
         if (presentation::action("Deploy Hero", {110 * s, 30 * s})) {
-            runtime_.beginHeroPlacement();
+            runtime_.beginHeroPlacement(heroType_);
+        }
+        if (runtime_.heroes()) {
+            ImGui::SameLine();
+            const auto& heroes = *runtime_.heroes();
+            ImGui::SetNextItemWidth(130 * s);
+            if (ImGui::BeginCombo("##heroType", heroes.definition(heroType_).name.c_str())) {
+                for (std::size_t type = 0; type < heroes.typeCount(); ++type) {
+                    if (ImGui::Selectable(heroes.definition(type).name.c_str(), heroType_ == type)) {
+                        heroType_ = type;
+                    }
+                }
+                ImGui::EndCombo();
+            }
         }
         ImGui::EndDisabled();
         if (runtime_.placing() || runtime_.deployingHero()) {
@@ -767,7 +788,7 @@ void GameHud::heroControls() {
     if (ImGui::Begin("Hero Info",
                      nullptr,
                      (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar)))) {
-        presentation::heading(runtime_.heroes()->definition().name.c_str());
+        presentation::heading(runtime_.heroes()->definition(*hero).name.c_str());
         char health[64];
         std::snprintf(health, sizeof(health), "%.0f / %.0f", hero->health, hero->maximumHealth);
         presentation::meter(hero->health / hero->maximumHealth, {-1, 18 * s}, health);
@@ -778,7 +799,7 @@ void GameHud::heroControls() {
                             : hero->combat.returning            ? "Returning to position"
                                                                 : "Defending this position";
         ImGui::TextColored(presentation::gold, "%s", state);
-        const auto& stats = runtime_.heroes()->definition().combat;
+        const auto& stats = runtime_.heroes()->definition(*hero).combat;
         ImGui::TextDisabled("DMG %.0f | RNG %.1f | %.1f/s", stats.damage, stats.range, 1 / stats.interval);
         if (const auto* target =
                 hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr) {
@@ -789,29 +810,31 @@ void GameHud::heroControls() {
             runtime_.cancelHeroOrder();
         }
         ImGui::EndDisabled();
-        const bool battle = runtime_.level().waves()->phase() == LevelPhase::battle;
-        ImGui::BeginDisabled(!battle || hero->health <= 0 || hero->combat.cleaveCooldown > 1e-10 ||
-                             (hero->combat.swinging && hero->combat.abilitySwing));
-        if (presentation::action("Cleave", {-1, 34 * s}, true)) {
-            (void)runtime_.activateHeroAbility(HeroAbility::cleave);
+        if (stats.attack == HeroAttack::melee) {
+            const bool battle = runtime_.level().waves()->phase() == LevelPhase::battle;
+            ImGui::BeginDisabled(!battle || hero->health <= 0 || hero->combat.cleaveCooldown > 1e-10 ||
+                                 (hero->combat.swinging && hero->combat.abilitySwing));
+            if (presentation::action("Cleave", {-1, 34 * s}, true)) {
+                (void)runtime_.activateHeroAbility(HeroAbility::cleave);
+            }
+            const auto abilityPosition = ImGui::GetItemRectMin();
+            auto abilityColor = presentation::gold;
+            abilityColor.w = ImGui::GetStyle().Alpha;
+            presentation::icon(presentation::Icon::sword,
+                               {abilityPosition.x + 18 * s, abilityPosition.y + 17 * s},
+                               20 * s,
+                               ImGui::ColorConvertFloat4ToU32(abilityColor));
+            ImGui::EndDisabled();
+            char cooldown[64];
+            std::snprintf(cooldown,
+                          sizeof(cooldown),
+                          hero->combat.cleaveCooldown > 0 ? "%.1f s remaining" : "Ready | %.0f damage",
+                          hero->combat.cleaveCooldown > 0 ? hero->combat.cleaveCooldown : stats.cleave.damage);
+            presentation::meter(1 - static_cast<float>(hero->combat.cleaveCooldown / stats.cleave.cooldown),
+                                {-1, 16 * s},
+                                cooldown,
+                                presentation::gold);
         }
-        const auto abilityPosition = ImGui::GetItemRectMin();
-        auto abilityColor = presentation::gold;
-        abilityColor.w = ImGui::GetStyle().Alpha;
-        presentation::icon(presentation::Icon::sword,
-                           {abilityPosition.x + 18 * s, abilityPosition.y + 17 * s},
-                           20 * s,
-                           ImGui::ColorConvertFloat4ToU32(abilityColor));
-        ImGui::EndDisabled();
-        char cooldown[64];
-        std::snprintf(cooldown,
-                      sizeof(cooldown),
-                      hero->combat.cleaveCooldown > 0 ? "%.1f s remaining" : "Ready | %.0f damage",
-                      hero->combat.cleaveCooldown > 0 ? hero->combat.cleaveCooldown : stats.cleave.damage);
-        presentation::meter(1 - static_cast<float>(hero->combat.cleaveCooldown / stats.cleave.cooldown),
-                            {-1, 16 * s},
-                            cooldown,
-                            presentation::gold);
         if (!runtime_.heroError().empty()) {
             ImGui::TextWrapped("%s", runtime_.heroError().c_str());
         }
@@ -901,7 +924,7 @@ void GameHud::placementOverlay(const Camera& camera) {
     };
     if (runtime_.heroes()) {
         for (const auto& hero : runtime_.heroes()->heroes()) {
-            healthBar(hero.position + glm::dvec3{0, runtime_.heroes()->definition().visualHeight + 0.12, 0},
+            healthBar(hero.position + glm::dvec3{0, runtime_.heroes()->definition(hero).visualHeight + 0.12, 0},
                       hero.health,
                       hero.maximumHealth,
                       hero.hitFlashRemaining);
@@ -961,7 +984,7 @@ void GameHud::placementOverlay(const Camera& camera) {
             }
         }
         if (hero->combat.feedbackRemaining > 0) {
-            const auto& cleave = runtime_.heroes()->definition().combat.cleave;
+            const auto& cleave = runtime_.heroes()->definition(*hero).combat.cleave;
             const auto center = hero->position + glm::dvec3{0, 0.05, 0};
             for (int i = 0; i < 20; ++i) {
                 const double a = hero->yaw + glm::radians(cleave.angle) * (static_cast<double>(i) / 20 - 0.5);

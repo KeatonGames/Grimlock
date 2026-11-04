@@ -43,25 +43,31 @@ void stop(Hero& hero, HeroState state) {
 } // namespace
 
 HeroSystem::HeroSystem(Engine& engine)
-    : engine_(engine), scene_(engine.scene()), definition_(loadHeroDefinition(engine.assetRoot())),
-      model_(engine.loadModel(engine.assetRoot() / definition_.model)), modelInfo_(engine.modelInfo(model_)),
-      heroes_(registry_.storage<Hero>()), teams_(registry_.storage<TeamComponent>()) {
+    : engine_(engine), scene_(engine.scene()), projectiles_(engine), heroes_(registry_.storage<Hero>()),
+      teams_(registry_.storage<TeamComponent>()) {
     registry_.reserveEntities(8);
     registry_.reserve<Hero>(8);
     registry_.reserve<TeamComponent>(8);
-    if (!scene_ || !std::isfinite(glm::length(modelInfo_.maximum - modelInfo_.minimum)) ||
-        modelInfo_.maximum.y <= modelInfo_.minimum.y) {
-        throw std::invalid_argument("Hero requires an active scene and finite model bounds.");
-    }
-    idleClip_ = clip(modelInfo_, definition_.idleAnimation);
-    attackClip_ = clip(modelInfo_, definition_.combat.attackAnimation);
-    deathClip_ = clip(modelInfo_, "death");
-    if (!deathClip_) {
-        deathClip_ = clip(modelInfo_, "die");
-    }
-    movementClip_ = clip(modelInfo_, definition_.runAnimation);
-    if (!movementClip_) {
-        movementClip_ = clip(modelInfo_, definition_.walkAnimation);
+    for (auto definition : loadHeroDefinitions(engine.assetRoot())) {
+        auto type = std::make_unique<TypeResources>();
+        type->definition = std::move(definition);
+        type->model = engine.loadModel(engine.assetRoot() / type->definition.model);
+        type->modelInfo = engine.modelInfo(type->model);
+        if (!scene_ || !std::isfinite(glm::length(type->modelInfo.maximum - type->modelInfo.minimum)) ||
+            type->modelInfo.maximum.y <= type->modelInfo.minimum.y) {
+            throw std::invalid_argument("Hero requires an active scene and finite model bounds.");
+        }
+        type->idleClip = clip(type->modelInfo, type->definition.idleAnimation);
+        type->attackClip = clip(type->modelInfo, type->definition.combat.attackAnimation);
+        type->deathClip = clip(type->modelInfo, "death");
+        if (!type->deathClip) {
+            type->deathClip = clip(type->modelInfo, "die");
+        }
+        type->movementClip = clip(type->modelInfo, type->definition.runAnimation);
+        if (!type->movementClip) {
+            type->movementClip = clip(type->modelInfo, type->definition.walkAnimation);
+        }
+        types_.push_back(std::move(type));
     }
 }
 
@@ -71,6 +77,7 @@ HeroSystem::~HeroSystem() {
 
 void HeroSystem::clear() noexcept {
     preview({});
+    projectiles_.clear();
     if (engine_.scene() == scene_) {
         for (const auto& hero : heroes_) {
             if (engine_.scene()->contains(hero.object)) {
@@ -115,51 +122,67 @@ void HeroSystem::synchronize(const TowerSystem& towers) {
         const auto box = tower.bounds();
         geometry.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
     }
-    NavMeshConfiguration config;
-    config.agentRadius = static_cast<float>(definition_.radius);
-    config.agentHeight = static_cast<float>(definition_.height);
-    if (!navigation_.build(geometry, config)) {
-        throw std::runtime_error("Cannot build hero navigation: " + navigation_.status());
+    for (auto& type : types_) {
+        NavMeshConfiguration config;
+        config.agentRadius = static_cast<float>(type->definition.radius);
+        config.agentHeight = static_cast<float>(type->definition.height);
+        if (!type->navigation.build(geometry, config)) {
+            throw std::runtime_error("Cannot build hero navigation: " + type->navigation.status());
+        }
     }
     geometryRevision_ = levelGeometry_.revision();
     towerRevision_ = towers.revision();
 }
 
-bool HeroSystem::validPosition(glm::dvec3 position, std::optional<HeroId> ignore) const {
-    if (!navigation_.contains(position)) {
+bool HeroSystem::validPosition(glm::dvec3 position, std::optional<HeroId> ignore, std::size_t type) const {
+    const auto& config = definition(type);
+    const auto& mesh = navigation(type);
+    if (!mesh.contains(position)) {
         return false;
     }
     for (const auto& hero : heroes_) {
         if (ignore == hero.id || hero.health <= 0) {
             continue;
         }
-        if (std::abs(hero.position.y - position.y) >= definition_.height) {
+        if (std::abs(hero.position.y - position.y) >= std::max(config.height, definition(hero).height)) {
             continue;
         }
         if (glm::length(glm::dvec2{hero.position.x - position.x, hero.position.z - position.z}) <
-            definition_.radius * 2) {
+            (config.radius + definition(hero).radius)) {
             return false;
         }
     }
     return true;
 }
 
-Transform HeroSystem::transform(glm::dvec3 position, double yaw) const {
-    const auto center = (modelInfo_.minimum + modelInfo_.maximum) * 0.5F;
-    const float scale = definition_.visualHeight / (modelInfo_.maximum.y - modelInfo_.minimum.y);
+Transform HeroSystem::transform(glm::dvec3 position, double yaw, std::size_t type) const {
+    const auto& config = definition(type);
+    const auto& modelInfo = types_.at(type)->modelInfo;
+    const auto center = (modelInfo.minimum + modelInfo.maximum) * 0.5F;
+    const float scale = config.visualHeight / (modelInfo.maximum.y - modelInfo.minimum.y);
     Transform result;
-    result.rotation = glm::angleAxis(static_cast<float>(yaw + definition_.forwardYaw), glm::vec3{0, 1, 0});
+    result.rotation = glm::angleAxis(static_cast<float>(yaw + config.forwardYaw), glm::vec3{0, 1, 0});
     result.scale = glm::vec3{scale};
     result.position =
-        glm::vec3{position} + result.rotation * (glm::vec3{-center.x, -modelInfo_.minimum.y, -center.z} * scale);
+        glm::vec3{position} + result.rotation * (glm::vec3{-center.x, -modelInfo.minimum.y, -center.z} * scale);
     return result;
 }
 
-HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing) {
-    if (!validPosition(position, existing)) {
+HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, std::size_t type) {
+    if (existing) {
+        const auto* hero = find(*existing);
+        if (!hero) {
+            throw std::invalid_argument("Unknown hero.");
+        }
+        type = hero->type;
+    }
+    const auto& config = definition(type);
+    const auto& mesh = navigation(type);
+    const auto idleClip = types_.at(type)->idleClip;
+    if (!validPosition(position, existing, type)) {
         throw std::invalid_argument("Deploy on clear navigable ground.");
     }
-    position = navigation_.project(position, 0.03)->position;
+    position = mesh.project(position, 0.03)->position;
     Hero* hero = existing ? findMutable(*existing) : nullptr;
     if (existing && !hero) {
         throw std::invalid_argument("Unknown hero.");
@@ -168,18 +191,19 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing) {
         throw std::invalid_argument("A dead hero cannot be redeployed. Restart the level to restore heroes.");
     }
     if (!hero) {
-        const auto object = engine_.scene()->createObject(definition_.name);
+        const auto object = engine_.scene()->createObject(config.name);
         ecs::Entity entity = 0;
         try {
             engine_.scene()->setRole(object, "grimlock.hero");
-            engine_.scene()->setModel(object, definition_.model);
+            engine_.scene()->setModel(object, config.model);
             engine_.prepareScene(*engine_.scene());
             Hero created;
+            created.type = type;
             entity = registry_.create();
             created.id = entity;
             created.spawnOrder = nextSpawnOrder_++;
             created.object = object;
-            created.health = created.maximumHealth = definition_.maximumHealth;
+            created.health = created.maximumHealth = config.maximumHealth;
             registry_.emplace<Hero>(entity, std::move(created));
             registry_.emplace<TeamComponent>(entity, TeamComponent{Team::player});
         } catch (...) {
@@ -195,8 +219,8 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing) {
     hero->combat = {};
     stop(*hero, HeroState::idle);
     updateModel(*hero);
-    if (idleClip_) {
-        engine_.scene()->playAnimation(hero->object, *idleClip_);
+    if (idleClip) {
+        engine_.scene()->playAnimation(hero->object, *idleClip);
     }
     return hero->id;
 }
@@ -238,14 +262,15 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
     if (!hero || hero->health <= 0 || damage == 0) {
         return false;
     }
+    const auto deathClip = types_.at(hero->type)->deathClip;
     if (receiveDamage(*hero, damage)) {
         finishAttack(*hero);
         hero->combat = {};
         stop(*hero, HeroState::idle);
         hero->controllable = false;
         engine_.scene()->setTint(hero->object, {0.4F, 0.35F, 0.35F, 1});
-        if (deathClip_) {
-            engine_.scene()->playAnimation(hero->object, *deathClip_, false);
+        if (deathClip) {
+            engine_.scene()->playAnimation(hero->object, *deathClip, false);
         } else {
             engine_.scene()->stopAnimation(hero->object);
         }
@@ -257,7 +282,8 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
 }
 
 bool HeroSystem::navigate(Hero& hero, glm::dvec3 destination) {
-    if (!navigation_.contains(destination) || !navigation_.findPath(hero.position, destination, hero.path)) {
+    const auto& mesh = navigation(hero.type);
+    if (!mesh.contains(destination) || !mesh.findPath(hero.position, destination, hero.path)) {
         stop(hero, HeroState::blocked);
         updateModel(hero);
         return false;
@@ -269,26 +295,27 @@ bool HeroSystem::navigate(Hero& hero, glm::dvec3 destination) {
 }
 
 void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) {
+    const auto& config = definition(hero);
+    const auto& mesh = navigation(hero.type);
     if (!hero.destination || hero.health <= 0 || !hero.controllable) {
         stop(hero, HeroState::idle);
         return;
     }
-    if (hero.path.revision != navigation_.revision() &&
-        !navigation_.findPath(hero.position, *hero.destination, hero.path)) {
+    if (hero.path.revision != mesh.revision() && !mesh.findPath(hero.position, *hero.destination, hero.path)) {
         stop(hero, HeroState::blocked);
         return;
     }
     double remaining = 0;
-    auto target = navigation_.steering(hero.position, hero.path, &remaining);
+    auto target = mesh.steering(hero.position, hero.path, &remaining);
     // Surface clipping can enter an adjacent polygon outside the cached corridor near a corner.
-    if (!target && navigation_.findPath(hero.position, *hero.destination, hero.path)) {
-        target = navigation_.steering(hero.position, hero.path, &remaining);
+    if (!target && mesh.findPath(hero.position, *hero.destination, hero.path)) {
+        target = mesh.steering(hero.position, hero.path, &remaining);
     }
     if (!target) {
         stop(hero, HeroState::blocked);
         return;
     }
-    if (remaining <= definition_.stoppingDistance) {
+    if (remaining <= config.stoppingDistance) {
         stop(hero, HeroState::reached);
         return;
     }
@@ -300,31 +327,31 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
         return;
     }
     const auto direction = offset / distance;
-    const auto desired = std::min(definition_.speed, std::sqrt(2 * definition_.deceleration * remaining));
+    const auto desired = std::min(config.speed, std::sqrt(2 * config.deceleration * remaining));
     hero.speed = std::clamp(desired,
-                            std::max(0.0, hero.speed - definition_.deceleration * delta),
-                            hero.speed + definition_.acceleration * delta);
+                            std::max(0.0, hero.speed - config.deceleration * delta),
+                            hero.speed + config.acceleration * delta);
     auto displacement = direction * std::min(remaining, hero.speed * delta);
     auto next = hero.position;
     for (int contact = 0; contact < 4 && glm::length(displacement) > 1e-10; ++contact) {
-        const auto surface = navigation_.move(next, displacement);
+        const auto surface = mesh.move(next, displacement);
         displacement = {surface.x - next.x, surface.z - next.z};
         const Enemy* neighbor = nullptr;
         double fraction = 1;
         for (const auto& enemy : enemies) {
             if (!enemy.active || !enemy.alive ||
-                (next.y >= enemy.position.y + enemy.height || enemy.position.y >= next.y + definition_.height)) {
+                (next.y >= enemy.position.y + enemy.height || enemy.position.y >= next.y + config.height)) {
                 continue;
             }
             const double t = contactFraction({next.x - enemy.position.x, next.z - enemy.position.z},
                                              displacement,
-                                             definition_.radius + enemy.radius);
+                                             config.radius + enemy.radius);
             if (t < fraction) {
                 fraction = t;
                 neighbor = &enemy;
             }
         }
-        next = navigation_.move(next, displacement * fraction);
+        next = mesh.move(next, displacement * fraction);
         if (!neighbor) {
             break;
         }
@@ -341,13 +368,14 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
     }
     if (traveled > 1e-6) {
         const auto yaw = std::atan2(next.x - hero.position.x, next.z - hero.position.z);
-        hero.yaw +=
-            std::remainder(yaw - hero.yaw, 2 * std::acos(-1.0)) * (1 - std::exp(-definition_.turningSpeed * delta));
+        hero.yaw += std::remainder(yaw - hero.yaw, 2 * std::acos(-1.0)) * (1 - std::exp(-config.turningSpeed * delta));
     }
     hero.position = next;
 }
 
 glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::span<const Enemy> enemies) const {
+    const auto& config = definition(hero);
+    const auto& mesh = navigation(hero.type);
     const auto horizontal = [](glm::dvec3 value) {
         return glm::dvec2{value.x, value.z};
     };
@@ -356,7 +384,7 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
             return enemy.id == *hero.avoidanceEnemy && enemy.alive && enemy.active;
         });
         if (found != enemies.end() && glm::length(horizontal(hero.avoidancePoint - hero.position)) > 0.12 &&
-            navigation_.visible(hero.position, hero.avoidancePoint)) {
+            mesh.visible(hero.position, hero.avoidancePoint)) {
             return hero.avoidancePoint;
         }
         hero.avoidanceEnemy.reset();
@@ -373,13 +401,13 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     for (const auto& enemy : enemies) {
         if (!enemy.alive || !enemy.active ||
             (hero.position.y >= enemy.position.y + enemy.height ||
-             enemy.position.y >= hero.position.y + definition_.height)) {
+             enemy.position.y >= hero.position.y + config.height)) {
             continue;
         }
         const auto relative = horizontal(enemy.position - hero.position);
         const double along = glm::dot(relative, forward);
-        const double clearance = definition_.radius + enemy.radius + 0.1;
-        if (along > 0 && along < nearest && along < clearance + definition_.speed * 0.35 &&
+        const double clearance = config.radius + enemy.radius + 0.1;
+        if (along > 0 && along < nearest && along < clearance + config.speed * 0.35 &&
             std::abs(glm::dot(relative, side)) < clearance) {
             obstacle = &enemy;
             nearest = along;
@@ -388,13 +416,13 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     if (!obstacle) {
         return target;
     }
-    const double clearance = definition_.radius + obstacle->radius + 0.18;
+    const double clearance = config.radius + obstacle->radius + 0.18;
     std::optional<glm::dvec3> best;
     double bestDistance = std::numeric_limits<double>::max();
     for (const double sign : {-1.0, 1.0}) {
         const auto desired = obstacle->position + glm::dvec3{side.x, 0, side.y} * (clearance * sign);
-        const auto point = navigation_.project(desired, 0.1);
-        if (!point || !navigation_.visible(hero.position, point->position)) {
+        const auto point = mesh.project(desired, 0.1);
+        if (!point || !mesh.visible(hero.position, point->position)) {
             continue;
         }
         const double cost = glm::length(horizontal(point->position - hero.position)) +
@@ -413,13 +441,14 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
 }
 
 void HeroSystem::updateModel(Hero& hero) {
-    engine_.scene()->setTransform(hero.object, transform(hero.position, hero.yaw));
+    const auto& type = *types_.at(hero.type);
+    engine_.scene()->setTransform(hero.object, transform(hero.position, hero.yaw, hero.type));
     if (hero.combat.swinging || hero.health <= 0) {
         return;
     }
     const bool moving = hero.state == HeroState::moving && hero.speed > 0;
     if (moving != hero.animationMoving) {
-        const auto selected = moving ? movementClip_ : idleClip_;
+        const auto selected = moving ? type.movementClip : type.idleClip;
         if (selected) {
             engine_.scene()->playAnimation(hero.object, *selected);
         } else {
@@ -430,22 +459,24 @@ void HeroSystem::updateModel(Hero& hero) {
 }
 
 void HeroSystem::playAttack(Hero& hero) {
-    if (attackClip_) {
-        engine_.scene()->playAnimation(hero.object, *attackClip_, false);
-    } else if (idleClip_) {
-        engine_.scene()->playAnimation(hero.object, *idleClip_);
+    const auto& type = *types_.at(hero.type);
+    if (type.attackClip) {
+        engine_.scene()->playAnimation(hero.object, *type.attackClip, false);
+    } else if (type.idleClip) {
+        engine_.scene()->playAnimation(hero.object, *type.idleClip);
     } else {
         engine_.scene()->stopAnimation(hero.object);
     }
 }
 
 void HeroSystem::finishAttack(Hero& hero) {
+    const auto& type = *types_.at(hero.type);
     if (!hero.combat.swinging) {
         return;
     }
     hero.combat.swinging = false;
-    if (idleClip_) {
-        engine_.scene()->playAnimation(hero.object, *idleClip_);
+    if (type.idleClip) {
+        engine_.scene()->playAnimation(hero.object, *type.idleClip);
     } else {
         engine_.scene()->stopAnimation(hero.object);
     }
@@ -466,10 +497,10 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
         if (!movingAllowed && hero.state == HeroState::moving) {
             stop(hero, HeroState::idle);
         }
+        const auto& config = definition(hero);
         double remaining = delta;
         while (movingAllowed && hero.state == HeroState::moving && remaining > 1e-10) {
-            const double stepTime =
-                std::min(remaining, std::min(1.0 / 60, definition_.radius * 0.4 / definition_.speed));
+            const double stepTime = std::min(remaining, std::min(1.0 / 60, config.radius * 0.4 / config.speed));
             step(hero, stepTime, enemies);
             remaining -= stepTime;
         }
@@ -477,7 +508,7 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
     }
 }
 
-void HeroSystem::preview(std::optional<glm::dvec3> position, bool valid) {
+void HeroSystem::preview(std::optional<glm::dvec3> position, bool valid, std::size_t type) {
     if (!position) {
         if (preview_) {
             engine_.removeInstance(*preview_);
@@ -485,10 +516,14 @@ void HeroSystem::preview(std::optional<glm::dvec3> position, bool valid) {
         }
         return;
     }
-    if (!preview_) {
-        preview_ = engine_.createInstance(model_, true);
+    if (preview_ && previewType_ != type) {
+        preview({});
     }
-    engine_.setTransform(*preview_, transform(*position, 0));
+    if (!preview_) {
+        preview_ = engine_.createInstance(types_.at(type)->model, true);
+        previewType_ = type;
+    }
+    engine_.setTransform(*preview_, transform(*position, 0, type));
     engine_.setTint(*preview_, valid ? glm::vec4{0.35F, 1, 0.55F, 0.4F} : glm::vec4{1, 0.25F, 0.2F, 0.4F});
 }
 
@@ -517,14 +552,15 @@ std::optional<HeroId> HeroSystem::fromObject(ObjectId object) const noexcept {
 std::string HeroSystem::towerError(const Tower& tower) const {
     const auto box = tower.bounds();
     for (const auto& hero : heroes_) {
+        const auto& config = definition(hero);
         if (hero.health <= 0 || hero.position.y >= box.center.y + box.halfExtent.y ||
-            hero.position.y + definition_.height <= box.center.y - box.halfExtent.y) {
+            hero.position.y + config.height <= box.center.y - box.halfExtent.y) {
             continue;
         }
         const auto nearest = glm::clamp(glm::dvec2{hero.position.x, hero.position.z},
                                         glm::dvec2{box.center.x - box.halfExtent.x, box.center.z - box.halfExtent.z},
                                         glm::dvec2{box.center.x + box.halfExtent.x, box.center.z + box.halfExtent.z});
-        if (glm::length(nearest - glm::dvec2{hero.position.x, hero.position.z}) < definition_.radius + 0.15) {
+        if (glm::length(nearest - glm::dvec2{hero.position.x, hero.position.z}) < config.radius + 0.15) {
             return "Tower overlaps the hero's navigation clearance.";
         }
     }

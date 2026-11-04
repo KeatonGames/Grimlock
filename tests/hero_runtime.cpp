@@ -1,4 +1,6 @@
 #include "input/ground_command.hpp"
+#include "runtime/level_runtime.hpp"
+#include "systems/enemy_combat_system.hpp"
 #include "systems/hero_combat_system.hpp"
 #include "systems/hero_system.hpp"
 
@@ -165,6 +167,174 @@ void combatChecks(Engine& engine) {
     require(heroes.find(hero)->combat.target == fleeing && enemies.find(fleeing)->health < 100,
             "hero did not recover when target returned inside acquisition range");
 }
+
+void heroTypeChecks(Engine& engine) {
+    auto scene = std::make_unique<Scene>("Mixed hero types");
+    scene->setNavigationGrid(GridConfiguration{28, 24, 1, {-14, 0, -12}});
+    engine.setScene(std::move(scene));
+    TowerSystem towers;
+    towers.synchronize(engine);
+    HeroSystem heroes{engine};
+    heroes.synchronize(towers);
+    EnemySystem enemies{engine, EnemyDefinition{.despawnOnArrival = false}};
+    HeroCombatSystem combat;
+    const auto type = [&](std::string_view id) {
+        for (std::size_t index = 0; index < heroes.typeCount(); ++index) {
+            if (heroes.definition(index).id == id) {
+                return index;
+            }
+        }
+        throw std::runtime_error("Missing configured hero type");
+    };
+    const auto rangerType = type("ranger"), warriorType = type("warrior");
+    require(heroes.typeCount() == 3 && heroes.definition().combat.damage == 25 &&
+                heroes.definition().combat.attack == HeroAttack::melee,
+            "Assassin definition changed or hero catalog is incomplete");
+    const auto assassin = heroes.deploy({-10, 0, 0});
+    const auto ranger = heroes.deploy({-3, 0, 0}, {}, rangerType);
+    const auto rangerPosition = heroes.find(ranger)->position;
+    const auto warrior = heroes.deploy({3, 0, 0}, {}, warriorType);
+    const auto spawn = [&](double x, double z) {
+        require(enemies.spawn(heroes.navigation(), {{x, z}, {x, z}, 0}, 1) == 1, "mixed hero enemy spawn failed");
+        return enemies.enemies().back().id;
+    };
+    const auto rangedTarget = spawn(0, 0);
+    const auto front = spawn(3, 1), back = spawn(3, -1), far = spawn(3, 5);
+    combat.update(heroes, enemies, 0.6, true);
+    require(enemies.find(rangedTarget)->health == 100 - heroes.definition(rangerType).combat.damage,
+            "Ranger failed to acquire/fire/hit at range");
+    require(glm::length(heroes.find(ranger)->position - rangerPosition) < 1e-6, "in-range Ranger chased unnecessarily");
+    require(enemies.find(front)->health == 80 && enemies.find(back)->health == 80 && enemies.find(far)->health == 100,
+            "Warrior area attack missed, hit twice, or exceeded radius");
+    require(heroes.find(assassin)->combat.target == std::nullopt &&
+                heroes.find(ranger)->combat.target != heroes.find(warrior)->combat.target,
+            "mixed heroes shared target state");
+    require(!combat.activate(heroes, ranger, HeroAbility::cleave, true) &&
+                !combat.activate(heroes, warrior, HeroAbility::cleave, true),
+            "new hero types inherited an active ability");
+
+    for (const auto id : {ranger, warrior}) {
+        require(heroes.command(id, heroes.find(id)->position + glm::dvec3{0, 0, -3}), "mixed hero manual move failed");
+    }
+    combat.update(heroes, enemies, 0.2, true);
+    require(!heroes.find(ranger)->combat.target && !heroes.find(warrior)->combat.target,
+            "manual move failed to override autonomous attacks");
+    require(heroes.cancelCommand(ranger) && heroes.cancelCommand(warrior), "mixed hero cancel failed");
+    combat.update(heroes, enemies, 0.5, true);
+    require(heroes.find(ranger)->combat.target && heroes.find(warrior)->combat.target,
+            "mixed heroes did not resume autonomous attacks");
+
+    enemies.clear();
+    combat.update(heroes, enemies, 0, false);
+    (void)heroes.deploy({-8, 0, 0}, ranger);
+    const auto distant = spawn(-1, 0);
+    require(combat.attack(heroes, enemies, ranger, distant), "Ranger explicit attack failed");
+    for (int frame = 0; frame < 300 && enemies.find(distant) && enemies.find(distant)->health == 100; ++frame) {
+        combat.update(heroes, enemies, 1.0 / 60, true);
+    }
+    require(enemies.find(distant) && enemies.find(distant)->health < 100 && heroes.find(ranger)->position.x > -7.9,
+            "Ranger failed to approach an out-of-range enemy");
+
+    enemies.clear();
+    combat.update(heroes, enemies, 0, false);
+    (void)heroes.deploy({3, 0, 0}, warrior);
+    const auto lethalFront = spawn(3, 1), lethalBack = spawn(3, -1);
+    (void)enemies.applyDamage(lethalFront, 90);
+    (void)enemies.applyDamage(lethalBack, 90);
+    combat.update(heroes, enemies, 0.6, true);
+    require(!enemies.find(lethalFront) && !enemies.find(lethalBack),
+            "Warrior lethal area damage skipped a compacted enemy");
+
+    for (const auto id : {assassin, ranger, warrior}) {
+        enemies.clear();
+        const auto point = heroes.find(id)->position;
+        const auto attacker = spawn(point.x, point.z + 0.8);
+        const auto health = heroes.find(id)->health;
+        EnemyCombatSystem enemyCombat;
+        for (int frame = 0; frame < 120 && heroes.find(id)->health == health; ++frame) {
+            enemyCombat.prepare(enemies, towers, &heroes, {12, 10}, 1.0 / 60, &heroes.combatGeometry());
+            enemies.update(heroes.navigation(), {}, 1.0 / 60);
+            enemyCombat.resolve(engine, enemies, towers, &heroes, 1.0 / 60);
+        }
+        require(enemies.find(attacker) && heroes.find(id)->health < health, "enemy AI failed to damage a hero type");
+    }
+
+    // The generic projectile path must sweep terrain and retain the hero attacker domain.
+    enemies.clear();
+    combat.update(heroes, enemies, 0, false);
+    const auto protectedTarget = spawn(0, 0);
+    const auto wall = engine.scene()->createObject("Projectile cover");
+    engine.scene()->setModel(wall, "models/cube.obj");
+    Transform wallTransform;
+    wallTransform.position = {-1.5F, 1, 0};
+    wallTransform.scale = {0.3F, 2, 2};
+    engine.scene()->setTransform(wall, wallTransform);
+    engine.prepareScene(*engine.scene());
+    heroes.synchronize(towers);
+    ProjectileSystem shots{engine};
+    shots.spawn({-3, 0.7, 0},
+                protectedTarget,
+                ProjectileDefinition{18, 12, 0.06},
+                0,
+                {DefensiveTargetKind::hero, ranger});
+    shots.update(enemies, 1, &heroes.combatGeometry());
+    require(shots.projectiles().empty() && enemies.find(protectedTarget)->health == 100,
+            "hero projectile crossed terrain at low frame rate");
+    engine.scene()->removeObject(wall);
+    heroes.synchronize(towers);
+    shots.spawn({-3, 0.7, 0},
+                protectedTarget,
+                ProjectileDefinition{18, 12, 0.06},
+                0,
+                {DefensiveTargetKind::hero, ranger});
+    require(shots.projectiles().front().sourceKind == DefensiveTargetKind::hero, "hero projectile lost attacker kind");
+    shots.update(enemies, 1, &heroes.combatGeometry());
+    require(enemies.find(protectedTarget)->health == 82, "clear hero projectile did not apply damage");
+    heroes.clear();
+    require(engine.update(), "mixed hero rendering/cleanup failed");
+}
+
+void heroDeploymentChecks(Engine& engine) {
+    LevelRuntime runtime;
+    runtime.load(engine, "assets/levels/first_watch.json");
+    const auto originalCount = runtime.heroes()->heroes().size();
+    const auto gold = runtime.level().economy().gold();
+    for (std::size_t type = 1; type < runtime.heroes()->typeCount(); ++type) {
+        runtime.beginHeroPlacement(type);
+        bool placed = false;
+        for (int x = -8; x <= 8 && !placed; ++x) {
+            for (int z = -5; z <= 5 && !placed; ++z) {
+                const Ray ray{{x, 15, z}, {0, -1, 0}, 0, 30};
+                const auto point = runtime.heroes()->ground(ray);
+                if (point && runtime.heroes()->validPosition(*point, {}, type)) {
+                    runtime.updateHeroPlacement(engine, ray, true);
+                    placed = !runtime.deployingHero();
+                }
+            }
+        }
+        require(placed && runtime.selectedHero() && runtime.selectedHero()->type == type &&
+                    runtime.level().economy().gold() == gold,
+                "typed hero placement failed or changed existing economy rules");
+        const auto id = runtime.selectedHero()->id;
+        runtime.beginHeroPlacement(type);
+        const auto position = runtime.selectedHero()->position;
+        runtime.updateHeroPlacement(engine, Ray{position + glm::dvec3{0, 10, 0}, {0, -1, 0}, 0, 20}, true);
+        require(runtime.selectedHero()->id == id && runtime.heroes()->heroes().size() == originalCount + type,
+                "typed redeployment duplicated or replaced the hero");
+    }
+    runtime.startWave();
+    bool rejected = false;
+    try {
+        runtime.beginHeroPlacement(1);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "typed hero deployment bypassed preparation restriction");
+    runtime.restart(engine);
+    require(runtime.heroes()->heroes().size() == originalCount && runtime.level().economy().gold() == gold,
+            "restart retained runtime hero types or changed gold");
+    runtime.unload(engine);
+}
 } // namespace
 
 int main() {
@@ -172,6 +342,8 @@ int main() {
         gestures();
         Engine engine{EngineConfig{.windowTitle = "Hero runtime checks"}};
         combatChecks(engine);
+        heroTypeChecks(engine);
+        heroDeploymentChecks(engine);
         auto scene = std::make_unique<Scene>("Hero obstacle fixture");
         scene->setNavigationGrid(GridConfiguration{16, 12, 1, {-8, 0, -6}});
         for (std::uint32_t row = 0; row < 9; ++row) {

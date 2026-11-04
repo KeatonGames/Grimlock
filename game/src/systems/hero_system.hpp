@@ -3,6 +3,7 @@
 #include "entities/hero.hpp"
 #include "navigation/level_geometry.hpp"
 #include "systems/combat_geometry.hpp"
+#include "systems/projectile_system.hpp"
 #include "systems/tower_system.hpp"
 
 namespace grimlock::game {
@@ -24,7 +25,7 @@ public:
         return sharedGeometry_ ? *sharedGeometry_ : combatGeometry_;
     }
 
-    [[nodiscard]] HeroId deploy(glm::dvec3 position, std::optional<HeroId> existing = {});
+    [[nodiscard]] HeroId deploy(glm::dvec3 position, std::optional<HeroId> existing = {}, std::size_t type = 0);
     [[nodiscard]] bool command(HeroId hero, glm::dvec3 destination);
     [[nodiscard]] bool cancelCommand(HeroId hero);
     [[nodiscard]] bool applyDamage(HeroId hero, float damage);
@@ -36,8 +37,10 @@ public:
         return registry_;
     }
 
-    void preview(std::optional<glm::dvec3> position, bool valid = false);
-    [[nodiscard]] bool validPosition(glm::dvec3 position, std::optional<HeroId> ignore = {}) const;
+    void preview(std::optional<glm::dvec3> position, bool valid = false, std::size_t type = 0);
+    [[nodiscard]] bool validPosition(glm::dvec3 position,
+                                     std::optional<HeroId> ignore = {},
+                                     std::size_t type = 0) const;
     [[nodiscard]] std::optional<glm::dvec3> ground(const Ray& ray) const;
     [[nodiscard]] const Hero* find(HeroId id) const noexcept;
 
@@ -51,12 +54,20 @@ public:
         return heroes_;
     }
 
-    [[nodiscard]] const HeroDefinition& definition() const noexcept {
-        return definition_;
+    [[nodiscard]] const HeroDefinition& definition(std::size_t type = 0) const {
+        return types_.at(type)->definition;
     }
 
-    [[nodiscard]] const NavMesh& navigation() const noexcept {
-        return navigation_;
+    [[nodiscard]] const HeroDefinition& definition(const Hero& hero) const {
+        return definition(hero.type);
+    }
+
+    [[nodiscard]] std::size_t typeCount() const noexcept {
+        return types_.size();
+    }
+
+    [[nodiscard]] const NavMesh& navigation(std::size_t type = 0) const {
+        return types_.at(type)->navigation;
     }
 
     [[nodiscard]] std::string towerError(const Tower& tower) const;
@@ -70,14 +81,20 @@ private:
     void updateModel(Hero& hero);
     void step(Hero& hero, double delta, std::span<const Enemy> enemies);
     glm::dvec3 steerAroundEnemies(Hero& hero, glm::dvec3 target, std::span<const Enemy> enemies) const;
-    [[nodiscard]] Transform transform(glm::dvec3 position, double yaw) const;
+    [[nodiscard]] Transform transform(glm::dvec3 position, double yaw, std::size_t type) const;
     Engine& engine_;
     const Scene* scene_;
-    HeroDefinition definition_;
-    ModelId model_;
-    ModelInfo modelInfo_;
-    std::optional<std::size_t> idleClip_, movementClip_, attackClip_, deathClip_;
-    NavMesh navigation_;
+
+    struct TypeResources {
+        HeroDefinition definition;
+        ModelId model;
+        ModelInfo modelInfo;
+        std::optional<std::size_t> idleClip, movementClip, attackClip, deathClip;
+        NavMesh navigation;
+    };
+
+    std::vector<std::unique_ptr<TypeResources>> types_;
+    ProjectileSystem projectiles_;
     ecs::Registry registry_;
     ecs::Storage<Hero>& heroes_;
     ecs::Storage<TeamComponent>& teams_;
@@ -87,6 +104,7 @@ private:
     const CombatGeometry* sharedGeometry_ = nullptr;
     std::uint64_t geometryRevision_ = 0, towerRevision_ = 0;
     std::optional<InstanceId> preview_;
+    std::size_t previewType_ = 0;
 };
 
 } // namespace grimlock::game

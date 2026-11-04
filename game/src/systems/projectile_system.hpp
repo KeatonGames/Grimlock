@@ -29,6 +29,12 @@ public:
                double lifetime = std::numeric_limits<double>::infinity(),
                ecs::Entity sourceEntity = 0);
     void update(EnemySystem& enemies, double delta, const CombatGeometry* geometry = nullptr);
+    void spawn(glm::dvec3 origin,
+               EnemyId target,
+               const ProjectileDefinition& definition,
+               ObjectId source = 0,
+               DefensiveTarget attacker = {},
+               double lifetime = std::numeric_limits<double>::infinity());
     void clear() noexcept;
 
     [[nodiscard]] std::span<const Projectile> projectiles() const noexcept {

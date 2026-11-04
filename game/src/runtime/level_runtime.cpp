@@ -171,30 +171,34 @@ const Hero* LevelRuntime::selectedHero() const noexcept {
     return heroes_ && selectedHero_ ? heroes_->find(*selectedHero_) : nullptr;
 }
 
-void LevelRuntime::beginHeroPlacement() {
+void LevelRuntime::beginHeroPlacement(std::size_t type) {
     if (!heroes_ || !level_.waves() || level_.waves()->phase() != LevelPhase::preparation) {
         throw std::invalid_argument("Deploy heroes during preparation.");
     }
-    const auto previous = selectedHero_;
-    if (const auto* hero = selectedHero(); hero && hero->health <= 0) {
+    (void)heroes_->definition(type);
+    std::optional<HeroId> previous;
+    if (const auto* selected = selectedHero(); selected && selected->type == type) {
+        previous = selected->id;
+    } else {
+        for (const auto& hero : heroes_->heroes()) {
+            if (hero.type == type && hero.health > 0) {
+                previous = hero.id;
+                break;
+            }
+        }
+    }
+    bool hasType = false;
+    for (const auto& hero : heroes_->heroes()) {
+        hasType = hasType || hero.type == type;
+    }
+    if ((previous && heroes_->find(*previous)->health <= 0) || (!previous && hasType)) {
         heroError_ = "A dead hero cannot be redeployed. Restart the level to restore heroes.";
         return;
     }
     cancelPlacement();
     inspectedTower_.reset();
     deployingId_ = previous;
-    if (!deployingId_ && !heroes_->heroes().empty()) {
-        for (const auto& hero : heroes_->heroes()) {
-            if (hero.health > 0) {
-                deployingId_ = hero.id;
-                break;
-            }
-        }
-        if (!deployingId_) {
-            heroError_ = "No living heroes remain. Restart the level to restore heroes.";
-            return;
-        }
-    }
+    deployingType_ = type;
     deployingHero_ = true;
     heroError_.clear();
 }
@@ -205,11 +209,11 @@ void LevelRuntime::updateHeroPlacement(Engine& engine, const std::optional<Ray>&
     }
     heroes_->synchronize(navigation_.towers());
     const auto point = ray ? heroes_->ground(*ray) : std::nullopt;
-    const bool valid = point && heroes_->validPosition(*point, deployingId_);
+    const bool valid = point && heroes_->validPosition(*point, deployingId_, deployingType_);
     heroError_ = valid ? "" : "Deploy on clear navigable ground.";
-    heroes_->preview(point, valid);
+    heroes_->preview(point, valid, deployingType_);
     if (valid && confirm) {
-        selectedHero_ = heroes_->deploy(*point, deployingId_);
+        selectedHero_ = heroes_->deploy(*point, deployingId_, deployingType_);
         engine.scene()->selectObject(heroes_->find(*selectedHero_)->object);
         deployingHero_ = false;
         heroes_->preview({});

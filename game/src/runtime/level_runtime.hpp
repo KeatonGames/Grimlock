@@ -50,7 +50,7 @@ public:
     void cancelPlacement() noexcept;
     void updatePlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
     void selectObject(Engine& engine, const std::optional<Ray>& ray);
-    void beginHeroPlacement();
+    void beginHeroPlacement(std::size_t type = 0);
     void updateHeroPlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
     [[nodiscard]] bool commandHero(const Ray& ray);
     [[nodiscard]] bool activateHeroAbility(HeroAbility ability);
@@ -103,6 +103,7 @@ private:
     Engine* engine_ = nullptr;
     std::optional<HeroId> selectedHero_, deployingId_;
     bool deployingHero_ = false;
+    std::size_t deployingType_ = 0;
     std::string heroError_;
     std::filesystem::path levelPath_;
     std::string selectedTower_ = "basic", placementError_, rejectedError_;

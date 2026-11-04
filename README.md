@@ -122,3 +122,6 @@ records lifetime regressions, allocation measurements, stress results, and remai
 Hero/tower ownership, Scene bridges, and migration verification are documented in
 [ECS heroes and towers](docs/ecs_heroes_towers.md).
 
+For Assassin, Ranger, and Warrior deployment, models, and combat configuration,
+see [hero types](docs/hero_types.md).
+

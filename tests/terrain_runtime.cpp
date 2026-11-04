@@ -179,17 +179,21 @@ void terrain(Engine& engine) {
 
     HeroSystem heroes{engine};
     heroes.synchronize(navigation.towers());
-    const auto hero = heroes.deploy({-2, 0, 0});
-    require(heroes.command(hero, {9, 2, 0}), "hero could not navigate up the ramp");
-    bool climbed = false;
-    for (int i = 0; i < 900; ++i) {
-        heroes.update(1.0 / 60, true);
-        const auto* value = heroes.find(hero);
-        climbed = climbed || (value->position.y > 0.5 && value->position.y < 1.7);
-        require(heroes.navigation().contains(value->position), "hero left the sloping surface");
+    for (std::size_t type = 0; type < heroes.typeCount(); ++type) {
+        const auto hero = heroes.deploy({-2, 0, 0}, {}, type);
+        require(heroes.command(hero, {9, 2, 0}), "hero could not navigate up the ramp");
+        bool climbed = false;
+        for (int i = 0; i < 900; ++i) {
+            heroes.update(1.0 / 60, true);
+            const auto* value = heroes.find(hero);
+            climbed = climbed || (value->position.y > 0.5 && value->position.y < 1.7);
+            require(heroes.navigation(type).contains(value->position), "hero left the sloping surface");
+        }
+        require(climbed && heroes.find(hero)->position.y > 1.9 && heroes.find(hero)->state == HeroState::reached,
+                "hero did not arrive at the correct hill height");
+
+        require(heroes.remove(hero), "terrain hero cleanup failed");
     }
-    require(climbed && heroes.find(hero)->position.y > 1.9 && heroes.find(hero)->state == HeroState::reached,
-            "hero did not arrive at the correct hill height");
 
     for (const double delta : {1.0 / 120, 1.0 / 30, 0.1}) {
         navigation.reset(engine);

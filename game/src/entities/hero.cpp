@@ -7,13 +7,10 @@
 
 namespace grimlock::game {
 
-HeroDefinition loadHeroDefinition(const std::filesystem::path& assets) {
-    std::ifstream file{assets / "config/hero.json"};
-    if (!file) {
-        throw std::runtime_error("Cannot open config/hero.json.");
-    }
-    const auto json = nlohmann::json::parse(file);
+namespace {
+HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlohmann::json& json) {
     HeroDefinition result;
+    result.id = json.value("id", result.id);
     result.name = json.at("name").get<std::string>();
     result.model = json.at("model").get<std::string>();
     result.speed = json.value("speed", result.speed);
@@ -31,6 +28,16 @@ HeroDefinition loadHeroDefinition(const std::filesystem::path& assets) {
     result.runAnimation = json.value("run_animation", result.runAnimation);
     const auto combat = json.value("combat", nlohmann::json::object());
     auto& stats = result.combat;
+    const auto attack = combat.value("attack", std::string{"melee"});
+    if (attack == "ranged") {
+        stats.attack = HeroAttack::ranged;
+    } else if (attack == "area") {
+        stats.attack = HeroAttack::area;
+    } else if (attack != "melee") {
+        throw std::invalid_argument("Unknown hero attack type.");
+    }
+    stats.projectileSpeed = combat.value("projectile_speed", stats.projectileSpeed);
+    stats.projectileRadius = combat.value("projectile_radius", stats.projectileRadius);
     stats.damage = combat.value("damage", stats.damage);
     stats.range = combat.value("range", stats.range);
     stats.interval = combat.value("attack_interval", stats.interval);
@@ -45,6 +52,8 @@ HeroDefinition loadHeroDefinition(const std::filesystem::path& assets) {
     stats.cleave.cooldown = ability.value("cooldown", stats.cleave.cooldown);
     for (const auto value : {static_cast<double>(stats.damage),
                              stats.range,
+                             stats.projectileSpeed,
+                             stats.projectileRadius,
                              stats.interval,
                              stats.acquisitionRange,
                              stats.pursuitRange,
@@ -77,10 +86,38 @@ HeroDefinition loadHeroDefinition(const std::filesystem::path& assets) {
             throw std::invalid_argument("Hero dimensions and movement values must be positive and finite.");
         }
     }
-    if (!safe || result.name.empty() || !std::isfinite(result.forwardYaw) || result.radius > 1000 ||
-        result.height > 1000 || result.height < 0.15 || result.speed > 20 ||
+    if (!safe || result.id.empty() || result.name.empty() || !std::isfinite(result.forwardYaw) ||
+        result.radius > 1000 || result.height > 1000 || result.height < 0.15 || result.speed > 20 ||
         !std::filesystem::is_regular_file(assets / result.model)) {
         throw std::invalid_argument("Invalid hero model or configuration.");
+    }
+    return result;
+}
+
+} // namespace
+
+HeroDefinition loadHeroDefinition(const std::filesystem::path& assets) {
+    std::ifstream file{assets / "config/hero.json"};
+    if (!file) {
+        throw std::runtime_error("Cannot open config/hero.json.");
+    }
+    return readHeroDefinition(assets, nlohmann::json::parse(file));
+}
+
+std::vector<HeroDefinition> loadHeroDefinitions(const std::filesystem::path& assets) {
+    std::vector<HeroDefinition> result{loadHeroDefinition(assets)};
+    std::ifstream file{assets / "config/heroes.json"};
+    if (!file) {
+        throw std::runtime_error("Cannot open config/heroes.json.");
+    }
+    for (const auto& json : nlohmann::json::parse(file)) {
+        auto definition = readHeroDefinition(assets, json);
+        for (const auto& existing : result) {
+            if (existing.id == definition.id) {
+                throw std::invalid_argument("Duplicate hero type: " + definition.id);
+            }
+        }
+        result.push_back(std::move(definition));
     }
     return result;
 }
