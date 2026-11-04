@@ -1,3 +1,4 @@
+#include "allocation_counter.hpp"
 #include "navigation/navigation_session.hpp"
 #include "systems/combat_system.hpp"
 #include "systems/enemy_combat_system.hpp"
@@ -90,6 +91,8 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
             types.push_back(type);
         }
     }
+    checks::AllocationScope spawning;
+    const auto spawnStart = Clock::now();
     for (std::size_t index = 0; index < count; ++index) {
         const auto type = index == 0 && boss ? *boss : types[index % types.size()];
         const double depth = count > 200 ? 12 : 4;
@@ -97,7 +100,18 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
             throw std::runtime_error("Stress fixture could not spawn its exact enemy count");
         }
     }
+    const auto spawnMilliseconds = elapsed(spawnStart);
+    const auto spawnAllocations = spawning.stop();
     verifyQueries(enemies);
+    checks::AllocationScope towerSyncScope;
+    const auto towerSyncStart = Clock::now();
+    for (int pass = 0; pass < 1000; ++pass) {
+        navigation.towers().synchronize(engine);
+    }
+    const auto towerSyncMilliseconds = elapsed(towerSyncStart);
+    const auto towerSyncAllocations = towerSyncScope.stop();
+    std::cout << "TOWER_SYNC," << count << ',' << towerSyncMilliseconds << ',' << towerSyncAllocations.count << ','
+              << towerSyncAllocations.bytes << '\n';
     CombatSystem towers{engine};
     ProjectileSystem volley{engine};
     EnemyCombatSystem ai;
@@ -106,42 +120,60 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
     double aiTime = 0, movementTime = 0, heroTime = 0, combatTime = 0, preparation = 0, render = 0, gpu = 0,
            animation = 0;
     std::size_t gpuSamples = 0, peakProjectiles = 0;
-    for (int frame = -30; frame < samples; ++frame) {
-        double measuredAi = 0, measuredMovement = 0, measuredHeroes = 0, measuredCombat = 0;
+    std::uint64_t frameAllocations = 0, frameBytes = 0, steadyAllocations = 0;
+    std::uint64_t aiAllocations = 0, movementAllocations = 0, heroAllocations = 0, combatAllocations = 0;
+    int frame = 0;
+    double measuredAi = 0, measuredMovement = 0, measuredHeroes = 0, measuredCombat = 0;
+    std::uint64_t measuredAiAllocations = 0, measuredMovementAllocations = 0, measuredHeroAllocations = 0,
+                  measuredCombatAllocations = 0;
+    const std::function<void(double)> update = [&](double) {
+        constexpr double step = 1.0 / 60;
+        auto begin = Clock::now();
+        checks::AllocationScope aiScope;
+        navigation.synchronize(engine);
+        ai.prepare(enemies, navigation.towers(), &heroes, {17, 0}, step, &navigation.combatGeometry());
+        measuredAi = elapsed(begin);
+        measuredAiAllocations = aiScope.stop().count;
+        begin = Clock::now();
+        checks::AllocationScope movementScope;
+        navigation.update(engine, step);
+        measuredMovement = elapsed(begin);
+        measuredMovementAllocations = movementScope.stop().count;
+        begin = Clock::now();
+        checks::AllocationScope resolveScope;
+        ai.resolve(engine, enemies, navigation.towers(), &heroes, step);
+        navigation.synchronize(engine);
+        measuredAi += elapsed(begin);
+        measuredAiAllocations += resolveScope.stop().count;
+        begin = Clock::now();
+        checks::AllocationScope heroScope;
+        heroCombat.update(heroes, enemies, step, true);
+        measuredHeroes = elapsed(begin);
+        measuredHeroAllocations = heroScope.stop().count;
+        begin = Clock::now();
+        checks::AllocationScope combatScope;
+        if (frame == 0) {
+            // A fixed volley stresses simultaneous projectiles without changing tower statistics.
+            const auto active = enemies.enemies();
+            for (std::size_t shot = 0; shot < 128 && !active.empty(); ++shot) {
+                volley.spawn({0, 2, 0}, active[shot % active.size()].id, navigation.towers().definition("basic"));
+            }
+        }
+        towers.update(navigation.towers(), enemies, step, &navigation.combatGeometry());
+        volley.update(enemies, step, &navigation.combatGeometry());
+        measuredCombat = elapsed(begin);
+        measuredCombatAllocations = combatScope.stop().count;
+    };
+    for (frame = -30; frame < samples; ++frame) {
+        measuredAi = measuredMovement = measuredHeroes = measuredCombat = 0;
+        measuredAiAllocations = measuredMovementAllocations = measuredHeroAllocations = measuredCombatAllocations = 0;
         const auto start = Clock::now();
-        if (!engine.update([&](double) {
-                constexpr double step = 1.0 / 60;
-                auto begin = Clock::now();
-                navigation.synchronize(engine);
-                ai.prepare(enemies, navigation.towers(), &heroes, {17, 0}, step, &navigation.combatGeometry());
-                measuredAi = elapsed(begin);
-                begin = Clock::now();
-                navigation.update(engine, step);
-                measuredMovement = elapsed(begin);
-                begin = Clock::now();
-                ai.resolve(engine, enemies, navigation.towers(), &heroes, step);
-                navigation.synchronize(engine);
-                measuredAi += elapsed(begin);
-                begin = Clock::now();
-                heroCombat.update(heroes, enemies, step, true);
-                measuredHeroes = elapsed(begin);
-                begin = Clock::now();
-                if (frame == 0) {
-                    // A fixed volley stresses simultaneous projectiles without changing tower statistics.
-                    const auto active = enemies.enemies();
-                    for (std::size_t shot = 0; shot < 128 && !active.empty(); ++shot) {
-                        volley.spawn({0, 2, 0},
-                                     active[shot % active.size()].id,
-                                     navigation.towers().definition("basic"));
-                    }
-                }
-                towers.update(navigation.towers(), enemies, step, &navigation.combatGeometry());
-                volley.update(enemies, step, &navigation.combatGeometry());
-                measuredCombat = elapsed(begin);
-            })) {
+        checks::AllocationScope allocationScope;
+        if (!engine.update(update)) {
             throw std::runtime_error("Stress window closed");
         }
         const double frameMilliseconds = elapsed(start);
+        const auto allocations = allocationScope.stop();
         peakProjectiles =
             std::max(peakProjectiles, towers.projectiles().projectiles().size() + volley.projectiles().size());
         for (const auto& enemy : enemies.enemies()) {
@@ -155,6 +187,15 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
             movementTime += measuredMovement;
             heroTime += measuredHeroes;
             combatTime += measuredCombat;
+            frameAllocations += allocations.count;
+            frameBytes += allocations.bytes;
+            if (frame > 30) {
+                steadyAllocations += allocations.count;
+            }
+            aiAllocations += measuredAiAllocations;
+            movementAllocations += measuredMovementAllocations;
+            heroAllocations += measuredHeroAllocations;
+            combatAllocations += measuredCombatAllocations;
             const auto& performance = engine.performance();
             preparation += performance.preparationMilliseconds;
             animation += performance.animationMilliseconds;
@@ -193,10 +234,28 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
               << ',' << towers.projectiles().impacts() + volley.impacts() << ',' << enemies.metrics().defeated << ','
               << enemies.enemies().size() << ',' << checksum << ',' << animation / samples << ','
               << enemies.registry().capacityBytes() + towers.projectiles().registry().capacityBytes() +
-                     volley.registry().capacityBytes()
-              << std::endl;
+                     volley.registry().capacityBytes() + heroes.registry().capacityBytes() +
+                     navigation.towers().registry().capacityBytes()
+              << ',' << frameAllocations << ',' << frameBytes << ',' << steadyAllocations << ',' << aiAllocations << ','
+              << movementAllocations << ',' << heroAllocations << ',' << combatAllocations << std::endl;
     towers.clear();
     volley.clear();
+    if (!enemies.enemies().empty()) {
+        const auto active = enemies.enemies();
+        for (std::size_t shot = 0; shot < 128; ++shot) {
+            volley.spawn({0, 5, 12}, active[shot % active.size()].id, navigation.towers().definition("basic"));
+        }
+        checks::AllocationScope projectileScope;
+        const auto projectileStart = Clock::now();
+        for (int pass = 0; pass < 32; ++pass) {
+            volley.update(enemies, 1.0 / 60, &navigation.combatGeometry());
+        }
+        const auto projectileMilliseconds = elapsed(projectileStart) / 32;
+        const auto projectileAllocations = projectileScope.stop();
+        std::cout << "PROJECTILES," << count << ',' << projectileMilliseconds << ',' << projectileAllocations.count
+                  << ',' << projectileAllocations.bytes << '\n';
+        volley.clear();
+    }
     verifyQueries(enemies);
     if (enemies.enemies().size() >= 2) {
         const auto removed = enemies.enemies().front().id;
@@ -215,8 +274,15 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
         }
         verifyQueries(enemies);
     }
+    const auto cleanupStart = Clock::now();
+    checks::AllocationScope cleanupScope;
     heroes.clear();
     navigation.shutdown();
+    const auto cleanupMilliseconds = elapsed(cleanupStart);
+    const auto cleanup = cleanupScope.stop();
+    std::cout << "LIFECYCLE," << count << ',' << spawnMilliseconds << ',' << spawnAllocations.count << ','
+              << spawnAllocations.bytes << ',' << cleanupMilliseconds << ',' << cleanup.count << ',' << cleanup.bytes
+              << '\n';
     if (!engine.update() || engine.performance().instances != 0) {
         throw std::runtime_error("Battle cleanup retained runtime render instances");
     }
@@ -238,7 +304,8 @@ int main(int argc, char** argv) {
         }
         std::cout << "scenario,enemies,fps,mean_ms,p50_ms,p95_ms,p99_ms,max_ms,ai_ms,movement_ms,hero_ms,combat_ms,"
                      "preparation_ms,render_ms,gpu_ms,private_mb,working_mb,peak_projectiles,impacts,defeated,alive,"
-                     "checksum,animation_ms,ecs_capacity_bytes\n";
+                     "checksum,animation_ms,ecs_capacity_bytes,frame_new,frame_new_bytes,steady_new,ai_new,movement_"
+                     "new,hero_new,combat_new\n";
         for (const auto count : {50, 100, 200}) {
             scenario(engine, count, samples, animated);
         }

@@ -15,7 +15,8 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                              const TowerDefinition& definition,
                              std::size_t level,
                              ObjectId source,
-                             double lifetime) {
+                             double lifetime,
+                             ecs::Entity sourceEntity) {
     const auto& statistics = definition.statistics(level);
     if (!std::isfinite(glm::length(origin)) || !std::isfinite(statistics.damage) || statistics.damage <= 0 ||
         !std::isfinite(definition.projectileSpeed) || definition.projectileSpeed <= 0 ||
@@ -43,6 +44,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                                                  *instance,
                                                  source});
         registry_.emplace<ProjectileLifetimeComponent>(entity, ProjectileLifetimeComponent{0, lifetime});
+        projectiles_.back().sourceEntity = sourceEntity;
     } catch (...) {
         if (instance) {
             engine_.removeInstance(*instance);
@@ -88,8 +90,9 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         }
         // Sweeping the entire homing segment prevents tunneling, even when one frame crosses the target.
         if (distance <= travel + projectile.radius + target->radius) {
-            const DefensiveTarget attacker =
-                projectile.source ? DefensiveTarget{DefensiveTargetKind::tower, projectile.source} : DefensiveTarget{};
+            const DefensiveTarget attacker = projectile.sourceEntity
+                                                 ? DefensiveTarget{DefensiveTargetKind::tower, projectile.sourceEntity}
+                                                 : DefensiveTarget{};
             if (enemies.applyDamage(projectile.target, projectile.damage, attacker)) {
                 ++impacts_;
             }

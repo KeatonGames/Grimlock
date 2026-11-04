@@ -57,7 +57,7 @@ std::optional<std::size_t> movementClip(const std::vector<std::string>& names, c
 } // namespace
 
 EnemySystem::EnemySystem(Engine& engine, EnemyDefinition definition)
-    : engine_(engine), enemies_(registry_.storage<Enemy>()) {
+    : engine_(engine), enemies_(registry_.storage<Enemy>()), teams_(registry_.storage<TeamComponent>()) {
     registry_.reserveEntities(maximumEnemies);
     (void)addDefinition(std::move(definition));
 }
@@ -279,7 +279,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     if (!enemy.active || !enemy.alive) {
         return false;
     }
-    receiveDamage(enemy.health, damage);
+    receiveDamage(enemy, damage);
     if (attacker.kind != DefensiveTargetKind::none) {
         enemy.combat.attacker = attacker;
         enemy.combat.threatRemaining = definition(enemy.type).combat.threatMemory;

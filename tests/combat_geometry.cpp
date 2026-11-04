@@ -86,7 +86,7 @@ void runtimeChecks(Engine& engine) {
             "own tower blocked its firing origin");
     CombatSystem combat{engine};
     combat.update(towers, enemies, 0.01, &world);
-    require(combat.attacks()[0].target == near, "nearest visible target was not acquired");
+    require(towers.attacks()[0].target == near, "nearest visible target was not acquired");
     const auto blocker = engine.scene()->createObject("Thin solid wall");
     engine.scene()->setModel(blocker, "models/cube.obj");
     engine.scene()->setRole(blocker, "grimlock.obstacle");
@@ -98,7 +98,7 @@ void runtimeChecks(Engine& engine) {
     require(!world.visible(firingOrigin(tower), combatAim(*enemies.find(near)), source),
             "thin wall did not obstruct target");
     combat.update(towers, enemies, 0.01, &world);
-    require(combat.attacks()[0].target == other, "tower did not replace an obstructed target");
+    require(towers.attacks()[0].target == other, "tower did not replace an obstructed target");
     const auto health = enemies.find(near)->health;
     ProjectileSystem projectiles{engine};
     auto fast = towers.definition("basic");
@@ -112,10 +112,10 @@ void runtimeChecks(Engine& engine) {
     require(world.visible(firingOrigin(tower), combatAim(*enemies.find(near)), source),
             "decorative geometry blocked combat");
     combat.update(towers, enemies, 0.01, &world);
-    require(combat.attacks()[0].target == other, "valid target switched unnecessarily after visibility changed");
+    require(towers.attacks()[0].target == other, "valid target switched unnecessarily after visibility changed");
     require(enemies.remove(other), "could not remove tracked target");
     combat.update(towers, enemies, 0.01, &world);
-    require(combat.attacks()[0].target == near, "tower did not reacquire after target death");
+    require(towers.attacks()[0].target == near, "tower did not reacquire after target death");
     projectiles.spawn(firingOrigin(tower), near, fast, 1, source);
     projectiles.update(enemies, 0.5, &world);
     require(enemies.find(near)->health == health - fast.statistics().damage, "clear projectile lost damage behavior");

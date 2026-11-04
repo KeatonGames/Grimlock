@@ -35,7 +35,7 @@ struct HeroCombatState {
     double cooldown = 0, impactRemaining = 0, cleaveCooldown = 0, feedbackRemaining = 0, retryDelay = 0;
 };
 
-using HeroId = std::uint64_t;
+using HeroId = ecs::Entity;
 enum class HeroState {
     idle,
     moving,
@@ -56,22 +56,23 @@ struct HeroDefinition {
 
 [[nodiscard]] HeroDefinition loadHeroDefinition(const std::filesystem::path& assets);
 
-struct Hero {
+struct HeroRuntimeComponent : HealthComponent {
     HeroCombatState combat;
     HeroId id = 0;
+    std::uint64_t spawnOrder = 0;
     ObjectId object = 0;
     glm::dvec3 position{0};
     glm::dvec3 defensivePosition{0};
     std::optional<EnemyId> avoidanceEnemy;
     glm::dvec3 avoidancePoint{0};
-    double hitFlashRemaining = 0;
     double yaw = 0, speed = 0, stuckTime = 0;
-    float health = 100, maximumHealth = 100;
     bool controllable = true;
     HeroState state = HeroState::idle;
     std::optional<glm::dvec3> destination;
     NavigationPath path;
     bool animationMoving = false;
 };
+
+using Hero = HeroRuntimeComponent;
 
 } // namespace grimlock::game

@@ -109,7 +109,7 @@ private:
     bool placing_ = false;
     std::optional<Tower> preview_, rejectedTower_;
     std::uint64_t rejectedRevision_ = 0;
-    std::optional<ObjectId> inspectedTower_;
+    std::optional<ecs::Entity> inspectedTower_;
     PlayerProgress* progress_ = nullptr; // Game-owned; Editor previews never attach player saves.
     double elapsed_ = 0;
     bool resultRecorded_ = false, personalRecord_ = false;

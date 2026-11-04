@@ -1,20 +1,29 @@
 #pragma once
 
+#include "entities/components.hpp"
+
+#include <grimlock/ecs.hpp>
 #include <grimlock/scene.hpp>
 #include <grimlock/terrain.hpp>
 
 namespace grimlock::game {
 
-struct TowerProgress {
+struct TowerProgress : HealthComponent {
+    TowerProgress(std::string configuredType = "",
+                  std::size_t configuredLevel = 1,
+                  float current = 250,
+                  float maximum = 250)
+        : HealthComponent{current, maximum, 0}, type(std::move(configuredType)), level(configuredLevel) {
+    }
+
     std::string type;
     std::size_t level = 1;
-    float health = 250, maximumHealth = 250;
-    double hitFlashRemaining = 0;
 };
 
 // Scene IDs remain the selection/ownership handles. Footprints never depend on imported model bounds or scale.
 struct Tower {
     ObjectId object = 0;
+    ecs::Entity entity = 0; // Runtime identity; object is the Scene/Editor bridge only.
     std::string type = "basic";
     glm::dvec3 position{0}; // Center, not foot position.
     glm::dquat rotation{1, 0, 0, 0};

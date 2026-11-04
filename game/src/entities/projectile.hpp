@@ -13,6 +13,7 @@ struct ProjectileComponent {
     InstanceId instance;
     ObjectId source = 0;
     glm::dvec3 velocity{0};
+    ecs::Entity sourceEntity = 0;
 };
 
 using Projectile = ProjectileComponent;

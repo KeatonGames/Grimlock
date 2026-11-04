@@ -116,5 +116,9 @@ For Editor profiling, reproducible combat stress tests, and measured results, se
 [combat performance](docs/combat_performance.md).
 
 For ECS ownership, generation handles, mutation rules, migration scope, and checks,
-see [incremental ECS](docs/ecs.md).
+see [Gameplay ECS](docs/ecs.md). The [ECS validation report](docs/ecs_validation.md)
+records lifetime regressions, allocation measurements, stress results, and remaining limits.
+
+Hero/tower ownership, Scene bridges, and migration verification are documented in
+[ECS heroes and towers](docs/ecs_heroes_towers.md).
 

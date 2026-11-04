@@ -43,6 +43,10 @@ public:
     [[nodiscard]] bool setDestination(EnemyId id, std::optional<glm::dvec2> destination);
     [[nodiscard]] const Enemy* find(EnemyId id) const noexcept;
 
+    [[nodiscard]] const TeamComponent* team(EnemyId id) const noexcept {
+        return teams_.get(id);
+    }
+
     [[nodiscard]] const ecs::Registry& registry() const noexcept {
         return registry_;
     }
@@ -118,6 +122,7 @@ private:
     std::vector<AnimalType> types_;
     ecs::Registry registry_;
     ecs::Storage<Enemy>& enemies_;
+    ecs::Storage<TeamComponent>& teams_;
     mutable EnemyNeighbors queryNeighbors_;
     mutable bool neighborsDirty_ = true;
     std::vector<DeathEffect> deaths_;

@@ -24,6 +24,8 @@ private:
     struct Target {
         DefensiveTarget reference;
         MeleeBody body;
+        ObjectId object = 0; // Scene handle used only for geometry, never for target identity.
+        Team team = Team::player;
     };
 
     [[nodiscard]] const Target* find(DefensiveTarget target) const;

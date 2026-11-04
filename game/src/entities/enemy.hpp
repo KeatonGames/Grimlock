@@ -1,5 +1,6 @@
 #pragma once
 
+#include "entities/components.hpp"
 #include "entities/enemy_definition.hpp"
 #include "navigation/nav_mesh.hpp"
 
@@ -56,7 +57,7 @@ enum class EnemyState {
 
 [[nodiscard]] const char* enemyStateName(EnemyState state) noexcept;
 
-struct EnemyRuntimeComponent {
+struct EnemyRuntimeComponent : HealthComponent {
     EnemyCombatState combat;
     EnemyId id = 0;
     std::uint64_t spawnOrder = 0; // Deterministic gameplay ordering is independent of recycled ECS handle bits.
@@ -68,8 +69,6 @@ struct EnemyRuntimeComponent {
     glm::dvec2 desiredVelocity{0};
     double speed = 1.5, radius = 0.195, yaw = 0;
     double acceleration = 8, deceleration = 12;
-    float maximumHealth = 100, health = 100;
-    double hitFlashRemaining = 0;
     MovementStatus movement = MovementStatus::idle;
     EnemyState state = EnemyState::idle;
     std::optional<glm::dvec2> destination;

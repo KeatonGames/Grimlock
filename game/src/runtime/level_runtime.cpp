@@ -158,7 +158,7 @@ void LevelRuntime::selectObject(Engine& engine, const std::optional<Ray>& ray) {
         selectedHero_ = heroes_->fromObject(*object);
     }
     if (object && navigation_.towers().contains(*object)) {
-        inspectedTower_ = *object;
+        inspectedTower_ = navigation_.towers().entityForObject(*object);
     }
     if (selectedHero_ || inspectedTower_) {
         engine.scene()->selectObject(object);
@@ -252,12 +252,7 @@ void LevelRuntime::cancelHeroOrder() {
 }
 
 const Tower* LevelRuntime::inspectedTower() const noexcept {
-    for (const auto& tower : navigation_.towers().towers()) {
-        if (inspectedTower_ == tower.object) {
-            return &tower;
-        }
-    }
-    return nullptr;
+    return inspectedTower_ ? navigation_.towers().find(*inspectedTower_) : nullptr;
 }
 
 void LevelRuntime::cancelPlacement() noexcept {

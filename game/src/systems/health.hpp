@@ -1,5 +1,7 @@
 #pragma once
 
+#include "entities/components.hpp"
+
 #include <cmath>
 #include <stdexcept>
 #include <type_traits>
@@ -22,6 +24,10 @@ template <typename T> bool receiveDamage(T& health, T damage) {
     const bool alive = health > 0;
     health = damage >= health ? T{0} : health - damage;
     return alive && health == 0;
+}
+
+inline bool receiveDamage(HealthComponent& health, float damage) {
+    return receiveDamage(health.health, damage);
 }
 
 } // namespace grimlock::game

@@ -60,13 +60,18 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
     geometry_ = geometry;
     targets_.clear();
     for (const auto& tower : towers.towers()) {
-        targets_.push_back({{DefensiveTargetKind::tower, tower.object}, meleeBody(tower)});
+        targets_.push_back({{DefensiveTargetKind::tower, tower.entity},
+                            meleeBody(tower),
+                            tower.object,
+                            towers.team(tower.entity)->team});
     }
     if (heroes) {
         for (const auto& hero : heroes->heroes()) {
-            if (hero.health > 0) {
-                targets_.push_back(
-                    {{DefensiveTargetKind::hero, hero.id}, {hero.position, heroes->definition().radius}});
+            if (hero.health > 0 && heroes->find(hero.id)) {
+                targets_.push_back({{DefensiveTargetKind::hero, hero.id},
+                                    {hero.position, heroes->definition().radius},
+                                    0,
+                                    heroes->team(hero.id)->team});
             }
         }
     }
@@ -76,6 +81,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         }
         auto& state = enemy.combat;
         const auto& stats = enemies.definition(enemy.type).combat;
+        const auto team = enemies.team(enemy.id)->team;
         if (!state.managed) {
             state.managed = true;
             state.objective = enemy.destination ? enemy.destination : std::optional{objective};
@@ -107,7 +113,8 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         const Target* target = state.target.kind == DefensiveTargetKind::objective ? &goal : find(state.target);
         const bool pursuitExceeded = target && (distance(state.origin, target->body.position) > stats.pursuitRange ||
                                                 distance(state.origin, enemy.position) > stats.pursuitRange);
-        if (state.target.kind != DefensiveTargetKind::none && (!target || !relevant(*target) || pursuitExceeded)) {
+        if (state.target.kind != DefensiveTargetKind::none &&
+            (!target || !hostile(team, target->team) || !relevant(*target) || pursuitExceeded)) {
             release(enemies, enemy, true);
             state.pursuitExhausted = pursuitExceeded;
             target = nullptr;
@@ -120,7 +127,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             const auto consider = [&](const Target& candidate, std::size_t index) {
                 const int rank = priority(stats, candidate.reference.kind);
                 const double gap = meleeGap(enemy.position, enemy.radius, candidate.body);
-                if (rank > 0 && gap <= stats.aggressionRange && relevant(candidate) &&
+                if (hostile(team, candidate.team) && rank > 0 && gap <= stats.aggressionRange && relevant(candidate) &&
                     !(state.rejected == candidate.reference &&
                       (state.rejectDelay > 0 ||
                        (state.pursuitExhausted &&
@@ -150,24 +157,20 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             for (std::size_t attempt = 0; attempt < attempts; ++attempt) {
                 const auto& candidate = candidates_[(state.candidateOffset + attempt) % candidates_.size()];
                 const auto& option = candidate.second == targets_.size() ? goal : targets_[candidate.second];
-                const bool contact =
-                    meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range) &&
-                    clearStrike(enemy,
-                                option.body,
-                                option.reference.kind == DefensiveTargetKind::tower ? option.reference.id : 0);
-                if (contact ||
-                    approachMelee(mesh,
-                                  enemy.position,
-                                  enemy.radius,
-                                  option.body,
-                                  stats.range,
-                                  approachPath_,
-                                  enemyOrder(enemy),
-                                  {},
-                                  0,
-                                  geometry_,
-                                  enemy.height,
-                                  option.reference.kind == DefensiveTargetKind::tower ? option.reference.id : 0)) {
+                const bool contact = meleeContact(mesh, enemy.position, enemy.radius, option.body, stats.range) &&
+                                     clearStrike(enemy, option.body, option.object);
+                if (contact || approachMelee(mesh,
+                                             enemy.position,
+                                             enemy.radius,
+                                             option.body,
+                                             stats.range,
+                                             approachPath_,
+                                             enemyOrder(enemy),
+                                             {},
+                                             0,
+                                             geometry_,
+                                             enemy.height,
+                                             option.object)) {
                     state.target = option.reference;
                     state.candidateOffset = 0;
                     state.origin = enemy.position;
@@ -196,9 +199,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             continue;
         }
         if (meleeContact(mesh, enemy.position, enemy.radius, target->body, stats.range) &&
-            clearStrike(enemy,
-                        target->body,
-                        target->reference.kind == DefensiveTargetKind::tower ? target->reference.id : 0)) {
+            clearStrike(enemy, target->body, target->object)) {
             EnemyAi::setDestination(enemy, {});
             enemy.yaw =
                 std::atan2(target->body.position.x - enemy.position.x, target->body.position.z - enemy.position.z);
@@ -227,7 +228,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                            0,
                            geometry_,
                            enemy.height,
-                           target->reference.kind == DefensiveTargetKind::tower ? target->reference.id : 0)) {
+                           target->object)) {
             release(enemies, enemy, true);
             continue;
         }
@@ -261,6 +262,7 @@ void EnemyCombatSystem::resolve(Engine& engine,
                 const auto& stats = enemies.definition(enemy.type).combat;
                 MeleeBody body;
                 bool valid = false;
+                ObjectId targetObject = 0;
                 if (state.target.kind == DefensiveTargetKind::hero && heroes) {
                     const auto* hero = heroes->find(state.target.id);
                     valid = hero && hero->health > 0;
@@ -268,26 +270,24 @@ void EnemyCombatSystem::resolve(Engine& engine,
                         body = {hero->position, heroes->definition().radius};
                     }
                 } else if (state.target.kind == DefensiveTargetKind::tower) {
-                    const auto list = towers.towers();
-                    const auto found = std::find_if(list.begin(), list.end(), [&](const Tower& tower) {
-                        return tower.object == state.target.id;
-                    });
-                    valid = found != list.end();
+                    const auto* found = towers.find(state.target.id);
+                    valid = found != nullptr;
                     if (valid) {
                         body = meleeBody(*found);
+                        targetObject = found->object;
                     }
                 } else if (state.target.kind == DefensiveTargetKind::objective && state.objective) {
                     body = {{state.objective->x, state.objectiveHeight, state.objective->y}, 0};
                     valid = true;
                 }
                 if (valid && meleeContact(*enemy.navigation, enemy.position, enemy.radius, body, stats.range) &&
-                    clearStrike(enemy, body, state.target.kind == DefensiveTargetKind::tower ? state.target.id : 0)) {
+                    clearStrike(enemy, body, targetObject)) {
                     switch (state.target.kind) {
                     case DefensiveTargetKind::hero:
                         (void)heroes->applyDamage(state.target.id, stats.damage * stats.heroDamageModifier);
                         break;
                     case DefensiveTargetKind::tower:
-                        (void)towers.applyDamage(engine, state.target.id, stats.damage * stats.towerDamageModifier);
+                        (void)towers.applyDamage(engine, targetObject, stats.damage * stats.towerDamageModifier);
                         break;
                     case DefensiveTargetKind::objective:
                         arrivals_.push_back(enemy.id);

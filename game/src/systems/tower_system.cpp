@@ -64,11 +64,11 @@ std::optional<ObjectId> TowerSystem::pick(const Ray& ray) const {
 
 void TowerSystem::clear() noexcept {
     scene_ = nullptr;
-    towers_.clear();
+    registry_.clear();
+    objectEntities_.clear();
     scratchTowers_.clear();
     props_.clear();
     models_.clear();
-    progress_.clear();
     catalogLoaded_ = false;
     ++revision_;
 }
@@ -86,7 +86,7 @@ void TowerSystem::synchronize(Engine& engine) {
         definitions_ = loadTowerDefinitions(engine.assetRoot());
         catalogLoaded_ = true;
     }
-    scratchTowers_.clear();
+    std::size_t towerCount = 0;
     props_.clear();
     for (const auto& [id, object] : scene->objects()) {
         if (!object.model || !scene->enabledInHierarchy(id) || object.role == "grimlock.hero" ||
@@ -96,12 +96,14 @@ void TowerSystem::synchronize(Engine& engine) {
         }
         const auto world = glm::dmat4{scene->worldTransform(id)};
         if (object.role == towerRole || object.role.starts_with("grimlock.tower:")) {
-            const auto type = object.role == towerRole ? "basic" : object.role.substr(15);
-            Tower tower = definition(type).instance();
-            const auto maximum = definition(type).maximumHealth;
-            auto& progress = progress_.try_emplace(id, TowerProgress{type, 1, maximum, maximum}).first->second;
-            if (progress.type != type) {
-                progress = TowerProgress{type, 1, maximum, maximum};
+            const std::string_view role = object.role;
+            const auto type = role == towerRole ? std::string_view{"basic"} : role.substr(15);
+            if (towerCount == scratchTowers_.size()) {
+                scratchTowers_.push_back(definition(type).instance());
+            }
+            auto& tower = scratchTowers_[towerCount++];
+            if (tower.type != type) {
+                tower = definition(type).instance();
             }
             tower.object = id;
             tower.position = world[3];
@@ -111,11 +113,12 @@ void TowerSystem::synchronize(Engine& engine) {
                 orientation[axis] = length > 1e-10 ? orientation[axis] / length : glm::dmat3{1}[axis];
             }
             tower.rotation = glm::normalize(glm::quat_cast(orientation));
-            tower.model = *object.model;
+            if (tower.model != *object.model) {
+                tower.model = *object.model;
+            }
             tower.visualScale = {glm::length(glm::dvec3{world[0]}),
                                  glm::length(glm::dvec3{world[1]}),
                                  glm::length(glm::dvec3{world[2]})};
-            scratchTowers_.push_back(std::move(tower));
         } else {
             auto found = models_.find(*object.model);
             if (found == models_.end()) {
@@ -135,20 +138,68 @@ void TowerSystem::synchronize(Engine& engine) {
             }
         }
     }
+    scratchTowers_.resize(towerCount);
     const bool sameObstacles =
         scratchTowers_.size() == towers_.size() &&
         std::equal(scratchTowers_.begin(), scratchTowers_.end(), towers_.begin(), [](const Tower& a, const Tower& b) {
             return a.object == b.object && a.position == b.position && a.halfExtent == b.halfExtent &&
                    std::min(glm::length(a.rotation - b.rotation), glm::length(a.rotation + b.rotation)) < 1e-6;
         });
-    towers_.swap(scratchTowers_);
-    std::erase_if(progress_, [&](const auto& entry) {
-        const auto id = entry.first;
-        if (!scene->contains(id)) {
-            return true;
+    for (auto entry = objectEntities_.begin(); entry != objectEntities_.end();) {
+        const auto id = entry->first;
+        const bool exists = scene->contains(id);
+        const auto role = exists ? std::string_view{scene->object(id).role} : std::string_view{};
+        if (!exists || (role != towerRole && !role.starts_with("grimlock.tower:"))) {
+            registry_.destroy(entry->second);
+            entry = objectEntities_.erase(entry);
+        } else {
+            if (!scene->enabledInHierarchy(id) || !scene->object(id).model) {
+                registry_.remove<Tower>(entry->second);
+                registry_.remove<TowerAttack>(entry->second);
+            }
+            ++entry;
         }
-        const auto& role = scene->object(id).role;
-        return role != towerRole && !role.starts_with("grimlock.tower:");
+    }
+    for (auto& tower : scratchTowers_) {
+        auto entity = entityForObject(tower.object);
+        const auto maximum = definition(tower.type).maximumHealth;
+        if (!entity) {
+            entity = registry_.create();
+            try {
+                tower.entity = entity;
+                registry_.emplace<Tower>(entity, tower);
+                registry_.emplace<TowerProgress>(entity, tower.type, 1, maximum, maximum);
+                registry_.emplace<TowerAttack>(entity);
+                registry_.emplace<TeamComponent>(entity, TeamComponent{Team::player});
+                objectEntities_.emplace(tower.object, entity);
+            } catch (...) {
+                registry_.destroy(entity);
+                throw;
+            }
+        } else {
+            auto& progress = *progress_.get(entity);
+            if (progress.type != tower.type) {
+                progress = TowerProgress{tower.type, 1, maximum, maximum};
+            }
+            tower.entity = entity;
+            if (auto* current = towers_.get(entity)) {
+                if (*current != tower) {
+                    *current = tower;
+                }
+            } else {
+                registry_.emplace<Tower>(entity, tower);
+                try {
+                    registry_.emplace<TowerAttack>(entity);
+                } catch (...) {
+                    registry_.remove<Tower>(entity);
+                    throw;
+                }
+            }
+        }
+    }
+    // Keep the original Scene-ID processing order after sparse-set swap removal.
+    registry_.sort<Tower>([](const Tower& first, const Tower& second) {
+        return first.object < second.object;
     });
     if (!sameObstacles) {
         ++revision_;
@@ -193,30 +244,43 @@ bool TowerSystem::remove(Engine& engine, ObjectId object) {
 }
 
 bool TowerSystem::contains(ObjectId object) const noexcept {
-    return std::any_of(towers_.begin(), towers_.end(), [object](const Tower& tower) {
-        return tower.object == object;
-    });
+    return find(entityForObject(object)) != nullptr;
 }
 
-const TowerDefinition& TowerSystem::definition(const std::string& type) const {
+ecs::Entity TowerSystem::entityForObject(ObjectId object) const noexcept {
+    const auto found = objectEntities_.find(object);
+    return found == objectEntities_.end() ? 0 : found->second;
+}
+
+void TowerSystem::resetCombat() noexcept {
+    for (auto& attack : attacks_) {
+        attack = {};
+    }
+}
+
+const TowerDefinition& TowerSystem::definition(std::string_view type) const {
     const auto found = std::find_if(definitions_.begin(), definitions_.end(), [&](const TowerDefinition& entry) {
         return entry.id == type;
     });
     if (found == definitions_.end()) {
-        throw std::invalid_argument("Unknown tower type: " + type);
+        throw std::invalid_argument("Unknown tower type: " + std::string{type});
     }
     return *found;
 }
 
 const TowerProgress& TowerSystem::progress(ObjectId object) const {
-    return progress_.at(object);
+    const auto* progress = progress_.get(entityForObject(object));
+    if (!progress) {
+        throw std::out_of_range("Unknown tower object.");
+    }
+    return *progress;
 }
 
 void TowerSystem::upgrade(ObjectId object, EconomySystem& economy) {
     if (!contains(object)) {
         throw std::invalid_argument("Select an existing tower to upgrade.");
     }
-    auto& progress = progress_.at(object);
+    auto& progress = *progress_.get(entityForObject(object));
     const auto& configured = definition(progress.type);
     if (progress.level >= configured.levels.size()) {
         throw std::invalid_argument("MAX LEVEL");
@@ -230,7 +294,7 @@ void TowerSystem::upgrade(ObjectId object, EconomySystem& economy) {
 }
 
 void TowerSystem::resetUpgrades() noexcept {
-    for (auto& [id, progress] : progress_) {
+    for (auto& progress : progress_) {
         progress.level = 1;
         progress.health = progress.maximumHealth;
         progress.hitFlashRemaining = 0;
@@ -239,27 +303,30 @@ void TowerSystem::resetUpgrades() noexcept {
 
 bool TowerSystem::applyDamage(Engine& engine, ObjectId object, float damage) {
     validateDamage(damage);
-    const auto found = progress_.find(object);
-    if (found == progress_.end() || !engine.scene() || !engine.scene()->contains(object) || damage == 0) {
+    const auto entity = entityForObject(object);
+    auto* found = progress_.get(entity);
+    if (!found || !contains(object) || !engine.scene() || !engine.scene()->contains(object) || damage == 0) {
         return false;
     }
-    if (receiveDamage(found->second.health, damage)) {
+    if (receiveDamage(*found, damage)) {
         engine.scene()->removeObject(object);
         // One navigation synchronization after all impacts batches obstacle rebuilds.
-        progress_.erase(found);
-        std::erase_if(towers_, [object](const Tower& tower) {
-            return tower.object == object;
+        registry_.destroy(entity);
+        objectEntities_.erase(object);
+        registry_.sort<Tower>([](const Tower& first, const Tower& second) {
+            return first.object < second.object;
         });
         ++revision_;
     } else {
-        found->second.hitFlashRemaining = 0.15;
+        found->hitFlashRemaining = 0.15;
         engine.scene()->setTint(object, {1, 0.35F, 0.3F, 1});
     }
     return true;
 }
 
 void TowerSystem::updateEffects(Engine& engine, double delta) {
-    for (auto& [object, progress] : progress_) {
+    for (const auto& [object, entity] : objectEntities_) {
+        auto& progress = *progress_.get(entity);
         if (progress.hitFlashRemaining > 0) {
             progress.hitFlashRemaining = std::max(0.0, progress.hitFlashRemaining - delta);
             if (progress.hitFlashRemaining == 0 && engine.scene()->contains(object)) {

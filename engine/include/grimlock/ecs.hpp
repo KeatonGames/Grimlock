@@ -34,9 +34,12 @@ namespace detail {
 class ComponentPool {
 public:
     virtual ~ComponentPool() = default;
-    virtual void erase(Entity entity) noexcept = 0;
     [[nodiscard]] virtual std::span<const Entity> entities() const noexcept = 0;
     [[nodiscard]] virtual std::size_t capacityBytes() const noexcept = 0;
+
+private:
+    friend class ::grimlock::ecs::Registry;
+    virtual void erase(Entity entity) noexcept = 0;
 };
 } // namespace detail
 
@@ -48,6 +51,12 @@ template <class T> class Storage final : public detail::ComponentPool {
                   "Packed components must support nonthrowing relocation and destruction.");
 
 public:
+    Storage() = default;
+    Storage(const Storage&) = delete;
+    Storage& operator=(const Storage&) = delete;
+    Storage(Storage&&) = delete;
+    Storage& operator=(Storage&&) = delete;
+
     [[nodiscard]] std::span<T> values() noexcept {
         return values_;
     }
@@ -181,6 +190,26 @@ private:
         sparse_[entityIndex(entity)] = absent;
     }
 
+    template <class Compare> void sort(Compare compare) {
+        if (std::is_sorted(values_.begin(), values_.end(), compare)) {
+            return;
+        }
+        auto order = entities_;
+        std::sort(order.begin(), order.end(), [&](Entity first, Entity second) {
+            return compare(*get(first), *get(second));
+        });
+        for (std::size_t index = 0; index < order.size(); ++index) {
+            const auto source = sparse_[entityIndex(order[index])];
+            if (source == index) {
+                continue;
+            }
+            std::swap(values_[index], values_[source]);
+            std::swap(entities_[index], entities_[source]);
+            sparse_[entityIndex(entities_[index])] = index;
+            sparse_[entityIndex(entities_[source])] = source;
+        }
+    }
+
     std::vector<T> values_;
     std::vector<Entity> entities_;
     std::vector<std::size_t> sparse_;
@@ -280,6 +309,11 @@ public:
     template <class T> void reserve(std::size_t count) {
         requireStructuralAccess();
         storage<T>().reserve(count);
+    }
+
+    template <class T, class Compare> void sort(Compare compare) {
+        requireStructuralAccess();
+        storage<T>().sort(compare);
     }
 
     template <class T, class... Args> T& emplace(Entity entity, Args&&... args) {

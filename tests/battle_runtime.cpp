@@ -161,6 +161,7 @@ void enemyBattle(Engine& engine) {
     auto large = navigation.towers().definition("wide").instance();
     large.position = {0, large.halfExtent.y, 0};
     const auto largeId = navigation.towers().create(engine, large);
+    const auto largeEntity = navigation.towers().entityForObject(largeId);
     navigation.synchronize(engine);
     require(navigation.spawnAt(engine, 0, {{-3, -3}, {3, 3}, 0}, 40) >= 20, "melee group fixture failed");
     std::size_t simultaneous = 0;
@@ -169,7 +170,8 @@ void enemyBattle(Engine& engine) {
         tick(1.0 / 60, false);
         std::size_t attacking = 0;
         for (const auto& enemy : enemies.enemies()) {
-            if (enemy.combat.target == DefensiveTarget{DefensiveTargetKind::tower, largeId} && enemy.combat.swinging) {
+            if (enemy.combat.target == DefensiveTarget{DefensiveTargetKind::tower, largeEntity} &&
+                enemy.combat.swinging) {
                 ++attacking;
             }
             require(enemy.navigation->contains(enemy.position), "combat crowd left NavMesh");
@@ -272,7 +274,8 @@ void archetypes(Engine& engine) {
     (void)heroes.deploy({0, 0, -2}, hero);
     const auto siege = spawn(engine, navigation, {-2, 0}, type("Siege"));
     prepare(0.4);
-    require(enemies.find(siege)->combat.target == DefensiveTarget{DefensiveTargetKind::tower, towerId},
+    require(enemies.find(siege)->combat.target ==
+                DefensiveTarget{DefensiveTargetKind::tower, navigation.towers().entityForObject(towerId)},
             "siege did not prefer reachable tower over hero");
     const float initialHealth = navigation.towers().progress(towerId).health;
     for (int frame = 0; frame < 600 && navigation.towers().progress(towerId).health == initialHealth; ++frame) {

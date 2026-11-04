@@ -30,10 +30,21 @@ public:
     [[nodiscard]] bool applyDamage(HeroId hero, float damage);
     void update(double delta, bool movingAllowed, std::span<const Enemy> enemies = {});
     void clear() noexcept;
+    [[nodiscard]] bool remove(HeroId hero) noexcept;
+
+    [[nodiscard]] const ecs::Registry& registry() const noexcept {
+        return registry_;
+    }
+
     void preview(std::optional<glm::dvec3> position, bool valid = false);
     [[nodiscard]] bool validPosition(glm::dvec3 position, std::optional<HeroId> ignore = {}) const;
     [[nodiscard]] std::optional<glm::dvec3> ground(const Ray& ray) const;
     [[nodiscard]] const Hero* find(HeroId id) const noexcept;
+
+    [[nodiscard]] const TeamComponent* team(HeroId id) const noexcept {
+        return teams_.get(id);
+    }
+
     [[nodiscard]] std::optional<HeroId> fromObject(ObjectId object) const noexcept;
 
     [[nodiscard]] std::span<const Hero> heroes() const noexcept {
@@ -67,8 +78,10 @@ private:
     ModelInfo modelInfo_;
     std::optional<std::size_t> idleClip_, movementClip_, attackClip_, deathClip_;
     NavMesh navigation_;
-    std::vector<Hero> heroes_;
-    HeroId nextId_ = 1;
+    ecs::Registry registry_;
+    ecs::Storage<Hero>& heroes_;
+    ecs::Storage<TeamComponent>& teams_;
+    std::uint64_t nextSpawnOrder_ = 1;
     LevelGeometry levelGeometry_;
     CombatGeometry combatGeometry_;
     const CombatGeometry* sharedGeometry_ = nullptr;

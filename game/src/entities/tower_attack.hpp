@@ -5,7 +5,6 @@
 namespace grimlock::game {
 
 struct TowerAttack {
-    ObjectId tower = 0;
     std::optional<EnemyId> target;
     double cooldown = 0;
     double searchDelay = 0;

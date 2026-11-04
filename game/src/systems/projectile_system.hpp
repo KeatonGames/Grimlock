@@ -26,7 +26,8 @@ public:
                const TowerDefinition& definition,
                std::size_t level = 1,
                ObjectId source = 0,
-               double lifetime = std::numeric_limits<double>::infinity());
+               double lifetime = std::numeric_limits<double>::infinity(),
+               ecs::Entity sourceEntity = 0);
     void update(EnemySystem& enemies, double delta, const CombatGeometry* geometry = nullptr);
     void clear() noexcept;
 

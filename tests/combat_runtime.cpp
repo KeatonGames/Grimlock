@@ -92,13 +92,13 @@ void checkTowers(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, Towe
     const auto nearest = spawn(enemies, mesh, 1.5);
     CombatSystem combat{engine};
     combat.update(towers, enemies, 0.01);
-    require(combat.attacks().size() == 1 && combat.attacks()[0].target == nearest && combat.shotsFired() == 1 &&
+    require(towers.attacks().size() == 1 && towers.attacks()[0].target == nearest && combat.shotsFired() == 1 &&
                 combat.projectiles().projectiles().size() == 1,
             "tower did not fire at the nearest in-range target");
     require(engine.update(), "combat rendering frame failed");
     require(enemies.remove(nearest), "tracked target removal failed");
     combat.update(towers, enemies, 0.01);
-    require(combat.attacks()[0].target == farther, "tower did not reacquire a valid target");
+    require(towers.attacks()[0].target == farther, "tower did not reacquire a valid target");
     const glm::dvec2 goal{8, 0};
     enemies.setSpeed(3);
     require(enemies.setDestination(farther, goal), "moving target destination failed");
@@ -106,16 +106,16 @@ void checkTowers(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, Towe
         enemies.update(mesh, std::nullopt, 1.0 / 60);
     }
     combat.update(towers, enemies, 0.01);
-    require(!combat.attacks()[0].target && enemies.find(farther) && enemies.find(farther)->position.x > 3.5,
+    require(!towers.attacks()[0].target && enemies.find(farther) && enemies.find(farther)->position.x > 3.5,
             "tower kept tracking an enemy after it left attack range");
     enemies.setSpeed(0);
     require(enemies.remove(farther), "second target removal failed");
     combat.update(towers, enemies, 1);
-    require(!combat.attacks()[0].target && enemies.find(distant)->health == 100 && combat.shotsFired() == 1,
+    require(!towers.attacks()[0].target && enemies.find(distant)->health == 100 && combat.shotsFired() == 1,
             "tower attacked an out-of-range enemy");
     require(towers.remove(engine, tower), "tower removal failed");
     combat.update(towers, enemies, 0.1);
-    require(combat.attacks().empty(), "removed tower retained attack state");
+    require(towers.attacks().empty(), "removed tower retained attack state");
     enemies.clear();
 
     small.position.z = -1;

@@ -44,7 +44,11 @@ void stop(Hero& hero, HeroState state) {
 
 HeroSystem::HeroSystem(Engine& engine)
     : engine_(engine), scene_(engine.scene()), definition_(loadHeroDefinition(engine.assetRoot())),
-      model_(engine.loadModel(engine.assetRoot() / definition_.model)), modelInfo_(engine.modelInfo(model_)) {
+      model_(engine.loadModel(engine.assetRoot() / definition_.model)), modelInfo_(engine.modelInfo(model_)),
+      heroes_(registry_.storage<Hero>()), teams_(registry_.storage<TeamComponent>()) {
+    registry_.reserveEntities(8);
+    registry_.reserve<Hero>(8);
+    registry_.reserve<TeamComponent>(8);
     if (!scene_ || !std::isfinite(glm::length(modelInfo_.maximum - modelInfo_.minimum)) ||
         modelInfo_.maximum.y <= modelInfo_.minimum.y) {
         throw std::invalid_argument("Hero requires an active scene and finite model bounds.");
@@ -74,7 +78,18 @@ void HeroSystem::clear() noexcept {
             }
         }
     }
-    heroes_.clear();
+    registry_.clear();
+}
+
+bool HeroSystem::remove(HeroId id) noexcept {
+    const auto* hero = heroes_.get(id);
+    if (!hero) {
+        return false;
+    }
+    if (engine_.scene() == scene_ && engine_.scene()->contains(hero->object)) {
+        engine_.scene()->removeObject(hero->object);
+    }
+    return registry_.destroy(id);
 }
 
 void HeroSystem::synchronize(const TowerSystem& towers) {
@@ -83,6 +98,13 @@ void HeroSystem::synchronize(const TowerSystem& towers) {
     }
     if (engine_.scene() != scene_) {
         throw std::logic_error("Reset heroes when replacing a scene.");
+    }
+    for (std::size_t index = 0; index < heroes_.size();) {
+        if (!engine_.scene()->contains(heroes_[index].object)) {
+            registry_.destroy(heroes_[index].id);
+        } else {
+            ++index;
+        }
     }
     levelGeometry_.synchronize(engine_, true);
     if (geometryRevision_ == levelGeometry_.revision() && towerRevision_ == towers.revision()) {
@@ -147,16 +169,21 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing) {
     }
     if (!hero) {
         const auto object = engine_.scene()->createObject(definition_.name);
+        ecs::Entity entity = 0;
         try {
             engine_.scene()->setRole(object, "grimlock.hero");
             engine_.scene()->setModel(object, definition_.model);
             engine_.prepareScene(*engine_.scene());
             Hero created;
-            created.id = nextId_++;
+            entity = registry_.create();
+            created.id = entity;
+            created.spawnOrder = nextSpawnOrder_++;
             created.object = object;
             created.health = created.maximumHealth = definition_.maximumHealth;
-            heroes_.push_back(std::move(created));
+            registry_.emplace<Hero>(entity, std::move(created));
+            registry_.emplace<TeamComponent>(entity, TeamComponent{Team::player});
         } catch (...) {
+            registry_.destroy(entity);
             engine_.scene()->removeObject(object);
             throw;
         }
@@ -211,7 +238,7 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
     if (!hero || hero->health <= 0 || damage == 0) {
         return false;
     }
-    if (receiveDamage(hero->health, damage)) {
+    if (receiveDamage(*hero, damage)) {
         finishAttack(*hero);
         hero->combat = {};
         stop(*hero, HeroState::idle);
@@ -470,22 +497,17 @@ std::optional<glm::dvec3> HeroSystem::ground(const Ray& ray) const {
 }
 
 Hero* HeroSystem::findMutable(HeroId id) noexcept {
-    const auto found = std::find_if(heroes_.begin(), heroes_.end(), [id](const Hero& hero) {
-        return hero.id == id;
-    });
-    return found == heroes_.end() ? nullptr : &*found;
+    return const_cast<Hero*>(find(id));
 }
 
 const Hero* HeroSystem::find(HeroId id) const noexcept {
-    const auto found = std::find_if(heroes_.begin(), heroes_.end(), [id](const Hero& hero) {
-        return hero.id == id;
-    });
-    return found == heroes_.end() ? nullptr : &*found;
+    const auto* hero = heroes_.get(id);
+    return hero && engine_.scene() == scene_ && scene_ && scene_->contains(hero->object) ? hero : nullptr;
 }
 
 std::optional<HeroId> HeroSystem::fromObject(ObjectId object) const noexcept {
     for (const auto& hero : heroes_) {
-        if (hero.object == object) {
+        if (hero.object == object && find(hero.id)) {
             return hero.id;
         }
     }

@@ -11,10 +11,7 @@ public:
     explicit CombatSystem(Engine& engine) : engine_(engine), projectiles_(engine) {
     }
 
-    void update(const TowerSystem& towers,
-                EnemySystem& enemies,
-                double delta,
-                const CombatGeometry* geometry = nullptr);
+    void update(TowerSystem& towers, EnemySystem& enemies, double delta, const CombatGeometry* geometry = nullptr);
     void clear() noexcept;
 
     void clearProjectiles() noexcept {
@@ -25,10 +22,6 @@ public:
         return projectiles_;
     }
 
-    [[nodiscard]] std::span<const TowerAttack> attacks() const noexcept {
-        return attacks_;
-    }
-
     [[nodiscard]] std::uint64_t shotsFired() const noexcept {
         return shotsFired_;
     }
@@ -37,7 +30,7 @@ private:
     Engine& engine_;
     CombatGeometry geometry_;
     ProjectileSystem projectiles_;
-    std::vector<TowerAttack> attacks_;
+    bool resetAttacks_ = true;
     std::uint64_t shotsFired_ = 0;
 };
 

@@ -187,7 +187,7 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
                        {enemy->position, enemy->radius},
                        stats.range,
                        hero.path,
-                       hero.id,
+                       hero.spawnOrder,
                        enemies.enemies(),
                        enemy->id,
                        &heroes.combatGeometry(),
@@ -210,7 +210,7 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
     state.retryDelay = 0.4;
     candidates_.clear();
     enemies.visitNearby(hero.position, stats.acquisitionRange, [&](const Enemy& candidate) {
-        if (!candidate.alive || !candidate.active ||
+        if (!candidate.alive || !candidate.active || !hostile(heroes.team(hero.id), enemies.team(candidate.id)) ||
             distance(hero.defensivePosition, candidate.position) > stats.pursuitRange ||
             (state.unreachableTarget == candidate.id && state.unreachableRetry > 0 &&
              state.failedRevision == heroes.navigation_.revision())) {
@@ -238,7 +238,7 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
                                        {enemy.position, enemy.radius},
                                        stats.range,
                                        approachPath_,
-                                       hero.id,
+                                       hero.spawnOrder,
                                        enemies.enemies(),
                                        enemy.id,
                                        &heroes.combatGeometry(),
