@@ -133,6 +133,41 @@ void checkTerrainAdapter() {
     require(navigation.build(navigationGeometry(boxes)), navigation.status().c_str());
     require(!navigation.contains({-0.5, 2, -0.5}) && navigation.contains({-3.5, 2, -0.5}),
             "rendered wall geometry did not match navigation");
+    require(navigationGeometry(boxes).walkable.size() == (grid.configuration().height + 1) * 12,
+            "grid floor rows retained redundant interior faces");
+
+    for (const double cellSize : {0.5, 1.0, 1.3}) {
+        Grid example{{12, 8, cellSize, {-6, 2, -4}}};
+        example.setWalkable({5, 3}, false);
+        example.setWalkable({5, 4}, false);
+        example.setWalkable({6, 4}, false);
+        const auto original = terrainBoxes(example);
+        NavigationGeometry unmerged;
+        for (const auto& box : original) {
+            unmerged.addBox(box.center - box.halfExtent, box.center + box.halfExtent, box.walkableTop);
+        }
+        NavMesh reference, merged;
+        require(reference.build(unmerged) && merged.build(navigationGeometry(original)),
+                "floor comparison build failed");
+        for (int z = 0; z <= 16; ++z) {
+            for (int x = 0; x <= 24; ++x) {
+                const glm::dvec3 point{-6 + x * cellSize * 0.5, 2, -4 + z * cellSize * 0.5};
+                require(reference.contains(point) == merged.contains(point),
+                        "coalesced floor changed wall/border clearance");
+            }
+        }
+        NavigationPath before, after;
+        require(
+            reference.findPath({-6 + cellSize, 2, -4 + cellSize}, {-6 + cellSize * 10, 2, -4 + cellSize * 6}, before) &&
+                merged.findPath({-6 + cellSize, 2, -4 + cellSize}, {-6 + cellSize * 10, 2, -4 + cellSize * 6}, after),
+            "coalesced floor changed a valid wall detour");
+    }
+    const std::vector<TerrainBox> separated{{{0, -0.1F, 0}, {0.5F, 0.1F, 0.5F}, true},
+                                            {{2, -0.1F, 0}, {0.5F, 0.1F, 0.5F}, true},
+                                            {{3, 0.9F, 0}, {0.5F, 0.1F, 0.5F}, true},
+                                            {{4, 0.9F, 0}, {0.5F, 0.1F, 0.5F}, false}};
+    require(navigationGeometry(separated).walkable.size() == separated.size() * 12,
+            "floor optimization bridged a gap, elevation change or wall");
 }
 
 } // namespace

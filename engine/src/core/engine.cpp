@@ -475,7 +475,10 @@ struct Engine::Impl {
 
         input.finishFrame(navigationEnabled && !capture.mouse && running);
         const auto now = std::chrono::steady_clock::now();
-        const double delta = previousFrame ? std::chrono::duration<double>(now - *previousFrame).count() : 0;
+        // Match the crowd's recovery budget after a debugger pause, window drag or
+        // synchronous asset load. Catching up an entire stall can cause another stall.
+        const double delta =
+            previousFrame ? std::min(0.25, std::chrono::duration<double>(now - *previousFrame).count()) : 0;
         previousFrame = now;
         auto frameCamera = currentCamera();
         auto frameLighting = lighting;

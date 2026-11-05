@@ -1,12 +1,12 @@
 # Development history
 
-Historical verification reports, measurements, and file inventories from earlier phases. Paths, checkout limitations, and toolchain details below describe those phases, not the current repository layout; see the [README](../README.md#structure-and-ownership) for current organization and setup.
+Historical verification reports, measurements, and file inventories from earlier phases. Paths, checkout limitations, and toolchain details below describe those phases, not the current repository layout; see the [README](../../README.md#project-structure) for current organization and setup.
 
 ### Phase 7 validation / current checkout limitation
 
 Debug and Release builds succeed. `Camera.Navigation`, `Input.State`, `Camera.Runtime`, and `Scene.Cpu` pass in both configurations. Camera tests cover initial pose preservation, XZ pan, 10,000 orbit updates without radius drift, pitch/zoom/ground bounds, fractional/flipped wheel input, unmapped keys/left button, drag edges, focus/resize/disable cancellation, cursor-mode teardown, active-camera switching, and attached-camera local/world save/reload. SDL events are injected into the Engine's own window for the integration checks; no keyboard camera actions or selection code is added.
 
-The unfiltered suite currently has two asset-setup failures (`Engine.PublicApi`, `Scene.Runtime`), because source `blackrat.glb` is an LFS pointer rather than model bytes. Both checks also pass when run directly against an ignored local fixture root containing a cached blackrat copy whose SHA-256 matches the pointer: `7b1012b36cb510a3f96f8647242eecb25dc7c1e8234176084d01f0e6e53b6996`. Source assets/pointers are left untouched. Full default-scene verification needs the LFS models and the separately supplied `assassin.glb`; do not mistake this checkout condition for a camera/parser regression. Local test logs are `out/verification/phase7-*.log`.
+The unfiltered suite currently has two asset-setup failures (`Engine.PublicApi`, `Scene.Runtime`), because source `blackrat.glb` is an LFS pointer rather than model bytes. Both checks also pass when run directly against an ignored local fixture root containing a cached blackrat copy whose SHA-256 matches the pointer: `7b1012b36cb510a3f96f8647242eecb25dc7c1e8234176084d01f0e6e53b6996`. Source assets/pointers are left untouched. Full default-scene verification needs the LFS models and the separately supplied `assassin.glb`; do not mistake this checkout condition for a camera/parser regression. Local test logs are `out/archive/verification/phase7-*.log`.
 
 An ignored diagnostic scene using available cached base/blackrat assets passes Debug and Release animated rendering, wide/tall/repeated resize, minimize/restore, runtime-path and cleanup checks. The supplied `witch.obj` preview passes stationary rendering with navigation enabled. Stationary capture comparison excludes the window's rounded DWM corners; no rendered interior pixels changed. Core and synchronization validation report no errors/warnings in these checks. The default JSON/model binaries are not replaced or edited to bypass the LFS setup requirement.
 
@@ -31,7 +31,7 @@ Earlier rendering/scene checks, recorded on 17 October 2026 before the current m
 - Missing shaders during pipeline initialization, a missing model after renderer initialization, and a missing environment before renderer initialization each produce a specific error, exit 1, and an aborted startup profile, with no validation errors/warnings during cleanup.
 - Debug emits one startup report; Release emits none. The default scene has the same measured geometry coverage (3312 sampled pixels) before/after; animation changes captures as expected. This is a regression check, not a claim of exhaustive pixel equivalence for all animations.
 
-Local checks/artifacts are under ignored `out/verification/`: `animation-checks`, `scene-checks`, `pbr-checks`, `pbr-gpu`, and `animation-debug/release-*` captures/logs (the shared helper uses `material-gpu-*` for custom executables). They use current sources, the installed toolchain, and standard library; no test framework/system installation is required. Upstream GLM emits CMake deprecation warnings, and fastgltf's Release compiler flags emit a harmless `/Ob2` to `/Ob3` override warning on MSVC.
+Local checks/artifacts are under ignored `out/archive/verification/`: `animation-checks`, `scene-checks`, `pbr-checks`, `pbr-gpu`, and `animation-debug/release-*` captures/logs (the shared helper uses `material-gpu-*` for custom executables). They use current sources, the installed toolchain, and standard library; no test framework/system installation is required. Upstream GLM emits CMake deprecation warnings, and fastgltf's Release compiler flags emit a harmless `/Ob2` to `/Ob3` override warning on MSVC.
 
 ## Startup measurements and optimizations (architecture-refactor baseline)
 
@@ -67,7 +67,7 @@ Measurements below were taken before Phase 6: per-phase medians of three baselin
 | CPU environment preprocessing | 662.846 | 600.321 | 1 -> 1 |
 | Complete GPU model uploads | 497.394 | 318.683 | 6 -> 5 |
 
-Baseline totals: 9050.783, 8838.681, 8860.491 ms. Final totals: 5185.299, 5086.196, 5024.697 ms. Median improvement is **42.6% (8.86 s -> 5.09 s)**. Full diagnostic logs are under ignored `out/verification/startup-baseline-{1,2,3}.log` and `startup-final-{1,2,3}.log`; do not treat these Debug/warm-cache results as universal cold-start or Release timings.
+Baseline totals: 9050.783, 8838.681, 8860.491 ms. Final totals: 5185.299, 5086.196, 5024.697 ms. Median improvement is **42.6% (8.86 s -> 5.09 s)**. Full diagnostic logs are under ignored `out/archive/verification/startup-baseline-{1,2,3}.log` and `startup-final-{1,2,3}.log`; do not treat these Debug/warm-cache results as universal cold-start or Release timings.
 
 Applied only small measured optimizations:
 
@@ -117,7 +117,7 @@ Modified:
 - `game/src/game.hpp/.cpp`, `main.cpp`: load the default/selected JSON scene; retain existing model-preview CLI, remove hardcoded demo construction/sphere generation.
 - `README.md`, `assets/models/README.md`: format, API, ownership, asset notes and verification.
 
-Removed: no production files, shaders, model formats, or user assets. Existing Transform declarations/implementation were moved rather than duplicated. Game's old demo-construction/sphere helpers were replaced by external data. The JSON library is the only new dependency; existing dependency versions and CMake presets remain unchanged. One-time sphere-export tooling and visual regression fixtures/captures are local artifacts under ignored `out/verification/`, not new production build tools.
+Removed: no production files, shaders, model formats, or user assets. Existing Transform declarations/implementation were moved rather than duplicated. Game's old demo-construction/sphere helpers were replaced by external data. The JSON library is the only new dependency; existing dependency versions and CMake presets remain unchanged. One-time sphere-export tooling and visual regression fixtures/captures are local artifacts under ignored `out/archive/verification/`, not new production build tools.
 
 ## Earlier architecture-refactor file inventory (before Phase 6)
 
@@ -141,4 +141,4 @@ Moved/split, with private includes updated throughout:
 
 Modified beyond moves: root `CMakeLists.txt` (target composition), `cmake/Shaders.cmake` (root-binary shader staging), `shaders/mesh.slang` (unused Fresnel helper removal only), `assets/models/README.md`, and this README. Instrumentation touches asset import/decoding/preparation, window/context, pipeline/swapchain creation, buffers/images/mesh uploads, and synchronization waits. `environment.cpp` additionally reuses sample directions; `vulkan_renderer.cpp` avoids redundant extent recreation and reports successful presentation accurately. `mesh_pipeline.hpp/.cpp` drops an unused color-format accessor/member.
 
-Removed/replaced: the old monolithic Application implementation and old source locations above; redundant startup cube work, unused pipeline getter/member, and unused shader helper. No working rendering feature or binary asset was deleted. Dependency versions/hashes, presets, project contract, and approved stack are unchanged. Local ignored regression projects were updated to the moved Engine sources/library; diagnostic captures/logs and temporary failure-test runtimes remain under `out/verification/`, not in production targets.
+Removed/replaced: the old monolithic Application implementation and old source locations above; redundant startup cube work, unused pipeline getter/member, and unused shader helper. No working rendering feature or binary asset was deleted. Dependency versions/hashes, presets, project contract, and approved stack are unchanged. Local ignored regression projects were updated to the moved Engine sources/library; diagnostic captures/logs and temporary failure-test runtimes remain under `out/archive/verification/`, not in production targets.

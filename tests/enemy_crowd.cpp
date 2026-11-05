@@ -24,6 +24,32 @@ NavigationGeometry openFloor() {
     return geometry;
 }
 
+void checkNeighborRelocation() {
+    std::vector<Enemy> enemies(4);
+    for (std::size_t index = 0; index < enemies.size(); ++index) {
+        enemies[index].position = {static_cast<double>(index) * 32, 0, 0};
+    }
+    EnemyNeighbors neighbors;
+    neighbors.build(enemies, 1, {});
+    for (int step = 0; step < 1024; ++step) {
+        const auto index = static_cast<std::size_t>(step) % enemies.size();
+        const auto before = enemies[index].position;
+        enemies[index].position = {static_cast<double>(step + 4) * 32, 0, step % 2 ? 32 : 0};
+        neighbors.relocate(index, before, enemies[index].position);
+        for (std::size_t expected = 0; expected < enemies.size(); ++expected) {
+            int found = 0;
+            neighbors.visit(enemies[expected].position, 0, [&](std::size_t actual) {
+                require(actual == expected, "spatial hash probe-chain repair returned an unrelated cell");
+                ++found;
+            });
+            require(found == 1, "spatial hash lost a relocated enemy");
+        }
+        neighbors.visit(before, 0, [&](std::size_t) {
+            require(false, "spatial hash retained an abandoned cell");
+        });
+    }
+}
+
 std::vector<Enemy> makeEnemies(std::size_t count) {
     std::vector<Enemy> enemies;
     enemies.reserve(count);
@@ -282,6 +308,7 @@ void checkChickenMap(const std::filesystem::path& scenePath) {
 
 int main(int argc, char** argv) {
     try {
+        checkNeighborRelocation();
         require(argc == 2, "expected chicken map path");
         checkDirectMovement();
         checkEditsAndInvalidQueries();

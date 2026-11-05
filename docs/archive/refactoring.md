@@ -164,7 +164,7 @@ below retain each iteration's scope and verification results.
   synchronization validation enabled. Captured logs contain no Vulkan validation
   errors. Seven frames captured with the installed SDK screenshot layer match the
   original implementation byte-for-byte, including ordering, pose, and resize cases.
-  Logs and captures are under the ignored `out/refactoring-iteration-5/` directory.
+  Logs and captures are under the ignored `out/archive/refactoring-iteration-5/` directory.
   clang-format verification and `git diff --check` passed. No dependencies or new
   external setup requirements were introduced.
 - Scope review: only `vulkan_renderer.cpp` and its internal header changed among
@@ -231,7 +231,7 @@ below retain each iteration's scope and verification results.
   enabled; all 16 CTest checks passed in each configuration with Vulkan core and
   synchronization validation enabled. Captured logs contain no Vulkan validation
   errors. The final Debug animation regression rerun, clang-format verification,
-  and `git diff --check` passed. Logs are under `out/refactoring-iteration-7/`.
+  and `git diff --check` passed. Logs are under `out/archive/refactoring-iteration-7/`.
   No dependencies or additional external setup were needed.
 - Scope review: only `animation.cpp` and private declarations in `animation.hpp`
   changed among the 95 pre-existing C++ files checked this iteration. The new CPU
@@ -291,5 +291,5 @@ below retain each iteration's scope and verification results.
   no validation errors. Modified C++ files were formatted, all 96 files passed
   clang-format verification, and `git diff --check` passed.
 - Build/test logs, baseline snapshots, and the scope check are in the ignored
-  `out/refactoring-final/` directory. No additional external setup is required;
+  `out/archive/refactoring-final/` directory. No additional external setup is required;
   no planned modules remain.

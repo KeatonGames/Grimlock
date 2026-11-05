@@ -86,4 +86,4 @@ Both Game and Editor build in Debug and Release. Full CTest runs passed 35/35 in
 each configuration (239.04 seconds Debug, 107.81 seconds Release), with Vulkan
 validation enabled and no validation errors or compiler warnings detected.
 Modified C++ files pass clang-format and Git whitespace checks. Verification logs
-are under `out/phase30/`.
+are under `out/archive/phase30/`.

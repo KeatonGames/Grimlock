@@ -82,4 +82,4 @@ both Game and Editor builds.
 Phase 23 verification passed: Debug and Release Game/Editor builds, **29/29 tests**
 in each configuration, formatting for all 16 modified C++ files, and whitespace
 checks. Vulkan validation reported no errors or synchronization hazards. Logs are
-under `out/phase23/`.
+under `out/archive/phase23/`.

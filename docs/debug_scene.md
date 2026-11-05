@@ -38,4 +38,4 @@ Animals disappear when they reach the goal, keeping the exit clear. Use Clear An
 
 `Towers.Cpu` verifies the scene's actual Recast/Detour routes for every animal configuration, sample tower obstacles, the chicken-only shortcut and the isolated pocket.
 
-Debug and Release builds passed. The tower, NavMesh and scene CPU checks passed in both configurations, and the default Editor launch was opened and visually reviewed. Verification logs are in `out/debug-scene/`.
+Debug and Release builds passed. The tower, NavMesh and scene CPU checks passed in both configurations, and the default Editor launch was opened and visually reviewed. Verification logs are in `out/archive/debug-scene/`.

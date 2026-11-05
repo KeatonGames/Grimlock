@@ -1,5 +1,6 @@
 #include "navigation/navigation_geometry.hpp"
 
+#include <algorithm>
 #include <grimlock/terrain.hpp>
 
 namespace grimlock::game {
@@ -39,8 +40,25 @@ NavigationGeometry navigationGeometry(std::span<const TerrainBox> boxes) {
     result.vertices.reserve(boxes.size() * 108);
     result.triangles.reserve(boxes.size() * 36);
     result.walkable.reserve(boxes.size() * 12);
-    for (const auto& box : boxes) {
-        result.addBox(box.center - box.halfExtent, box.center + box.halfExtent, box.walkableTop);
+    for (std::size_t index = 0; index < boxes.size(); ++index) {
+        const auto& box = boxes[index];
+        auto minimum = box.center - box.halfExtent;
+        auto maximum = box.center + box.halfExtent;
+        // Grid floor cubes form coplanar rows. Remove internal faces before
+        // rasterization, while preserving actual gaps, elevations and solid walls.
+        while (box.walkableTop && index + 1 < boxes.size()) {
+            const auto& next = boxes[index + 1];
+            const auto low = next.center - next.halfExtent;
+            const auto high = next.center + next.halfExtent;
+            if (!next.walkableTop || low.y != minimum.y || high.y != maximum.y || low.z != minimum.z ||
+                high.z != maximum.z || low.x > maximum.x || high.x < minimum.x) {
+                break;
+            }
+            minimum.x = std::min(minimum.x, low.x);
+            maximum.x = std::max(maximum.x, high.x);
+            ++index;
+        }
+        result.addBox(minimum, maximum, box.walkableTop);
     }
     return result;
 }

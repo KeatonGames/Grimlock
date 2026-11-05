@@ -70,12 +70,28 @@ void EnemyNeighbors::relocate(std::size_t index, glm::dvec3 before, glm::dvec3 a
     if (key(before) == key(after)) {
         return;
     }
-    auto* link = &buckets_[find(key(before))].first;
+    const auto previous = find(key(before));
+    auto* link = &buckets_[previous].first;
     while (*link != index) {
         link = &next_[*link];
     }
     *link = next_[index];
+    if (buckets_[previous].first == none) {
+        eraseBucket(previous);
+    }
     insert(index, after);
+}
+
+void EnemyNeighbors::eraseBucket(std::size_t index) {
+    buckets_[index] = {};
+    // Repair the probe chain after deletion. Keeping empty cells marked as used
+    // would eventually fill the table with abandoned cells and make find loop forever.
+    const auto mask = buckets_.size() - 1;
+    for (auto next = (index + 1) & mask; buckets_[next].used; next = (next + 1) & mask) {
+        const auto bucket = buckets_[next];
+        buckets_[next] = {};
+        buckets_[find(bucket.key)] = bucket;
+    }
 }
 
 void CrowdMovement::update(const NavMesh& navigation,

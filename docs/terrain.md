@@ -87,8 +87,8 @@ flat gameplay, rendering, assets, input, economy, combat and Editor interactions
 Initial terrain verification: Game and Editor build in Debug and Release, with no compiler warnings;
 all 33 CTest checks pass in both configurations (Release 99.26 s, Debug 218.15 s).
 Vulkan validation reports no errors or synchronization hazards. Formatting and
-whitespace checks pass. Logs are under `out/terrain/`.
+whitespace checks pass. Logs are under `out/archive/terrain/`.
 
 For the subsequent solid-cover, projectile collision and visibility work, see
 [combat and cover](combat.md). Current verification passes all 34 tests in both
-configurations; logs are under `out/phase28/`.
+configurations; logs are under `out/archive/phase28/`.

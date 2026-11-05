@@ -104,7 +104,7 @@ executable, assets, 960x540 window, 30 warm-up frames, and 180 measured frames p
 population. Each battle used eight towers, three heroes, mixed enemies, one boss,
 and a fixed 128-projectile volley. Validation was disabled for timing. Run the
 current harness with `CombatStressChecks.exe 180 --large`; logs are under
-`out/phase36/{baseline,ecs}-{1,2,3}.log` in this workspace.
+`out/archive/phase36/{baseline,ecs}-{1,2,3}.log` in this workspace.
 
 Values average three per-trial results; percentile values average per-trial
 percentiles rather than pooling all frames.

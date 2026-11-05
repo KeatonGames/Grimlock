@@ -180,4 +180,4 @@ only; Debug averaged about 19.06 ms). The BVH fixture completed 20,000 rays agai
 Full Game/Editor builds passed in Debug and Release, with 34/34 CTest checks passing
 in each configuration (Release 106.79 s, Debug 231.03 s).
 Vulkan validation reported no errors or synchronization hazards; formatting and
-whitespace checks passed. Phase 28 build/test logs are in `out/phase28/`.
+whitespace checks passed. Phase 28 build/test logs are in `out/archive/phase28/`.

@@ -117,4 +117,4 @@ around stationary animals, enemy hero/tower attacks, destruction/rebaking, prior
 crowd engagement and a simulation with 508 mixed animals and two active heroes.
 See [combat](combat.md).
 Build/test commands remain the README presets and CTest commands. Phase 26 logs
-are under `out/phase26/`.
+are under `out/archive/phase26/`.

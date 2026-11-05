@@ -89,8 +89,8 @@ that every placement wins. Human playtesting is still needed to tune subjective 
 The Assassin still has no animation clips; it uses the established timed static-pose
 fallback. Indicators remain ordinary HUD overlays and are not depth-occluded.
 
-Original playable-level logs are under `out/phase27/`; terrain verification is
-under `out/terrain/`, and current solid-cover playthroughs are under `out/phase28/`.
+Original playable-level logs are under `out/archive/phase27/`; terrain verification is
+under `out/archive/terrain/`, and current solid-cover playthroughs are under `out/archive/phase28/`.
 Game and Editor build in Debug and Release; all 34 CTest checks
 pass in both configurations, including identical win/loss outcomes for the five
 plans above. Vulkan validation reports no errors or synchronization hazards.

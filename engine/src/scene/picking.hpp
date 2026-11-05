@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace grimlock::picking {
@@ -29,8 +30,11 @@ private:
         glm::dvec3 minimum{}, maximum{};
     };
 
+    [[nodiscard]] std::optional<Bounds> skinBounds(std::size_t mesh, std::span<const glm::mat4> joints) const;
+
     std::vector<Bounds> bounds_;
-    std::vector<glm::dvec3> positions_; // Reused only on clicks for skinned/morphed nodes.
+    std::vector<std::vector<Bounds>> jointBounds_;
+    std::vector<glm::dvec3> positions_; // Scratch for exact skinned/morphed triangle tests.
 };
 
 } // namespace grimlock::picking

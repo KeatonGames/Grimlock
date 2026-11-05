@@ -75,7 +75,7 @@ Desktop screenshot capture was unavailable in this execution session (invalid
 desktop handle), so no screenshot is presented as a visual review. To inspect
 locally, launch Grimlock normally; `GameUiChecks.exe --preview` also holds a HUD
 scene and then the main menu for inspection. Verification logs are in
-`out/phase33/`.
+`out/archive/phase33/`.
 
 Game and Editor builds pass in Debug and Release. Full suites passed 38/38 in each
 configuration (269.18 seconds Debug, 131.82 seconds Release); focused UI regressions

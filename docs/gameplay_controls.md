@@ -56,7 +56,7 @@ and existing melee/projectile/area behavior. `Game.Runtime` checks preview
 retention over UI, construction/upgrades, hero selection/orders, camera gestures,
 and UI capture. `Game.Ui` checks selection-first Escape and pause/resume.
 Terrain, battle, crowd, rendering, and Editor checks provide broader regression
-coverage. Local build/test logs are in `out/phase39/`.
+coverage. Local build/test logs are in `out/archive/phase39/`.
 
 Game and Editor built successfully in Release and Debug. The full Release suite
 passed 41/41 (146.26 s), followed by a 7/7 affected-check rerun after the final

@@ -67,4 +67,4 @@ suite passed 40/41; its HUD input check exposed the moved deployment button. Aft
 restoring that button's position and wrapping crowded rows, Game.Runtime and
 Game.Ui both passed on rerun (2/2). Release hero and terrain checks also passed.
 Modified C++ passed clang-format verification; local build/test logs are in
-`out/phase38/`. No extended manual playthrough was performed.
+`out/archive/phase38/`. No extended manual playthrough was performed.

@@ -120,6 +120,8 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
     double aiTime = 0, movementTime = 0, heroTime = 0, combatTime = 0, preparation = 0, render = 0, gpu = 0,
            animation = 0;
     std::size_t gpuSamples = 0, peakProjectiles = 0;
+    double worstFrame = 0, worstAi = 0, worstMovement = 0, worstHeroes = 0, worstCombat = 0;
+    bool worstRebuilt = false;
     std::uint64_t frameAllocations = 0, frameBytes = 0, steadyAllocations = 0;
     std::uint64_t aiAllocations = 0, movementAllocations = 0, heroAllocations = 0, combatAllocations = 0;
     int frame = 0;
@@ -167,6 +169,7 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
     for (frame = -30; frame < samples; ++frame) {
         measuredAi = measuredMovement = measuredHeroes = measuredCombat = 0;
         measuredAiAllocations = measuredMovementAllocations = measuredHeroAllocations = measuredCombatAllocations = 0;
+        const auto revision = navigation.revision();
         const auto start = Clock::now();
         checks::AllocationScope allocationScope;
         if (!engine.update(update)) {
@@ -182,6 +185,14 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
             }
         }
         if (frame >= 0) {
+            if (frameMilliseconds > worstFrame) {
+                worstFrame = frameMilliseconds;
+                worstAi = measuredAi;
+                worstMovement = measuredMovement;
+                worstHeroes = measuredHeroes;
+                worstCombat = measuredCombat;
+                worstRebuilt = navigation.revision() != revision;
+            }
             frames.push_back(frameMilliseconds);
             aiTime += measuredAi;
             movementTime += measuredMovement;
@@ -238,6 +249,8 @@ void scenario(Engine& engine, std::size_t count, int samples, bool animated) {
                      navigation.towers().registry().capacityBytes()
               << ',' << frameAllocations << ',' << frameBytes << ',' << steadyAllocations << ',' << aiAllocations << ','
               << movementAllocations << ',' << heroAllocations << ',' << combatAllocations << std::endl;
+    std::cout << "WORST," << count << ',' << worstFrame << ',' << worstAi << ',' << worstMovement << ',' << worstHeroes
+              << ',' << worstCombat << ',' << worstRebuilt << '\n';
     towers.clear();
     volley.clear();
     if (!enemies.enemies().empty()) {

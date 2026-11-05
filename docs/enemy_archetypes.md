@@ -84,7 +84,7 @@ category damage, pursuit limits and the complete four-wave elevated scenario.
 
 Debug and Release builds include both Game and Editor. The complete suites passed
 34/34 tests in each configuration (229.60 seconds Debug, 105.33 seconds Release),
-with Vulkan validation enabled. Logs are in `out/phase29/`. Checks include existing
+with Vulkan validation enabled. Logs are in `out/archive/phase29/`. Checks include existing
 First Watch strategies, tower upgrades/economy, hero controls and abilities,
 terrain/visibility, crowd movement, assets, rendering and Editor interactions.
 Modified C++ files pass the root clang-format check and Git whitespace validation.

@@ -52,9 +52,13 @@ game/
   src/runtime/              Independent playable level state and player placement
   src/ui/                   Player HUD without Editor dependencies
   src/{main.cpp,game.*}     Executable launcher and Game application
-  assets/{models,scenes}/   Source models, scenes and Game navigation configuration
+  assets/config/           Shared enemy, hero and tower definitions
+  assets/levels/           Handcrafted levels, waves and economy settings
+  assets/models/           Shared source models and test fixtures
+  assets/scenes/           Authored environments and diagnostic scenes
 tests/                      CPU and Vulkan/editor runtime checks
-docs/                       Historical project notes
+docs/                       Current gameplay, authoring and architecture guides
+  archive/                  Completed refactoring plan and historical project notes
 out/                        Generated builds/runtime assets (Git-ignored)
 ```
 
@@ -112,8 +116,27 @@ ctest --test-dir out/build/release -C Release --output-on-failure
 
 Runtime tests require a working Vulkan display and the supplied assets.
 
+## Repository housekeeping
+
+Keep authored assets in `game/assets`, checks in `tests`, and generated output in
+the ignored `out` directory. Diagnostic scenes and sample models also serve as
+regression fixtures; retain them even when no playable level references them.
+
+Local output is organized into `out/build` for active CMake builds,
+`out/dependencies` and `out/downloads` for dependency caches, `out/cleanup` for the
+latest cleanup verification, and `out/archive` for historical logs and captures.
+Archived results describe earlier revisions and are not current verification.
+Old generated build trees can be removed when unused; check CMake cache source
+overrides before removing dependency folders.
+
+The [historical reports](docs/archive/history.md) and
+[completed refactoring plan](docs/archive/refactoring.md) are retained separately
+from current guides.
+
 For Editor profiling, reproducible combat stress tests, and measured results, see
 [combat performance](docs/combat_performance.md).
+The [performance and stability report](docs/performance_stability.md) covers the
+Game HUD benchmark, picking optimization, crowd-hash regression, and stall recovery.
 
 For ECS ownership, generation handles, mutation rules, migration scope, and checks,
 see [Gameplay ECS](docs/ecs.md). The [ECS validation report](docs/ecs_validation.md)

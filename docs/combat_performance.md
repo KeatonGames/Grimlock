@@ -1,5 +1,8 @@
 # Combat performance
 
+For the current hover-picking regression, crowd-hash fix, stall recovery, and
+Game HUD profiles, see [Phase 40 performance and stability](performance_stability.md).
+
 Enemy/projectile ownership now uses the [incremental ECS](ecs.md). The Phase 34
 comparison below records the architecture before that migration.
 
@@ -53,7 +56,7 @@ timing. The baseline was built with the same diagnostics and scenario before the
 optimizations. Three alternating baseline/optimized trials used 180 samples each.
 Values below average the three per-trial measurements; percentile columns average
 the per-trial percentiles rather than pooling frames. Raw logs are in
-`out/phase34/final-{baseline,optimized}-{1,2,3}.log` in this workspace.
+`out/archive/phase34/final-{baseline,optimized}-{1,2,3}.log` in this workspace.
 
 | Enemies | Movement CPU before/after (ms) | Frame mean before/after (ms) | FPS before/after | p95 before/after (ms) | p99 before/after (ms) |
 | --- | --- | --- | --- | --- | --- |

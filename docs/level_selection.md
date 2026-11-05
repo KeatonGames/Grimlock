@@ -89,4 +89,4 @@ Both Game and Editor build successfully in Debug and Release. The complete suite
 passed 36/36 tests in each configuration (256.21 seconds Debug, 121.95 seconds
 Release), with Vulkan validation enabled and no validation errors or compiler
 warnings detected. Modified C++ files pass clang-format and Git whitespace checks.
-Logs are under `out/phase31/`.
+Logs are under `out/archive/phase31/`.

@@ -201,6 +201,57 @@ void alphaCoverage() {
     require(!geometry.intersect(front, instance, glm::mat4{1}, {}, 100), "zero-alpha blend picked");
 }
 
+void skinBroadPhase() {
+    auto model = triangleModel();
+    model->materials[0].doubleSided = true;
+    model->nodes.resize(3);
+    model->nodes[0].children = {1, 2};
+    model->nodes[0].skin = 0;
+    for (std::size_t node = 1; node < 3; ++node) {
+        model->nodes[node].parent = 0;
+        model->nodes[node].matrixTransform = false;
+        model->nodes[node].translation = {static_cast<float>(node) * 4, 0, 0};
+        model->nodes[node].scale = {node == 1 ? -2 : 1, 0.75F, 1};
+    }
+    model->skins.push_back({"mixed skin", {1, 2}, {glm::mat4{1}, glm::mat4{1}}, {}});
+    for (auto& vertex : model->meshes[0].vertices) {
+        vertex.weights0.x = 0.25F;
+        vertex.weights1.x = 0.75F;
+        vertex.joints1.x = 1;
+    }
+    assets::AnimationData clip;
+    clip.end = 1;
+    clip.samplers.push_back({{0, 1}, {4, 0, 0, -6, 0, 0}, 3});
+    clip.channels.push_back({0, 1, assets::AnimationPath::translation});
+    model->animations.push_back(clip);
+    assets::ModelInstance first{model}, second{model};
+    second.play();
+    second.seek(1);
+    picking::Geometry accelerated{*model};
+    // A zero morph target exercises the original exact path without broad-phase bounds.
+    auto referenceModel = std::make_shared<assets::ModelData>(*model);
+    referenceModel->meshes[0].morphVertexCount = 3;
+    referenceModel->meshes[0].morphTargetCount = 1;
+    referenceModel->meshes[0].morphDeltas.resize(3);
+    referenceModel->nodes[0].weights = {0};
+    assets::ModelInstance referenceFirst{referenceModel}, referenceSecond{referenceModel};
+    referenceSecond.play();
+    referenceSecond.seek(1);
+    picking::Geometry reference{*referenceModel};
+    for (const auto world : {glm::mat4{1}, glm::scale(glm::mat4{1}, glm::vec3{-1, 2, 0.5F})}) {
+        for (int query = -40; query <= 40; ++query) {
+            const auto test = ray({query * 0.25, 0, 5});
+            for (const bool animated : {false, true, false}) {
+                const auto expected =
+                    reference.intersect(test, animated ? referenceSecond : referenceFirst, world, {}, 100);
+                const auto actual = accelerated.intersect(test, animated ? second : first, world, {}, 100);
+                require(actual.has_value() == expected.has_value() && (!actual || std::abs(*actual - *expected) < 1e-8),
+                        "skin broad phase disagrees with exact geometry across instances/poses/scales");
+            }
+        }
+    }
+}
+
 void selection() {
     Scene scene;
     const auto parent = scene.createObject(), a = scene.createObject("a", parent), b = scene.createObject("b");
@@ -339,6 +390,7 @@ int main(int argc, char** argv) {
         rays();
         geometry();
         deformation();
+        skinBroadPhase();
         alphaCoverage();
         selection();
         require(argc == 2, "expected model directory");

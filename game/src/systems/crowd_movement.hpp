@@ -41,6 +41,7 @@ private:
 
     [[nodiscard]] glm::i64vec2 key(glm::dvec3 position) const;
     [[nodiscard]] std::size_t find(glm::i64vec2 key) const;
+    void eraseBucket(std::size_t index);
 
     std::vector<Bucket> buckets_;
     std::vector<std::size_t> next_;

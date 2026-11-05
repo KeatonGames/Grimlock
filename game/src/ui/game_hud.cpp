@@ -884,7 +884,7 @@ void GameHud::finishFrame(const Camera& camera) {
     }
     hoveredObject_.reset();
     if (ray && !runtime_.placing() && !runtime_.deployingHero()) {
-        const auto object = engine_.pickObject(*ray);
+        const auto object = confirm ? engine_.selectedObject() : engine_.pickObject(*ray);
         if (object && ((runtime_.heroes() && runtime_.heroes()->fromObject(*object)) ||
                        runtime_.navigation().towers().contains(*object))) {
             hoveredObject_ = object;

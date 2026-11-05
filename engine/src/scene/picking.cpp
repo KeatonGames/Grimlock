@@ -171,6 +171,7 @@ bool covered(const assets::ModelData& model,
 
 Geometry::Geometry(const assets::ModelData& model) {
     bounds_.reserve(model.meshes.size());
+    jointBounds_.reserve(model.meshes.size());
 
     for (const auto& mesh : model.meshes) {
         Bounds bounds{glm::dvec3{std::numeric_limits<double>::max()},
@@ -181,7 +182,67 @@ Geometry::Geometry(const assets::ModelData& model) {
         }
 
         bounds_.push_back(bounds);
+
+        std::vector<Bounds> joints;
+        bool convex = !mesh.vertices.empty() && mesh.morphTargetCount == 0;
+        for (const auto& vertex : mesh.vertices) {
+            double weightSum = 0;
+            for (int lane = 0; lane < 4; ++lane) {
+                for (const auto weight : {vertex.weights0[lane], vertex.weights1[lane]}) {
+                    convex = convex && std::isfinite(weight) && weight >= 0;
+                    weightSum += weight;
+                }
+            }
+            convex = convex && std::abs(weightSum - 1) <= 1e-6;
+            if (!convex) {
+                break;
+            }
+            const auto include = [&](std::size_t joint, float weight) {
+                if (weight == 0) {
+                    return;
+                }
+                if (joint >= joints.size()) {
+                    joints.resize(joint + 1,
+                                  {glm::dvec3{std::numeric_limits<double>::max()},
+                                   glm::dvec3{std::numeric_limits<double>::lowest()}});
+                }
+                joints[joint].minimum = glm::min(joints[joint].minimum, glm::dvec3{vertex.position});
+                joints[joint].maximum = glm::max(joints[joint].maximum, glm::dvec3{vertex.position});
+            };
+            for (int lane = 0; lane < 4; ++lane) {
+                include(vertex.joints0[lane], vertex.weights0[lane]);
+                include(vertex.joints1[lane], vertex.weights1[lane]);
+            }
+        }
+        jointBounds_.push_back(convex ? std::move(joints) : std::vector<Bounds>{});
     }
+}
+
+std::optional<Geometry::Bounds> Geometry::skinBounds(std::size_t mesh, std::span<const glm::mat4> joints) const {
+    const auto& source = jointBounds_.at(mesh);
+    if (source.empty() || source.size() > joints.size()) {
+        return {};
+    }
+    Bounds result{glm::dvec3{std::numeric_limits<double>::max()}, glm::dvec3{std::numeric_limits<double>::lowest()}};
+    for (std::size_t joint = 0; joint < source.size(); ++joint) {
+        const auto& bounds = source[joint];
+        if (bounds.minimum.x > bounds.maximum.x) {
+            continue;
+        }
+        const glm::dmat4 transform{joints[joint]};
+        const glm::dvec3 center = transform * glm::dvec4{(bounds.minimum + bounds.maximum) * 0.5, 1};
+        const auto half = (bounds.maximum - bounds.minimum) * 0.5;
+        const auto extent = glm::abs(glm::dvec3{transform[0]}) * half.x + glm::abs(glm::dvec3{transform[1]}) * half.y +
+                            glm::abs(glm::dvec3{transform[2]}) * half.z;
+        result.minimum = glm::min(result.minimum, center - extent);
+        result.maximum = glm::max(result.maximum, center + extent);
+    }
+    // Normalized nonnegative skin weights form a convex combination of these bounds.
+    // Include float skinning/weight-normalization roundoff before rejecting a ray.
+    const auto padding = 1e-5 * glm::max(glm::dvec3{1}, glm::max(glm::abs(result.minimum), glm::abs(result.maximum)));
+    result.minimum -= padding;
+    result.maximum += padding;
+    return result;
 }
 
 std::optional<double> Geometry::intersect(const Ray& ray,
@@ -211,6 +272,13 @@ std::optional<double> Geometry::intersect(const Ray& ray,
             const auto& mesh = model.meshes[meshIndex];
             auto bounds = bounds_.at(meshIndex);
             const bool deformed = !pose.joints[node].empty() || mesh.morphTargetCount != 0;
+
+            if (!pose.joints[node].empty()) {
+                const auto coarse = skinBounds(meshIndex, pose.joints[node]);
+                if (coarse && !box(origin, direction, coarse->minimum, coarse->maximum, ray.minimum, nearest)) {
+                    continue;
+                }
+            }
 
             if (deformed) {
                 positions_.resize(mesh.vertices.size());
