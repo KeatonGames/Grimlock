@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
         scene.setEnabled(leaf, false);
         require(!scene.enabledInHierarchy(leaf) && scene.enabledInHierarchy(child), "independent enabled state failed");
 
-        scene.setModel(child, "models/blackrat.glb");
+        scene.setModel(child, "enemies/animals/blackrat.glb");
         scene.setAnimation(child, AnimationSettings{.clip = 1, .time = 0.25F, .speed = -0.75F, .paused = true});
         scene.setTint(child, {0.3F, 0.4F, 0.5F, 1});
         scene.setMaterialOverride(child, 1);
@@ -361,7 +361,7 @@ int main(int argc, char** argv) {
               {{"version", 1},
                {"objects",
                 Json::array({{{"id", "1"},
-                              {"model", "models/blackrat.glb"},
+                              {"model", "enemies/animals/blackrat.glb"},
                               {"animation", {{"clip", 1}, {"time", 0.25}, {"paused", true}, {"speed", 0.5}}}}})}});
         auto legacy = Scene::load(output / "legacy-animation.json");
         require(legacy->animationSettings(1).paused && legacy->animationSettings(1).time == 0.25F &&
@@ -373,7 +373,7 @@ int main(int argc, char** argv) {
                {"objects",
                 Json::array(
                     {{{"id", "1"},
-                      {"model", "models/blackrat.glb"},
+                      {"model", "enemies/animals/blackrat.glb"},
                       {"animation",
                        {{"clip", "renamed-or-missing"}, {"autoplay", true}, {"loop", false}, {"speed", 1.5}}}}})}});
         auto named = Scene::load(output / "named-animation.json");

@@ -1,70 +1,112 @@
 # Hero types
 
-During Preparation, choose **Assassin**, **Ranger**, or **Warrior** beside **Deploy Hero**,
-then click valid navigable ground. Cancel with Escape. Deploying an existing living
-hero of that type repositions it without replacing its identity or restoring health.
-A type not yet deployed can be placed alongside the others. This uses the existing
-free hero deployment rules; gold, tower costs, and battle placement restrictions
-are unchanged. Dead heroes cannot be restored through deployment.
+Choose **Knight**, **Ranger**, or **Mage** beside **Deploy Hero** during Preparation,
+then click clear navigable ground. Escape cancels placement. Deploying a living
+hero of an existing type repositions it without changing its entity identity or
+restoring health. Dead heroes remain unavailable until level restart.
 
-Select each hero through its roster button or in the world. Right-click enemies to
-attack, right-click ground to move, and right-drag to move the camera. Manual moves
-retain priority; autonomous defense resumes afterward. Names, health, damage,
-range, and attack rate come from the selected hero's definition.
-
-## Configuration
-
-- `game/assets/config/hero.json` retains the original Assassin definition and statistics.
-- `game/assets/config/heroes.json` contains the additional reusable definitions.
-  Each entry has a unique `id`, display `name`, and asset-relative `model` path.
-- `combat.attack` chooses `melee`, `ranged`, or `area`.
-- `combat.damage`, `range`, `attack_interval`, and `impact_time` control the basic attack.
-  Range uses the existing surface-gap convention, including actor physical radii.
-  An area attack covers all valid bodies within that reach, in every direction.
-- `combat.acquisition_range` and `pursuit_range` control autonomous targeting/chasing.
-- Ranged entries additionally use `projectile_speed` and `projectile_radius`.
-- `maximum_health`, `speed`, `radius`, and `height` control health and physical movement.
-  `visual_height` and `forward_yaw` independently control model presentation.
-- Existing idle/walk/run/attack animation names can be configured per definition.
-  Missing clips fall back to idle or no animation; damage timing remains reliable.
+Select a hero through its roster button or in the world. Right-click enemies to
+attack, right-click ground to move, and right-drag to pan the camera. Manual orders
+override autonomous targeting temporarily. Each hero resumes defense after orders
+finish. All three share one ECS HeroSystem and can fight simultaneously.
 
 | Hero | Health | Damage | Reach | Attack interval |
 | --- | --- | --- | --- | --- |
-| Assassin | 100 | 25, single target | 1.2 | 0.8 s |
-| Ranger | 90 | 18, projectile | 5.0 | 0.9 s |
-| Warrior | 160 | 20, area | 1.4 | 1.1 s |
+| Knight | 100 | 25, melee single target | 1.2 | 0.8 s |
+| Ranger | 90 | 18, arrow single target | 5.0 | 3.0 s |
+| Mage | 100 | 20, projectile with 1.5 splash radius | 4.5 | 1.1 s |
 
-Both new types currently use `models/assassin.glb` as a placeholder because no other
-hero character model is available. Change their independent `model` fields to use
-other existing assets. Model/GPU resources remain shared through Engine's cache.
-Assassin retains its existing Cleave ability; Ranger and Warrior have no active ability.
-Existing level hero spawn positions continue spawning Assassin by default. Runtime
-hero deployment does not edit the original scene or level JSON.
+All attacks are autonomous basic attacks. None of these heroes exposes an active
+ability. Range follows the existing surface-gap convention, including physical
+actor radii. Splash uses distance between enemy aim points at impact and checks
+visibility to each victim; geometry absorbs projectiles without splash.
 
-## Shared implementation
+## Configuration and compatibility
 
-One ECS `HeroSystem` owns all hero records. A record stores its definition index;
-position, health, target, commands, path, and cooldown stay independent per entity.
-Per-type model/animation resources and radius/height-aware Recast profiles are
-shared across that type's instances and refreshed through the existing geometry
-revision checks. Enemy combat resolves each hero's own physical radius.
+`game/assets/config/hero.json` defines Knight. Its legacy `assassin` type key and
+first catalog slot remain unchanged. `config/heroes.json` defines Ranger and Mage
+in slots two and three. Mage replaces the previous placeholder Warrior; authored
+level spawn positions, free deployment limits, selection and scene roles remain
+compatible. Existing custom `area` attack definitions still parse with their
+original instant-area behavior; Mage uses the new `ranged_area` basic attack.
+There is no serialized class-specific entity implementation to migrate.
 
-`HeroCombatSystem` retains the same acquisition, pursuit, return-to-defense,
-manual-command, and attack-timing logic. Ranged impacts spawn through the existing
-`ProjectileSystem`; projectiles sweep terrain and retain a generation-safe hero
-attacker reference. Area impacts collect victim IDs before applying damage so
-lethal packed-storage removal cannot skip or invalidate another victim. Shots are
-cleared at encounter end and during hero/level cleanup.
+Definitions configure health, movement, collision radius/height, visual height,
+forward yaw, clip names and combat statistics. Visual normalization does not affect
+Recast agent dimensions. Attack settings include damage, range, interval, impact
+time, acquisition/pursuit ranges, projectile speed/radius, model/scale/tint, socket
+and local muzzle offset. `splash_radius` applies to `ranged_area` projectiles.
+`special_abilities` is false for all three playable definitions.
 
-`Hero.Runtime` covers mixed types, ranged hits/approach/terrain collision, lethal
-area damage, independent targets, command overrides, enemy attacks, free typed
-deployment, and restart cleanup. `Terrain.Runtime` drives each type up the existing
-3D ramp. Original Assassin combat/ability and movement regressions remain enabled.
+## Shared asset preparation
 
-Validation: Game and Editor built successfully in Release and Debug. The complete
-Debug suite passed 41/41 tests with Vulkan validation enabled. The initial Release
-suite passed 40/41; its HUD input check exposed the moved deployment button. After
-restoring that button's position and wrapping crowded rows, Game.Runtime and
-Game.Ui both passed on rerun (2/2). Release hero and terrain checks also passed.
-Modified C++ passed clang-format verification; local build/test logs are in
-`out/archive/phase38/`. No extended manual playthrough was performed.
+Hero base models are retained at `game/assets/heroes/<type>/base.glb`. Shared
+Rig_Medium and Rig_Large GLBs are under `heroes/other/animations/`; weapon props
+are organized by purpose. Rebuild the animated heroes from these embedded GLBs:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/prepare_knight.ps1
+powershell -ExecutionPolicy Bypass -File tools/prepare_knight.ps1 -Character Ranger
+powershell -ExecutionPolicy Bypass -File tools/prepare_knight.ps1 -Character Mage
+```
+
+The original Knight command remains supported. Each model retains its skin joints,
+inverse bind matrices, mesh parts, colors and embedded material atlas. The shared
+script checks animation node names, parent hierarchy and local bind transforms
+before remapping channels. Root animation channels are removed because navigation
+owns world movement. Useful original GLB models and animations remain available for future work.
+
+| Character | Attachment | Socket | Running | Basic attack |
+| --- | --- | --- | --- | --- |
+| Knight | sword_1handed | handslot.r | Running_A | Melee_1H_Attack_Slice_Horizontal |
+| Ranger | bow_withString | handslot.l | Running_HoldingBow | Ranged_Bow_Draw / Ranged_Bow_Release |
+| Mage | staff | handslot.r | Running_A | Ranged_Magic_Shoot |
+
+All models include `Idle_A`, `Walking_A`, `Running_A`, `Hit_A` and `Death_A` from
+Rig_Medium General and MovementBasic. Ranger additionally imports Running_HoldingBow
+from MovementAdvanced and all four requested bow clips from CombatRanged. Its normal
+idle is `Ranged_Bow_Idle`. Mage imports only the basic magic shooting clip, without
+spellcasting. Weapon geometry uses the corresponding character material and authored
+grip origin/scale. The bow's existing draw morph animates during draw and release.
+
+Ranger arrows load `towers/projectiles/kaykit/arrow_bow.glb`, with geometry and
+texture embedded. The native +Z arrow axis follows projectile velocity; visual
+scale remains independent of the swept collision radius. Mage uses a small blue
+instance of the existing cube projectile, without a particle system.
+
+## Combat and animation timing
+
+Knight retains its 0.25-second impact and 0.8-second cooldown. Each basic swing
+starts once; the next attack can interrupt the source clip's recovery.
+
+Ranger aims for 0.2 seconds, plays the full 1.333-second draw, then spawns one arrow
+and starts the 1.333-second release at 1.533 seconds. The configurable three-second
+interval accommodates those source clips at their original playback speed. Mage
+spawns one projectile 0.4 seconds into its shooting clip. Projectile origins sample
+the hand socket from the attack pose using the combat clock, independent of render
+frame rate. Targets are checked again at release; damage occurs on swept impact.
+
+Mage impacts collect stable enemy IDs before damage, preventing lethal storage
+compaction from skipping victims or applying damage twice. Missing or recycled
+targets remove the projectile safely. Existing terrain sweeps, attacker attribution,
+manual overrides, pathfinding, retargeting and encounter cleanup remain shared.
+
+Idle and movement clips loop; walk is selected below 55% of running speed. Attack,
+hit and death are one-shots. Repeated attack orders do not restart windup. Hits do
+not interrupt an active attack or restart a current reaction. Death cancels movement,
+targets and combat and retains the corpse until normal hero/level cleanup. The
+existing animation player switches clips without crossfading.
+
+## Validation
+
+Debug Game and Editor builds succeed. The full suite passes 42 of 43 checks; the
+only failure is the existing Level.Playable regression described below. Final focused
+hero, terrain, combat, Game HUD and Editor runtime checks pass. Hero checks cover all three models, animated attachments,
+bow morphs and attack phases, hit/death lifecycle, independent commands and damage,
+lethal splash compaction, stale projectile generations and 1/5/60 FPS splash timing.
+No extended manual visual playthrough was performed.
+
+The Phase 42 `Level.Playable` small-tower strategy regression remains: that old
+strategy relied on Assassin Cleave. The mixed-defense strategy still wins. Its
+original assertion is retained; this phase does not rebalance Knight or the levels.
+Current build and test logs are under `out/phase43_*.log`.

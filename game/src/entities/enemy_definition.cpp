@@ -70,9 +70,9 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
         EnemyDefinition d;
         d.name = entry.at("name").get<std::string>();
         d.model = std::filesystem::path{entry.at("model").get<std::string>()}.lexically_normal();
-        if (d.model.is_absolute() || d.model.parent_path() != "models" || d.model.extension() != ".glb" ||
+        if (d.model.is_absolute() || d.model.parent_path() != "enemies/animals" || d.model.extension() != ".glb" ||
             !models.insert(d.model).second) {
-            throw std::invalid_argument("Animal models must be unique GLB files in assets/models.");
+            throw std::invalid_argument("Animal models must be unique GLB files in assets/enemies/animals.");
         }
         d.radius = entry.at("radius").get<double>();
         d.height = entry.at("height").get<double>();
@@ -96,7 +96,7 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
             definitions.push_back(std::move(d));
         }
     }
-    if (definitions.empty() || definitions.front().model != "models/chicken.glb") {
+    if (definitions.empty() || definitions.front().model != "enemies/animals/chicken.glb") {
         throw std::invalid_argument("Animal definitions must list the available chicken model first.");
     }
     // Archetypes inherit physical dimensions and presentation from a named animal, not AI behavior from its model.

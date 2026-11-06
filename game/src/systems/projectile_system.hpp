@@ -7,7 +7,7 @@
 
 namespace grimlock::game {
 
-// Runtime instances share one cube model and never become serialized scene objects.
+// Runtime instances share cached models and never become serialized scene objects.
 class ProjectileSystem final {
 public:
     explicit ProjectileSystem(Engine& engine)
@@ -58,6 +58,7 @@ private:
     ecs::Storage<ProjectileLifetimeComponent>& lifetimes_;
     std::uint64_t impacts_ = 0;
     CombatGeometry geometry_;
+    std::vector<EnemyId> victims_;
 };
 
 } // namespace grimlock::game

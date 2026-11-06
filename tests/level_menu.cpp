@@ -191,7 +191,7 @@ int main() {
         require(runtime.level().combat()->shotsFired() > 0 &&
                     !runtime.level().combat()->projectiles().projectiles().empty(),
                 "switching fixture did not leave active projectiles");
-        const auto cube = engine.loadModel(root / "models/cube.obj");
+        const auto cube = engine.loadModel(root / "towers/structures/primitives/cube.glb");
         control(engine, runtime, window, "Game Status", "Choose Level");
         require(!engine.scene() && !runtime.heroes() && !runtime.level().waves() && !runtime.navigation().enemies(),
                 "return to selection retained gameplay state");
@@ -199,7 +199,7 @@ int main() {
         control(engine, runtime, window, "Level Selection", "Play");
         require(runtime.level().economy().gold() == 99 && !engine.scene()->navigationGrid() &&
                     runtime.level().combat()->shotsFired() == 0 && runtime.navigation().towers().towers().empty() &&
-                    engine.loadModel(root / "models/cube.obj") == cube,
+                    engine.loadModel(root / "towers/structures/primitives/cube.glb") == cube,
                 "switching level leaked state or lost terrain");
         runtime.startWave();
         runtime.update(engine, 0);

@@ -1,5 +1,6 @@
 #include "entities/hero.hpp"
 
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -26,6 +27,8 @@ HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlo
     result.idleAnimation = json.value("idle_animation", result.idleAnimation);
     result.walkAnimation = json.value("walk_animation", result.walkAnimation);
     result.runAnimation = json.value("run_animation", result.runAnimation);
+    result.hitAnimation = json.value("hit_animation", result.hitAnimation);
+    result.deathAnimation = json.value("death_animation", result.deathAnimation);
     const auto combat = json.value("combat", nlohmann::json::object());
     auto& stats = result.combat;
     const auto attack = combat.value("attack", std::string{"melee"});
@@ -33,6 +36,8 @@ HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlo
         stats.attack = HeroAttack::ranged;
     } else if (attack == "area") {
         stats.attack = HeroAttack::area;
+    } else if (attack == "ranged_area") {
+        stats.attack = HeroAttack::rangedArea;
     } else if (attack != "melee") {
         throw std::invalid_argument("Unknown hero attack type.");
     }
@@ -45,6 +50,37 @@ HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlo
     stats.acquisitionRange = combat.value("acquisition_range", stats.acquisitionRange);
     stats.pursuitRange = combat.value("pursuit_range", stats.pursuitRange);
     stats.attackAnimation = combat.value("attack_animation", stats.attackAnimation);
+    stats.releaseAnimation = combat.value("release_animation", stats.releaseAnimation);
+    stats.aimingAnimation = combat.value("aiming_animation", stats.aimingAnimation);
+    stats.projectileSocket = combat.value("projectile_socket", stats.projectileSocket);
+    stats.projectileModel = combat.value("projectile_model", std::string{});
+    stats.projectileScale = combat.value("projectile_scale", stats.projectileScale);
+    stats.splashRadius = combat.value("splash_radius", stats.splashRadius);
+    stats.aimingTime = combat.value("aiming_time", stats.aimingTime);
+    if (combat.contains("projectile_offset")) {
+        const auto offset = combat.at("projectile_offset").get<std::array<float, 3>>();
+        stats.projectileOffset = {offset[0], offset[1], offset[2]};
+    }
+    if (combat.contains("projectile_tint")) {
+        const auto tint = combat.at("projectile_tint").get<std::array<float, 4>>();
+        stats.projectileTint = {tint[0], tint[1], tint[2], tint[3]};
+    }
+    if (!std::isfinite(stats.projectileScale) || stats.projectileScale < 0 || !std::isfinite(stats.splashRadius) ||
+        stats.splashRadius < 0 || stats.splashRadius > 100 || !std::isfinite(glm::length(stats.projectileOffset)) ||
+        !std::isfinite(glm::length(stats.projectileTint)) || !std::isfinite(stats.aimingTime) || stats.aimingTime < 0 ||
+        stats.aimingTime > stats.impactTime || (stats.attack == HeroAttack::rangedArea && stats.splashRadius <= 0)) {
+        throw std::invalid_argument("Invalid hero projectile configuration.");
+    }
+    if (!stats.projectileModel.empty()) {
+        bool safeProjectile = !stats.projectileModel.is_absolute() && !stats.projectileModel.has_root_name();
+        for (const auto& part : stats.projectileModel) {
+            safeProjectile = safeProjectile && part != "..";
+        }
+        if (!safeProjectile || !std::filesystem::is_regular_file(assets / stats.projectileModel)) {
+            throw std::invalid_argument("Invalid hero projectile model.");
+        }
+    }
+    stats.specialAbilities = combat.value("special_abilities", stats.specialAbilities);
     const auto ability = combat.value("cleave", nlohmann::json::object());
     stats.cleave.damage = ability.value("damage", stats.cleave.damage);
     stats.cleave.radius = ability.value("radius", stats.cleave.radius);

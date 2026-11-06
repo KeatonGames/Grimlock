@@ -386,14 +386,12 @@ int main() {
                 "Game right-click enemy did not issue explicit attack");
         require(runtime.heroes()->command(runtime.selectedHero()->id, {-5, 0, -1}), "Game combat move override failed");
         tick(engine, runtime);
-        control(engine, runtime, id, "Hero Info", "Cleave");
-        require(runtime.selectedHero()->combat.cleaveCooldown > 0 && runtime.selectedHero()->combat.abilitySwing,
-                "Game Cleave HUD did not activate ability");
+        require(!runtime.activateHeroAbility(HeroAbility::cleave), "Knight retained a special ability");
         require(enemies.remove(enemyId), "Game hero target cleanup failed");
         control(engine, runtime, id, "Hero Info", "Cancel Order");
         require(!runtime.selectedHero()->combat.swinging && !runtime.selectedHero()->combat.playerMoving &&
-                    !runtime.selectedHero()->combat.target && runtime.selectedHero()->combat.cleaveCooldown > 0,
-                "Game cancel order failed or refunded ability cooldown");
+                    !runtime.selectedHero()->combat.target && runtime.selectedHero()->combat.cleaveCooldown == 0,
+                "Game cancel order failed or Knight acquired an ability cooldown");
         require(runtime.heroes()->applyDamage(runtime.selectedHero()->id, 1), "Game hero hit feedback setup failed");
         for (const auto& tower : runtime.navigation().towers().towers()) {
             require(runtime.navigation().towers().applyDamage(engine, tower.object, 1),

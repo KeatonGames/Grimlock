@@ -59,7 +59,11 @@ HeroSystem::HeroSystem(Engine& engine)
         }
         type->idleClip = clip(type->modelInfo, type->definition.idleAnimation);
         type->attackClip = clip(type->modelInfo, type->definition.combat.attackAnimation);
-        type->deathClip = clip(type->modelInfo, "death");
+        type->releaseClip = clip(type->modelInfo, type->definition.combat.releaseAnimation);
+        type->aimingClip = clip(type->modelInfo, type->definition.combat.aimingAnimation);
+        type->hitClip = clip(type->modelInfo, type->definition.hitAnimation);
+        type->walkClip = clip(type->modelInfo, type->definition.walkAnimation);
+        type->deathClip = clip(type->modelInfo, type->definition.deathAnimation);
         if (!type->deathClip) {
             type->deathClip = clip(type->modelInfo, "die");
         }
@@ -197,6 +201,23 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, s
             engine_.scene()->setRole(object, "grimlock.hero");
             engine_.scene()->setModel(object, config.model);
             engine_.prepareScene(*engine_.scene());
+            auto& resources = *types_.at(type);
+            if (!config.combat.projectileSocket.empty() && !resources.attackPose) {
+                auto pose = std::make_unique<assets::ModelInstance>(engine_.scene()->animation(object).asset());
+                std::optional<std::size_t> socket;
+                const auto& nodes = pose->model().nodes;
+                for (std::size_t i = 0; i < nodes.size(); ++i) {
+                    if (nodes[i].name == config.combat.projectileSocket) {
+                        socket = i;
+                        break;
+                    }
+                }
+                if (!socket) {
+                    throw std::invalid_argument("Hero projectile socket is missing from the model.");
+                }
+                resources.projectileNode = socket;
+                resources.attackPose = std::move(pose);
+            }
             Hero created;
             created.type = type;
             entity = registry_.create();
@@ -218,6 +239,8 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, s
     hero->avoidanceEnemy.reset();
     hero->defensivePosition = position;
     hero->combat = {};
+    hero->hitAnimationRemaining = 0;
+    hero->locomotionClip = idleClip;
     stop(*hero, HeroState::idle);
     updateModel(*hero);
     if (idleClip) {
@@ -287,6 +310,13 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
             engine_.scene()->stopAnimation(hero->object);
         }
     } else {
+        const auto hitClip = types_.at(hero->type)->hitClip;
+        if (hitClip && !hero->combat.swinging && hero->hitAnimationRemaining <= 0) {
+            engine_.scene()->playAnimation(hero->object, *hitClip, false);
+            const auto& animation = engine_.scene()->animation(hero->object).model().animations.at(*hitClip);
+            hero->hitAnimationRemaining = animation.end - animation.start;
+            hero->locomotionClip.reset();
+        }
         hero->hitFlashRemaining = 0.15;
         engine_.scene()->setTint(hero->object, {1, 0.35F, 0.3F, 1});
     }
@@ -455,12 +485,15 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
 void HeroSystem::updateModel(Hero& hero) {
     const auto& type = *types_.at(hero.type);
     engine_.scene()->setTransform(hero.object, transform(hero.position, hero.visualYaw, hero.type));
-    if (hero.combat.swinging || hero.health <= 0) {
+    if (hero.combat.swinging || hero.health <= 0 || hero.hitAnimationRemaining > 0) {
         return;
     }
     const bool moving = hero.state == HeroState::moving && hero.speed > 0;
-    if (moving != hero.animationMoving) {
-        const auto selected = moving ? type.movementClip : type.idleClip;
+    const auto selected =
+        moving ? (hero.speed < type.definition.speed * 0.55 && type.walkClip ? type.walkClip : type.movementClip)
+               : (hero.combat.target && type.aimingClip ? type.aimingClip : type.idleClip);
+    if (selected != hero.locomotionClip) {
+        hero.locomotionClip = selected;
         if (selected) {
             engine_.scene()->playAnimation(hero.object, *selected);
         } else {
@@ -472,7 +505,13 @@ void HeroSystem::updateModel(Hero& hero) {
 
 void HeroSystem::playAttack(Hero& hero) {
     const auto& type = *types_.at(hero.type);
-    if (type.attackClip) {
+    hero.hitAnimationRemaining = 0;
+    hero.locomotionClip.reset();
+    hero.combat.drawRemaining = -1;
+    if (type.aimingClip && type.definition.combat.aimingTime > 0) {
+        hero.combat.drawRemaining = type.definition.combat.aimingTime;
+        engine_.scene()->playAnimation(hero.object, *type.aimingClip);
+    } else if (type.attackClip) {
         engine_.scene()->playAnimation(hero.object, *type.attackClip, false);
     } else if (type.idleClip) {
         engine_.scene()->playAnimation(hero.object, *type.idleClip);
@@ -487,12 +526,29 @@ void HeroSystem::finishAttack(Hero& hero) {
         return;
     }
     hero.combat.swinging = false;
-    if (type.idleClip) {
-        engine_.scene()->playAnimation(hero.object, *type.idleClip);
+    const auto idle = hero.combat.target && type.aimingClip
+                          ? type.aimingClip
+                          : (hero.combat.target && type.aimingClip ? type.aimingClip : type.idleClip);
+    if (idle) {
+        engine_.scene()->playAnimation(hero.object, *idle);
     } else {
         engine_.scene()->stopAnimation(hero.object);
     }
     hero.animationMoving = false;
+    hero.locomotionClip = idle;
+}
+
+glm::dvec3 HeroSystem::projectileOrigin(const Hero& hero) {
+    auto& type = *types_.at(hero.type);
+    if (!type.projectileNode || !type.attackPose || !type.attackClip) {
+        return hero.position + glm::dvec3{0, type.definition.height * 0.5, 0};
+    }
+    // Sample the contact pose from the combat clock, independent of render frame rate.
+    type.attackPose->play(*type.attackClip, false);
+    type.attackPose->seek(static_cast<float>(type.definition.combat.impactTime - type.definition.combat.aimingTime));
+    const auto local =
+        type.attackPose->pose().world.at(*type.projectileNode) * glm::vec4{type.definition.combat.projectileOffset, 1};
+    return glm::dvec3{engine_.scene()->worldTransform(hero.object) * local};
 }
 
 void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy> enemies) {
@@ -500,6 +556,7 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
         throw std::invalid_argument("Hero delta must be finite and nonnegative.");
     }
     for (auto& hero : heroes_) {
+        hero.hitAnimationRemaining = std::max(0.0, hero.hitAnimationRemaining - delta);
         if (hero.health > 0 && hero.hitFlashRemaining > 0) {
             hero.hitFlashRemaining = std::max(0.0, hero.hitFlashRemaining - delta);
             if (hero.hitFlashRemaining == 0) {

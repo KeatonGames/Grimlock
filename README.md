@@ -56,7 +56,11 @@ game/
   src/{main.cpp,game.*}     Executable launcher and Game application
   assets/config/           Shared enemy, hero and tower definitions
   assets/levels/           Handcrafted levels, waves and economy settings
-  assets/models/           Shared source models and test fixtures
+  assets/environment/      Nature, castle, dungeon, graveyard and pirate GLBs
+  assets/towers/           Structures, weapons and projectile GLBs
+  assets/enemies/          Animal, orc, undead and other enemy GLBs
+  assets/heroes/           Knight, Ranger, Mage, other characters and shared rigs
+  assets/licenses/         Original license texts and provenance notices
   assets/scenes/           Authored environments and diagnostic scenes
 tests/                      CPU and Vulkan/editor runtime checks
 docs/                       Current gameplay, authoring and architecture guides
@@ -107,7 +111,7 @@ Targets `Game` and `Editor` produce `Grimlock` and `GrimlockEditor`. Build eithe
 to ON; configure with `-DGRIMLOCK_BUILD_EDITOR=OFF` for a Game-only build. The HUD
 still works in that build. Both applications use the same staged asset directory.
 
-CMake compiles shaders automatically and stages assets beside each executable. GLB files must contain actual model data, not Git LFS pointer text.
+CMake compiles shaders automatically and synchronizes assets beside each executable, pruning obsolete staged files. GLB files must contain actual model data, not Git LFS pointer text.
 
 Game discovers all valid JSON levels under its active `assets/levels` directory.
 Use `--assets <folder>` to play directly from an authored asset tree; see
@@ -125,7 +129,7 @@ Runtime tests require a working Vulkan display and the supplied assets.
 ## Repository housekeeping
 
 Keep authored assets in `game/assets`, checks in `tests`, and generated output in
-the ignored `out` directory. Diagnostic scenes and sample models also serve as
+the ignored `out` directory. The GLB-only asset library is described in [asset organization](docs/asset_library.md). Diagnostic scenes and sample models also serve as
 regression fixtures; retain them even when no playable level references them.
 
 Local output is organized into `out/build` for active CMake builds,
@@ -151,7 +155,7 @@ records lifetime regressions, allocation measurements, stress results, and remai
 Hero/tower ownership, Scene bridges, and migration verification are documented in
 [ECS heroes and towers](docs/ecs_heroes_towers.md).
 
-For Assassin, Ranger, and Warrior deployment, models, and combat configuration,
+For Knight, Ranger, and Mage deployment, models, and combat configuration,
 see [hero types](docs/hero_types.md).
 
 See [gameplay controls](docs/gameplay_controls.md) for selection, orders, cancellation,

@@ -390,7 +390,7 @@ void SceneDocument::setTransform(ObjectId object, Transform transform) {
 
 void SceneDocument::refreshModels() {
     std::vector<std::filesystem::path> result;
-    const auto directory = engine_.assetRoot() / "models";
+    const auto directory = engine_.assetRoot();
     std::error_code error;
 
     if (std::filesystem::exists(directory, error)) {
@@ -412,7 +412,7 @@ void SceneDocument::refreshModels() {
                 return static_cast<char>(std::tolower(c));
             });
 
-            if (extension == ".glb" || extension == ".gltf" || extension == ".obj") {
+            if (extension == ".glb") {
                 result.push_back(entry->path().lexically_relative(engine_.assetRoot()));
             }
         }

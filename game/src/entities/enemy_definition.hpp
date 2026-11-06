@@ -21,7 +21,7 @@ using EnemyTypeId = std::size_t;
 
 struct EnemyDefinition {
     std::string name = "Chicken";
-    std::filesystem::path model = "models/chicken.glb";
+    std::filesystem::path model = "enemies/animals/chicken.glb";
     double speed = 1.5;
     double radius = 0.195;
     double height = 0.45;

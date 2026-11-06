@@ -101,9 +101,10 @@ int main(int argc, char** argv) {
         const std::filesystem::path root{argv[1]}, output{argv[2]};
         std::filesystem::create_directories(output);
 
-        for (const auto* name : {"blackrat.glb", "cube.obj"}) {
-            std::filesystem::copy_file(root / "assets/models" / name,
-                                       output / name,
+        for (const std::filesystem::path model :
+             {"enemies/animals/blackrat.glb", "towers/structures/primitives/cube.glb"}) {
+            std::filesystem::copy_file(root / "assets" / model,
+                                       output / model.filename(),
                                        std::filesystem::copy_options::overwrite_existing);
         }
 
@@ -139,7 +140,7 @@ int main(int argc, char** argv) {
         require(std::abs(active->animation(a).time() - 0.1F) < 1e-5F && active->animation(b).time() > 0,
                 "independent scene animation update failed");
 
-        auto bad = single("cube.obj");
+        auto bad = single("cube.glb");
         const auto missing = bad->createObject();
         bad->setModel(missing, "missing.glb");
         rejects([&] {
@@ -163,7 +164,7 @@ int main(int argc, char** argv) {
                 "missing named clip fallback lost configuration");
 
         invalidName.reset();
-        auto invalidMaterial = single("cube.obj");
+        auto invalidMaterial = single("cube.glb");
         invalidMaterial->setMaterialOverride(1, 999);
         rejects([&] {
             engine.setScene(std::move(invalidMaterial));
@@ -330,7 +331,7 @@ int main(int argc, char** argv) {
         engine.unloadScene();
         const auto standaloneModel = engine.loadModel(output / "lights.gltf");
         (void)engine.createInstance(standaloneModel);
-        const auto secondInstance = engine.createInstance(engine.loadModel(output / "cube.obj"));
+        const auto secondInstance = engine.createInstance(engine.loadModel(output / "cube.glb"));
         engine.setTransform(secondInstance, glm::translate(glm::mat4{1}, glm::vec3{1, 0, 0}));
         require(engine.update(), "standalone imported lights failed");
         engine.setScene(std::make_unique<Scene>());

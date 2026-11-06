@@ -28,7 +28,7 @@ void require(bool value, const std::string& message) {
 
 void verifyAssets(const std::filesystem::path& root) {
     std::size_t count = 0;
-    for (const auto& file : std::filesystem::directory_iterator(root / "models/kenney_nature")) {
+    for (const auto& file : std::filesystem::directory_iterator(root / "environment/nature/kenney")) {
         if (file.path().extension() != ".glb") {
             continue;
         }
@@ -138,7 +138,7 @@ void terrain(Engine& engine) {
     editor::SceneDocument document{engine};
     document.open(engine.assetRoot() / "scenes/forest_defense.json");
     document.refreshModels();
-    const auto expected = std::filesystem::path{"models/kenney_nature/tree_default.glb"};
+    const auto expected = std::filesystem::path{"environment/nature/kenney/tree_default.glb"};
     require(std::find(document.models().begin(), document.models().end(), expected) != document.models().end(),
             "Editor did not discover nested Nature Kit assets");
     ObjectId tree = 0;

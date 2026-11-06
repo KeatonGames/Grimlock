@@ -11,7 +11,7 @@ Menu** button; the main menu provides **Quit**.
 
 Game and Editor use the same version-1 level JSON and scene files. No export,
 alternate Game format or list of hardcoded levels is required. The active asset
-root contains `levels/`, `scenes/`, `models/` and `config/`.
+root contains `levels/`, `scenes/`, `config/`, and the categorized GLB library.
 
 Levels now have stable IDs for [player progression](progression.md), independent
 of names and paths. Editor assigns IDs on save; preserve an ID for a rename, and

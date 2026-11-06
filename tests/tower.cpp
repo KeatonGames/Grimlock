@@ -83,7 +83,7 @@ void checkRoleSerialization(const std::filesystem::path& path) {
     Scene scene;
     const auto id = scene.createObject("Renamable tower");
     scene.setRole(id, "grimlock.tower");
-    scene.setModel(id, "models/cube.obj");
+    scene.setModel(id, "towers/structures/primitives/cube.glb");
     Transform transform;
     transform.position = {2.37F, 0.75F, 3.19F};
     transform.scale = {0.45F, 0.75F, 0.45F};
@@ -121,7 +121,7 @@ void checkDebugScene(const std::filesystem::path& path) {
         require(TowerSystem::routeFromArea(navigation, spawn, destination),
                 (definition.name + " has no default route through the debug scene").c_str());
         require(!navigation.contains({0.8, configuration.origin.y, -0.7}), "debug tower has no navigation footprint");
-        if (definition.model == "models/chicken.glb") {
+        if (definition.model == "enemies/animals/chicken.glb") {
             NavigationPath route;
             require(navigation.contains({9.5, 0, -6.5}) && !navigation.findPath({9.5, 0, -6.5}, destination, route),
                     "debug pocket is not a navigable isolated region");

@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 3, "expected asset and fixture directories");
         const auto definitions = loadAnimalDefinitions(argv[1]);
-        require(definitions.size() == 15 && definitions.front().model == "models/chicken.glb" &&
+        require(definitions.size() == 15 && definitions.front().model == "enemies/animals/chicken.glb" &&
                     definitions.front().radius == 0.195 && definitions.front().visualHeight == 0.36F,
                 "animal catalog/default settings incorrect");
         bool varied = false;
@@ -93,12 +93,12 @@ int main(int argc, char** argv) {
         }
 
         const std::filesystem::path fixture{argv[2]};
-        std::filesystem::create_directories(fixture / "models");
+        std::filesystem::create_directories(fixture / "enemies/animals");
         std::filesystem::create_directories(fixture / "config");
         std::filesystem::remove(fixture / "config/enemy_archetypes.json");
-        std::ofstream{fixture / "models/chicken.glb"};
+        std::ofstream{fixture / "enemies/animals/chicken.glb"};
         const nlohmann::json entry{{"name", "Chicken"},
-                                   {"model", "models/chicken.glb"},
+                                   {"model", "enemies/animals/chicken.glb"},
                                    {"radius", 0.195},
                                    {"height", 0.45},
                                    {"visual_height", 0.36}};
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
         require(!loadAnimalDefinitions(fixture).front().despawnOnArrival, "arrival retention override ignored");
         auto unavailable = entry;
         unavailable["name"] = "Unavailable";
-        unavailable["model"] = "models/not-installed.glb";
+        unavailable["model"] = "enemies/animals/not-installed.glb";
         document.push_back(unavailable);
         save(document);
         require(loadAnimalDefinitions(fixture).size() == 1, "missing assets were offered in the selector");

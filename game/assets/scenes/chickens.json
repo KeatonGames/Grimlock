@@ -19,15 +19,15 @@
     "exposure":1
   },
   "objects": [
-    {"id":"4","name":"Rat A","model":"models/blackrat.glb",
+    {"id":"4","name":"Rat A","model":"enemies/animals/blackrat.glb",
       "transform":{"position":[-1,0.04,-3],"scale":[3.2,3.2,3.2]},
       "animation":{"clip":"idle_A1","autoplay":true,"loop":true,"speed":0.75}},
-    {"id":"5","name":"Rat B","model":"models/blackrat.glb",
+    {"id":"5","name":"Rat B","model":"enemies/animals/blackrat.glb",
       "transform":{"position":[4,0.04,-3],"scale":[3.2,3.2,3.2]},
       "animation":{"clip":"idle_A2","autoplay":true,"loop":true,"speed":1}},
-    {"id":"6","name":"Bunny","model":"models/bunny2.glb",
+    {"id":"6","name":"Bunny","model":"enemies/animals/bunny2.glb",
       "transform":{"position":[-2,-0.497,1],"scale":[0.18846,0.18846,0.18846]}},
-    {"id":"7","name":"PBR sphere","model":"models/pbr-comparison.glb","material_override":0,
+    {"id":"7","name":"PBR sphere","model":"environment/primitives/pbr-comparison.glb","material_override":0,
       "transform":{"position":[5,0.6,3.5],"scale":[0.6,0.6,0.6]}}
   ]
 }

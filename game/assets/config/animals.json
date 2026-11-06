@@ -1,7 +1,7 @@
 [
   {
     "name": "Chicken",
-    "model": "models/chicken.glb",
+    "model": "enemies/animals/chicken.glb",
     "radius": 0.195,
     "height": 0.45,
     "visual_height": 0.36,
@@ -22,7 +22,7 @@
   },
   {
     "name": "Black Rat",
-    "model": "models/blackrat.glb",
+    "model": "enemies/animals/blackrat.glb",
     "radius": 0.265,
     "height": 0.2,
     "visual_height": 0.12,
@@ -43,7 +43,7 @@
   },
   {
     "name": "Bunny",
-    "model": "models/bunny.glb",
+    "model": "enemies/animals/bunny.glb",
     "radius": 0.29,
     "height": 0.55,
     "visual_height": 0.45,
@@ -64,7 +64,7 @@
   },
   {
     "name": "Bunny 2",
-    "model": "models/bunny2.glb",
+    "model": "enemies/animals/bunny2.glb",
     "radius": 0.29,
     "height": 0.55,
     "visual_height": 0.45,
@@ -86,7 +86,7 @@
   {
     "name": "Deer",
     "show_health_bar": true,
-    "model": "models/deer.glb",
+    "model": "enemies/animals/deer.glb",
     "radius": 0.54,
     "height": 1.15,
     "visual_height": 1.05,
@@ -108,7 +108,7 @@
   {
     "name": "Dog",
     "show_health_bar": true,
-    "model": "models/dog.glb",
+    "model": "enemies/animals/dog.glb",
     "radius": 0.47,
     "height": 0.7,
     "visual_height": 0.6,
@@ -129,7 +129,7 @@
   },
   {
     "name": "Dogcat",
-    "model": "models/dogcat.glb",
+    "model": "enemies/animals/dogcat.glb",
     "radius": 0.41,
     "height": 0.65,
     "visual_height": 0.55,
@@ -150,7 +150,7 @@
   },
   {
     "name": "Horse",
-    "model": "models/horse.glb",
+    "model": "enemies/animals/horse.glb",
     "radius": 0.88,
     "height": 1.3,
     "visual_height": 1.2,
@@ -171,7 +171,7 @@
   },
   {
     "name": "Kitty",
-    "model": "models/kitty.glb",
+    "model": "enemies/animals/kitty.glb",
     "radius": 0.27,
     "height": 0.35,
     "visual_height": 0.25,
@@ -192,7 +192,7 @@
   },
   {
     "name": "Penguin",
-    "model": "models/pinguin.glb",
+    "model": "enemies/animals/pinguin.glb",
     "radius": 0.28,
     "height": 0.75,
     "visual_height": 0.65,
@@ -214,7 +214,7 @@
   {
     "name": "Tiger",
     "show_health_bar": true,
-    "model": "models/tiger.glb",
+    "model": "enemies/animals/tiger.glb",
     "radius": 0.95,
     "height": 0.9,
     "visual_height": 0.8,

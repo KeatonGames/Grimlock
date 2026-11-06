@@ -64,7 +64,7 @@ void checkPersistence(const std::filesystem::path& path) {
     PlacementSystem::editZone(scene, zone);
     const auto id = scene.createObject("Typed tower");
     scene.setRole(id, "grimlock.tower:wide");
-    scene.setModel(id, "models/cube.obj");
+    scene.setModel(id, "towers/structures/primitives/cube.glb");
     Transform transform;
     transform.position = tower.position;
     transform.rotation = glm::angleAxis(0.3F, glm::vec3{0, 1, 0});

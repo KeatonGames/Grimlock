@@ -118,7 +118,7 @@ void panelControl(Engine& engine, SDL_WindowID window, const char* label) {
 
 void checkAnimatedEnemies(Engine& engine, const Grid& grid) {
     game::EnemyDefinition definition;
-    definition.model = "models/blackrat.glb";
+    definition.model = "enemies/animals/blackrat.glb";
     definition.movementAnimation = "idle_A1";
     definition.despawnOnArrival = false;
     const auto& c = grid.configuration();
@@ -226,7 +226,7 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
 
     navigationControl(engine, window, "Animal Model", "Dog");
     const auto dogType = session.selectedAnimal();
-    require(system.definition(dogType).model == "models/dog.glb" && system.enemies().size() == 2 &&
+    require(system.definition(dogType).model == "enemies/animals/dog.glb" && system.enemies().size() == 2 &&
                 system.enemies()[0].radius == chicken.radius && system.enemies()[0].navigation == chicken.navigation &&
                 chicken.navigation->revision() == chickenRevision && engine.transform(*chicken.instance) == transform,
             "selecting an animal modified an existing chicken");
@@ -321,7 +321,7 @@ void checkAnimalBatches(Engine& engine, game::NavigationDebug& debug, SDL_Window
     }
     session.reset(engine);
     for (game::EnemyTypeId type = 0; type < system.typeCount(); ++type) {
-        if (system.definition(type).model == "models/bunny2.glb") {
+        if (system.definition(type).model == "enemies/animals/bunny2.glb") {
             session.selectAnimal(engine, type);
             break;
         }
@@ -371,7 +371,7 @@ void checkTowers(Engine& engine,
     camera.camera.target = {6, 0, 4};
     scene->setCamera("main", camera);
     const auto prop = scene->createObject("Ordinary prop");
-    scene->setModel(prop, "models/cube.obj");
+    scene->setModel(prop, "towers/structures/primitives/cube.glb");
     Transform propTransform;
     propTransform.position = {8, 0.5F, 6};
     propTransform.scale = {0.4F, 0.5F, 0.4F};

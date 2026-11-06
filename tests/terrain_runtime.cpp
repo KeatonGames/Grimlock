@@ -68,7 +68,8 @@ void layers() {
 }
 
 void footprints(Engine& engine) {
-    const auto file = engine.assetRoot() / "models/terrain_support_fixture.obj";
+    std::filesystem::create_directories(engine.assetRoot() / "test_fixtures");
+    const auto file = engine.assetRoot() / "test_fixtures/terrain_support_fixture.obj";
     {
         std::ofstream output{file};
         output << "v -1 0 -1\nv 0 0 -1\nv 0 0 1\nv -1 0 1\n"
@@ -77,7 +78,7 @@ void footprints(Engine& engine) {
     }
     auto scene = std::make_unique<Scene>("Footprint coverage fixture");
     const auto first = scene->createObject("Duplicated half-floor triangles");
-    scene->setModel(first, "models/terrain_support_fixture.obj");
+    scene->setModel(first, "test_fixtures/terrain_support_fixture.obj");
     scene->setRole(first, "grimlock.terrain");
     engine.setScene(std::move(scene));
     LevelGeometry geometry;
@@ -86,7 +87,7 @@ void footprints(Engine& engine) {
     tower.position = {0, tower.halfExtent.y, 0};
     require(!geometry.supportError(tower).empty(), "overlapping triangles concealed an unsupported footprint");
     const auto second = engine.scene()->createObject("Other half of the foundation");
-    engine.scene()->setModel(second, "models/terrain_support_fixture.obj");
+    engine.scene()->setModel(second, "test_fixtures/terrain_support_fixture.obj");
     engine.scene()->setRole(second, "grimlock.terrain");
     Transform transform;
     transform.position.x = 1;
@@ -94,7 +95,7 @@ void footprints(Engine& engine) {
     geometry.synchronize(engine);
     require(geometry.supportError(tower).empty(), "adjacent terrain sections could not support a footprint");
     const auto obstacle = engine.scene()->createObject("Enclosing obstacle");
-    engine.scene()->setModel(obstacle, "models/cube.obj");
+    engine.scene()->setModel(obstacle, "towers/structures/primitives/cube.glb");
     engine.scene()->setRole(obstacle, "grimlock.obstacle");
     transform.position = {0, 1, 0};
     transform.scale = {2, 1, 2};
@@ -106,7 +107,7 @@ void footprints(Engine& engine) {
     require(geometry.supportError(tower).empty(), "disabled obstacle retained placement references");
     std::filesystem::remove(file);
 
-    const auto diagonal = engine.assetRoot() / "models/terrain_diagonal_fixture.obj";
+    const auto diagonal = engine.assetRoot() / "test_fixtures/terrain_diagonal_fixture.obj";
     {
         std::ofstream output{diagonal};
         output << "v -1 0 -1\nv -1 0 1\nv 1 0 -1\nv 1 0 1\nf 4 1 2\nf 1 4 3\n";
@@ -114,7 +115,7 @@ void footprints(Engine& engine) {
     }
     auto square = std::make_unique<Scene>("Diagonal foundation fixture");
     const auto floor = square->createObject("Two coplanar triangles");
-    square->setModel(floor, "models/terrain_diagonal_fixture.obj");
+    square->setModel(floor, "test_fixtures/terrain_diagonal_fixture.obj");
     square->setRole(floor, "grimlock.terrain");
     engine.setScene(std::move(square));
     geometry.synchronize(engine);

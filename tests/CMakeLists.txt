@@ -214,7 +214,7 @@ if(WIN32)
             $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:EngineApiChecks>
         VERBATIM)
 endif()
-add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/game/assets/models/blackrat.glb")
+add_test(NAME Engine.PublicApi COMMAND EngineApiChecks "${PROJECT_SOURCE_DIR}/game/assets/enemies/animals/blackrat.glb")
 
 add_executable(SceneChecks scene.cpp)
 target_link_libraries(SceneChecks PRIVATE Engine nlohmann_json::nlohmann_json)
@@ -270,7 +270,7 @@ set_tests_properties(Camera.Runtime PROPERTIES RUN_SERIAL TRUE)
 add_executable(PickingChecks picking.cpp)
 target_include_directories(PickingChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
 target_link_libraries(PickingChecks PRIVATE Engine)
-add_test(NAME Picking.Cpu COMMAND PickingChecks "${PROJECT_SOURCE_DIR}/game/assets/models")
+add_test(NAME Picking.Cpu COMMAND PickingChecks "${PROJECT_SOURCE_DIR}/game/assets/enemies/animals")
 
 add_executable(GltfPrimitiveChecks gltf_primitive.cpp)
 target_include_directories(GltfPrimitiveChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
@@ -302,7 +302,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:RendererRuntimeChecks>
         VERBATIM)
 endif()
-add_test(NAME Renderer.Runtime COMMAND RendererRuntimeChecks "${PROJECT_SOURCE_DIR}/game/assets/models/cube.obj")
+add_test(NAME Renderer.Runtime COMMAND RendererRuntimeChecks "${PROJECT_SOURCE_DIR}/game/assets/towers/structures/primitives/cube.glb")
 set_tests_properties(Renderer.Runtime PROPERTIES RUN_SERIAL TRUE)
 
 add_executable(SelectionRuntimeChecks selection_runtime.cpp)
@@ -341,3 +341,9 @@ if(GRIMLOCK_BUILD_EDITOR)
     add_test(NAME Editor.Runtime COMMAND EditorRuntimeChecks "${PROJECT_SOURCE_DIR}/game" "${CMAKE_CURRENT_BINARY_DIR}/editor-output")
     set_tests_properties(Editor.Runtime PROPERTIES RUN_SERIAL TRUE)
 endif()
+
+add_executable(AssetLibraryChecks asset_library.cpp)
+target_include_directories(AssetLibraryChecks PRIVATE "${PROJECT_SOURCE_DIR}/engine/src")
+target_link_libraries(AssetLibraryChecks PRIVATE Engine nlohmann_json::nlohmann_json)
+add_test(NAME Assets.Library COMMAND AssetLibraryChecks "${PROJECT_SOURCE_DIR}/game/assets"
+    "${PROJECT_SOURCE_DIR}/docs/asset_migration.json")

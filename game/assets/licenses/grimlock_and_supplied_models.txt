@@ -1,0 +1,12 @@
+Grimlock's original cube, hierarchy and pbr-comparison geometric assets are
+public domain under CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/.
+The cube was converted from OBJ to GLB preserving the existing runtime geometry.
+
+Assassin, witch, blackrat, dogcat, bunny and bunny2 are user-supplied assets.
+Their source licenses were not established in the original model README; the
+Grimlock CC0 dedication does not apply to them. Their provenance is unchanged.
+Other pre-existing animal models retain their original supplied provenance.
+
+KayKit Adventurers and Character Animations: Kay Lousberg, CC0, with original
+license texts retained alongside this notice. Kenney packs retain each supplied
+license text. Full original-to-current model paths: docs/asset_migration.json.

@@ -73,9 +73,9 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
                 level.waves[3].goldReward == 60 && level.waves[4].goldReward == 0 && towers[0].constructionCost == 30 &&
                 towers[1].constructionCost == 60,
             "handcrafted economy values incorrect");
-    std::filesystem::create_directories(fixture / "models");
+    std::filesystem::create_directories(fixture / "towers/structures/primitives");
     std::filesystem::create_directories(fixture / "config");
-    std::ofstream{fixture / "models/cube.obj"};
+    std::ofstream{fixture / "towers/structures/primitives/cube.glb"};
     const auto levelPath = fixture / "level.json";
     const auto towerPath = fixture / "config/towers.json";
     auto levelJson = read(assets / "levels/first_watch.json");

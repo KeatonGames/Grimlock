@@ -47,6 +47,78 @@ void gestures() {
     require(!gesture.update(input, true), "simultaneous selection issued a hero order");
 }
 
+void heroAnimationChecks(Engine& engine, std::size_t type) {
+    auto scene = std::make_unique<Scene>("Hero animation lifecycle");
+    scene->setNavigationGrid(GridConfiguration{16, 16, 1, {-8, 0, -8}});
+    engine.setScene(std::move(scene));
+    TowerSystem towers;
+    towers.synchronize(engine);
+    HeroSystem heroes{engine};
+    heroes.synchronize(towers);
+    const auto id = heroes.deploy({0, 0, 0}, {}, type);
+    const auto object = heroes.find(id)->object;
+    const auto& animation = engine.scene()->animation(object);
+    const auto& model = animation.model();
+    require(model.animations.size() == (type == 1 ? 10 : 6) && model.meshes.size() > 1 && !model.skins.empty(),
+            "Hero lost clips, mesh parts or skin");
+    std::optional<std::size_t> weapon, hand;
+    for (std::size_t i = 0; i < model.nodes.size(); ++i) {
+        if (model.nodes[i].name == (type == 0 ? "Knight_Sword" : type == 1 ? "Ranger_Weapon" : "Mage_Weapon")) {
+            weapon = i;
+        }
+        if (model.nodes[i].name == (type == 1 ? "handslot.l" : "handslot.r")) {
+            hand = i;
+        }
+    }
+    require(weapon && hand && model.nodes[*weapon].parent == hand, "Knight weapon is not attached to right hand");
+    assets::ModelInstance sample{animation.asset()};
+    bool handMoved = false;
+    for (std::size_t clip = 0; clip < model.animations.size(); ++clip) {
+        sample.play(clip, false);
+        const auto initial = sample.pose().world[*weapon];
+        sample.seek((model.animations[clip].start + model.animations[clip].end) * 0.5F);
+        const auto expected = sample.pose().world[*hand] * model.nodes[*weapon].localTransform;
+        for (int column = 0; column < 4; ++column) {
+            require(glm::length(sample.pose().world[*weapon][column] - expected[column]) < 1e-4F,
+                    "Sword detached from animated hand");
+            handMoved = handMoved || glm::length(sample.pose().world[*weapon][column] - initial[column]) > 0.01F;
+        }
+    }
+    require(handMoved, "Hero animations did not move the attached weapon");
+    if (type == 1) {
+        for (std::size_t clip = 0; clip < model.animations.size(); ++clip) {
+            if (model.animations[clip].name == "Ranged_Bow_Draw") {
+                sample.play(clip, false);
+                sample.seek(model.animations[clip].end);
+                require(!sample.pose().weights[*weapon].empty() && sample.pose().weights[*weapon][0] > 0.99F,
+                        "Bow string did not draw");
+            }
+            if (model.animations[clip].name == "Ranged_Bow_Release") {
+                sample.play(clip, false);
+                sample.seek(0.3F);
+                require(!sample.pose().weights[*weapon].empty() && sample.pose().weights[*weapon][0] < 0.01F,
+                        "Bow string did not release");
+            }
+        }
+    }
+    require(model.animations[animation.clip()].name == heroes.definition(type).idleAnimation && animation.looping(),
+            "Hero idle missing");
+    require(heroes.applyDamage(id, 1), "Hero hit rejected");
+    require(model.animations[animation.clip()].name == "Hit_A" && !animation.looping(), "Hero hit missing");
+    require(heroes.applyDamage(id, 1), "Hero repeated hit rejected");
+    heroes.update(0.7, true);
+    require(model.animations[animation.clip()].name == heroes.definition(type).idleAnimation,
+            "Hero did not recover from hit");
+    require(heroes.applyDamage(id, 1000), "Hero death rejected");
+    const auto death = animation.clip();
+    require(model.animations[death].name == "Death_A" && !animation.looping(), "Hero death missing");
+    EnemySystem enemies{engine};
+    HeroCombatSystem combat;
+    combat.update(heroes, enemies, 2, true);
+    require(animation.clip() == death && engine.scene()->contains(object) && !heroes.command(id, {1, 0, 0}),
+            "Hero death interrupted, removed prematurely or accepted a command");
+}
+
 void turningChecks(Engine& engine) {
     auto scene = std::make_unique<Scene>("Hero facing and attack timing");
     scene->setNavigationGrid(GridConfiguration{16, 16, 1, {-8, 0, -8}});
@@ -62,10 +134,10 @@ void turningChecks(Engine& engine) {
     HeroCombatSystem combat;
     combat.update(heroes, enemies, 0.05, true);
     const auto* hero = heroes.find(id);
-    require(std::isfinite(hero->visualYaw) && hero->visualYaw < 0 && hero->visualYaw > hero->yaw &&
+    require(std::isfinite(hero->visualYaw) && hero->visualYaw < 0 && std::abs(hero->visualYaw - hero->yaw) < 1e-6 &&
                 enemies.find(target)->health == 100,
             "hero visual rotation snapped or damaged before windup");
-    combat.update(heroes, enemies, 0.3, true);
+    combat.update(heroes, enemies, 0.45, true);
     require(enemies.find(target)->health == 75, "visual rotation changed logical attack timing/damage");
 }
 
@@ -95,7 +167,7 @@ void combatChecks(Engine& engine) {
     require(combat.attack(heroes, enemies, hero, target) && combat.attack(heroes, enemies, hero, target) &&
                 heroes.find(hero)->combat.swinging && heroes.find(hero)->combat.impactRemaining == windup,
             "repeated attack commands restarted the attack animation/timing");
-    combat.update(heroes, enemies, 0.3, true);
+    combat.update(heroes, enemies, 0.45, true);
     require(enemies.find(target)->health == 75, "hero impact timing/damage incorrect");
     combat.update(heroes, enemies, 0.2, true);
     require(enemies.find(target)->health == 75, "hero applied duplicate swing damage");
@@ -129,24 +201,10 @@ void combatChecks(Engine& engine) {
     combat.update(heroes, enemies, 0.1, true);
     require(heroes.find(hero)->combat.swinging && !heroes.find(hero)->combat.abilitySwing,
             "basic swing interruption fixture failed");
-    require(combat.activate(heroes, hero, HeroAbility::cleave, true), "basic attack locked out manual Cleave");
-    combat.update(heroes, enemies, 0.3, true);
-    require(enemies.find(interrupted)->health == 55 && !combat.activate(heroes, hero, HeroAbility::cleave, true),
-            "interrupted basic swing dealt duplicate damage or bypassed ability cooldown");
-    enemies.clear();
-    (void)heroes.deploy({0, 0, 0}, hero);
-    const auto front = spawn(0, 1), side = spawn(0.7, 1), behind = spawn(0, -1), far = spawn(0, 4);
-    require(!combat.activate(heroes, hero, HeroAbility::cleave, false), "Cleave allowed outside battle");
-    require(combat.activate(heroes, hero, HeroAbility::cleave, true), "Cleave activation failed");
-    require(!combat.activate(heroes, hero, HeroAbility::cleave, true), "Cleave cooldown ignored");
-    combat.update(heroes, enemies, 0.3, true);
-    require(enemies.find(front)->health == 55 && enemies.find(side)->health == 55 &&
-                enemies.find(behind)->health == 100 && enemies.find(far)->health == 100,
-            "Cleave cone/radius/damage incorrect");
+    require(!combat.activate(heroes, hero, HeroAbility::cleave, true), "Knight retained Cleave");
+    combat.update(heroes, enemies, 0.45, true);
+    require(enemies.find(interrupted)->health == 75, "rejected ability interrupted basic damage");
     const auto other = heroes.deploy({-5, 0, 0});
-    require(combat.activate(heroes, other, HeroAbility::cleave, true) &&
-                heroes.find(hero)->combat.cleaveCooldown != heroes.find(other)->combat.cleaveCooldown,
-            "heroes shared ability cooldown state");
     const auto otherTarget = spawn(-5, 1);
     require(combat.attack(heroes, enemies, other, otherTarget) && heroes.find(hero)->combat.target != otherTarget,
             "heroes shared target state");
@@ -157,13 +215,6 @@ void combatChecks(Engine& engine) {
 
     enemies.clear();
     (void)heroes.deploy({0, 0, 0}, hero);
-    const auto firstVictim = spawn(0, 1), secondVictim = spawn(0.7, 1);
-    require(enemies.applyDamage(firstVictim, 60) && enemies.applyDamage(secondVictim, 60),
-            "Cleave lethal setup failed");
-    require(combat.activate(heroes, hero, HeroAbility::cleave, true), "second Cleave activation failed");
-    combat.update(heroes, enemies, 0.3, true);
-    require(!enemies.find(firstVictim) && !enemies.find(secondVictim), "Cleave skipped a compacted/dead victim");
-
     enemies.clear();
     (void)heroes.deploy({-3, 0, -2}, hero);
     for (std::uint32_t row = 0; row < 16; ++row) {
@@ -218,42 +269,56 @@ void heroTypeChecks(Engine& engine) {
         }
         throw std::runtime_error("Missing configured hero type");
     };
-    const auto rangerType = type("ranger"), warriorType = type("warrior");
+    const auto rangerType = type("ranger"), mageType = type("mage");
     require(heroes.typeCount() == 3 && heroes.definition().combat.damage == 25 &&
                 heroes.definition().combat.attack == HeroAttack::melee,
             "Assassin definition changed or hero catalog is incomplete");
     const auto assassin = heroes.deploy({-10, 0, 0});
     const auto ranger = heroes.deploy({-3, 0, 0}, {}, rangerType);
     const auto rangerPosition = heroes.find(ranger)->position;
-    const auto warrior = heroes.deploy({3, 0, 0}, {}, warriorType);
+    const auto mage = heroes.deploy({3, 0, 0}, {}, mageType);
     const auto spawn = [&](double x, double z) {
         require(enemies.spawn(heroes.navigation(), {{x, z}, {x, z}, 0}, 1) == 1, "mixed hero enemy spawn failed");
         return enemies.enemies().back().id;
     };
     const auto rangedTarget = spawn(0, 0);
-    const auto front = spawn(3, 1), back = spawn(3, -1), far = spawn(3, 5);
-    combat.update(heroes, enemies, 0.6, true);
+    const auto front = spawn(3, 1), back = spawn(3.7, 1), far = spawn(3, 5);
+    const auto rangerClip = [&] {
+        const auto& animation = engine.scene()->animation(heroes.find(ranger)->object);
+        return animation.model().animations[animation.clip()].name;
+    };
+    combat.update(heroes, enemies, 0.1, true);
+    require(rangerClip() == "Ranged_Bow_Aiming_Idle", "Ranger did not aim");
+    combat.update(heroes, enemies, 0.3, true);
+    require(rangerClip() == "Ranged_Bow_Draw" && enemies.find(rangedTarget)->health == 100,
+            "Ranger did not draw or fired early");
+    const auto windup = heroes.find(ranger)->combat.impactRemaining;
+    require(combat.attack(heroes, enemies, ranger, rangedTarget) &&
+                heroes.find(ranger)->combat.impactRemaining == windup,
+            "Repeated Ranger attack command restarted the draw");
+    combat.update(heroes, enemies, 1.5, true);
+    require(rangerClip() == "Ranged_Bow_Release", "Ranger did not release");
     require(enemies.find(rangedTarget)->health == 100 - heroes.definition(rangerType).combat.damage,
             "Ranger failed to acquire/fire/hit at range");
     require(glm::length(heroes.find(ranger)->position - rangerPosition) < 1e-6, "in-range Ranger chased unnecessarily");
-    require(enemies.find(front)->health == 80 && enemies.find(back)->health == 80 && enemies.find(far)->health == 100,
-            "Warrior area attack missed, hit twice, or exceeded radius");
+    require(enemies.find(front)->health == 60 && enemies.find(back)->health == 60 && enemies.find(far)->health == 100,
+            "Mage area attack missed, hit twice, or exceeded radius");
     require(heroes.find(assassin)->combat.target == std::nullopt &&
-                heroes.find(ranger)->combat.target != heroes.find(warrior)->combat.target,
+                heroes.find(ranger)->combat.target != heroes.find(mage)->combat.target,
             "mixed heroes shared target state");
     require(!combat.activate(heroes, ranger, HeroAbility::cleave, true) &&
-                !combat.activate(heroes, warrior, HeroAbility::cleave, true),
+                !combat.activate(heroes, mage, HeroAbility::cleave, true),
             "new hero types inherited an active ability");
 
-    for (const auto id : {ranger, warrior}) {
+    for (const auto id : {ranger, mage}) {
         require(heroes.command(id, heroes.find(id)->position + glm::dvec3{0, 0, -3}), "mixed hero manual move failed");
     }
     combat.update(heroes, enemies, 0.2, true);
-    require(!heroes.find(ranger)->combat.target && !heroes.find(warrior)->combat.target,
+    require(!heroes.find(ranger)->combat.target && !heroes.find(mage)->combat.target,
             "manual move failed to override autonomous attacks");
-    require(heroes.cancelCommand(ranger) && heroes.cancelCommand(warrior), "mixed hero cancel failed");
+    require(heroes.cancelCommand(ranger) && heroes.cancelCommand(mage), "mixed hero cancel failed");
     combat.update(heroes, enemies, 0.5, true);
-    require(heroes.find(ranger)->combat.target && heroes.find(warrior)->combat.target,
+    require(heroes.find(ranger)->combat.target && heroes.find(mage)->combat.target,
             "mixed heroes did not resume autonomous attacks");
 
     enemies.clear();
@@ -269,15 +334,15 @@ void heroTypeChecks(Engine& engine) {
 
     enemies.clear();
     combat.update(heroes, enemies, 0, false);
-    (void)heroes.deploy({3, 0, 0}, warrior);
-    const auto lethalFront = spawn(3, 1), lethalBack = spawn(3, -1);
+    (void)heroes.deploy({3, 0, 0}, mage);
+    const auto lethalFront = spawn(3, 1), lethalBack = spawn(3.7, 1);
     (void)enemies.applyDamage(lethalFront, 90);
     (void)enemies.applyDamage(lethalBack, 90);
-    combat.update(heroes, enemies, 0.6, true);
+    combat.update(heroes, enemies, 1.9, true);
     require(!enemies.find(lethalFront) && !enemies.find(lethalBack),
-            "Warrior lethal area damage skipped a compacted enemy");
+            "Mage lethal area damage skipped a compacted enemy");
 
-    for (const auto id : {assassin, ranger, warrior}) {
+    for (const auto id : {assassin, ranger, mage}) {
         enemies.clear();
         const auto point = heroes.find(id)->position;
         const auto attacker = spawn(point.x, point.z + 0.8);
@@ -296,7 +361,7 @@ void heroTypeChecks(Engine& engine) {
     combat.update(heroes, enemies, 0, false);
     const auto protectedTarget = spawn(0, 0);
     const auto wall = engine.scene()->createObject("Projectile cover");
-    engine.scene()->setModel(wall, "models/cube.obj");
+    engine.scene()->setModel(wall, "towers/structures/primitives/cube.glb");
     Transform wallTransform;
     wallTransform.position = {-1.5F, 1, 0};
     wallTransform.scale = {0.3F, 2, 2};
@@ -322,6 +387,31 @@ void heroTypeChecks(Engine& engine) {
     require(shots.projectiles().front().sourceKind == DefensiveTargetKind::hero, "hero projectile lost attacker kind");
     shots.update(enemies, 1, &heroes.combatGeometry());
     require(enemies.find(protectedTarget)->health == 82, "clear hero projectile did not apply damage");
+    for (const int fps : {1, 5, 60}) {
+        enemies.clear();
+        const auto primary = spawn(0, 0), neighbor = spawn(0.7, 0), outside = spawn(3, 0);
+        ProjectileDefinition magic{60, 10, 0.09};
+        magic.splashRadius = 1.5;
+        shots.spawn({-3, 0.7, 0}, primary, magic, 0, {DefensiveTargetKind::hero, mage});
+        require(enemies.find(primary)->health == 100 && enemies.find(neighbor)->health == 100,
+                "Mage damaged enemies before projectile impact");
+        for (int frame = 0; frame < fps; ++frame) {
+            shots.update(enemies, 1.0 / fps, &heroes.combatGeometry());
+        }
+        require(enemies.find(primary)->health == 40 && enemies.find(neighbor)->health == 40 &&
+                    enemies.find(outside)->health == 100 && shots.projectiles().empty(),
+                "Mage splash damage duplicated, missed or varied with frame rate");
+        shots.spawn({-3, 0.7, 0}, primary, magic, 0, {DefensiveTargetKind::hero, mage});
+        shots.update(enemies, 1, &heroes.combatGeometry());
+        require(!enemies.find(primary) && !enemies.find(neighbor) && enemies.find(outside),
+                "Lethal splash skipped a compacted enemy");
+        shots.spawn({0, 0.7, 0}, outside, magic);
+        require(enemies.remove(outside), "Stale projectile target setup failed");
+        const auto replacement = spawn(3, 0);
+        shots.update(enemies, 1, &heroes.combatGeometry());
+        require(enemies.find(replacement)->health == 100 && shots.projectiles().empty(),
+                "Projectile followed a recycled enemy generation");
+    }
     heroes.clear();
     require(engine.update(), "mixed hero rendering/cleanup failed");
 }
@@ -373,6 +463,9 @@ int main() {
     try {
         gestures();
         Engine engine{EngineConfig{.windowTitle = "Hero runtime checks"}};
+        for (std::size_t type = 0; type < 3; ++type) {
+            heroAnimationChecks(engine, type);
+        }
         turningChecks(engine);
         combatChecks(engine);
         heroTypeChecks(engine);
@@ -462,7 +555,7 @@ int main() {
         heroes.synchronize(towers);
         require(heroes.validPosition({-3, 0, -2}, id), "removed tower did not restore hero navigation");
         const auto prop = engine.scene()->createObject("Blocking prop");
-        engine.scene()->setModel(prop, "models/cube.obj");
+        engine.scene()->setModel(prop, "towers/structures/primitives/cube.glb");
         Transform transform;
         transform.position = {-3, 0.5F, -2};
         transform.scale = {0.5F, 0.5F, 0.5F};

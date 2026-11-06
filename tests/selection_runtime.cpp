@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
         const auto a = candidate->createObject("left"), b = candidate->createObject("right");
 
         for (auto object : {a, b}) {
-            candidate->setModel(object, "models/cube.obj");
+            candidate->setModel(object, "towers/structures/primitives/cube.glb");
         }
 
         candidate->setTransform(a, Transform{{-1.2F, 0, 0}});

@@ -35,11 +35,13 @@ bool HeroCombatSystem::inRange(const HeroSystem& heroes, const Hero& hero, const
            meleeGap(hero.position, heroes.definition(hero).radius, {enemy.position, enemy.radius}) <= range + 1e-6 &&
            heroes.combatGeometry().visible(hero.position + glm::dvec3{0, heroes.definition(hero).height * 0.5, 0},
                                            combatAim(enemy)) &&
-           (heroes.definition(hero).combat.attack == HeroAttack::ranged || meleeContact(heroes.navigation(hero.type),
-                                                                                        hero.position,
-                                                                                        heroes.definition(hero).radius,
-                                                                                        {enemy.position, enemy.radius},
-                                                                                        range));
+           (heroes.definition(hero).combat.attack == HeroAttack::ranged ||
+            heroes.definition(hero).combat.attack == HeroAttack::rangedArea ||
+            meleeContact(heroes.navigation(hero.type),
+                         hero.position,
+                         heroes.definition(hero).radius,
+                         {enemy.position, enemy.radius},
+                         range));
 }
 
 bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, HeroId id, EnemyId target) {
@@ -73,6 +75,7 @@ bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, He
 bool HeroCombatSystem::activate(HeroSystem& heroes, HeroId id, HeroAbility ability, bool battle) {
     auto* hero = heroes.findMutable(id);
     if (!battle || ability != HeroAbility::cleave || !hero || !hero->controllable || hero->health <= 0 ||
+        !heroes.definition(*hero).combat.specialAbilities ||
         heroes.definition(*hero).combat.attack != HeroAttack::melee || hero->combat.cleaveCooldown > 1e-10 ||
         (hero->combat.swinging && hero->combat.abilitySwing)) {
         return false;
@@ -93,12 +96,23 @@ bool HeroCombatSystem::activate(HeroSystem& heroes, HeroId id, HeroAbility abili
 
 void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& hero) {
     const auto& stats = heroes.definition(hero).combat;
-    if (!hero.combat.abilitySwing && stats.attack == HeroAttack::ranged) {
+    if (!hero.combat.abilitySwing && (stats.attack == HeroAttack::ranged || stats.attack == HeroAttack::rangedArea)) {
+        const auto release = heroes.types_.at(hero.type)->releaseClip;
+        if (release) {
+            heroes.engine_.scene()->playAnimation(hero.object, *release, false);
+        }
         const auto* enemy = hero.combat.target ? enemies.find(*hero.combat.target) : nullptr;
         if (enemy && inRange(heroes, hero, *enemy, stats.range)) {
-            heroes.projectiles_.spawn(hero.position + glm::dvec3{0, heroes.definition(hero).height * 0.5, 0},
+            ProjectileDefinition projectile{stats.damage,
+                                            stats.projectileSpeed,
+                                            stats.projectileRadius,
+                                            stats.projectileTint};
+            projectile.model = stats.projectileModel;
+            projectile.visualScale = stats.projectileScale;
+            projectile.splashRadius = stats.attack == HeroAttack::rangedArea ? stats.splashRadius : 0;
+            heroes.projectiles_.spawn(heroes.projectileOrigin(hero),
                                       enemy->id,
-                                      ProjectileDefinition{stats.damage, stats.projectileSpeed, stats.projectileRadius},
+                                      projectile,
                                       hero.object,
                                       {DefensiveTargetKind::hero, hero.id});
         }
@@ -161,6 +175,15 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         return;
     }
     if (state.swinging) {
+        if (state.drawRemaining >= 0) {
+            state.drawRemaining -= delta;
+            if (state.drawRemaining <= 1e-10) {
+                if (const auto draw = heroes.types_.at(hero.type)->attackClip) {
+                    heroes.engine_.scene()->playAnimation(hero.object, *draw, false);
+                }
+                state.drawRemaining = -1;
+            }
+        }
         if (state.impactRemaining >= 0) {
             state.impactRemaining -= delta;
             if (state.impactRemaining <= 1e-10) {
@@ -203,6 +226,7 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
             state.swinging = true;
             state.abilitySwing = false;
             state.cooldown = stats.interval;
+            hero.visualYaw = hero.yaw;
             state.impactRemaining = stats.impactTime;
             heroes.playAttack(hero);
         }

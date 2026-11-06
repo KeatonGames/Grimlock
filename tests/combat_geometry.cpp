@@ -88,7 +88,7 @@ void runtimeChecks(Engine& engine) {
     combat.update(towers, enemies, 0.01, &world);
     require(towers.attacks()[0].target == near, "nearest visible target was not acquired");
     const auto blocker = engine.scene()->createObject("Thin solid wall");
-    engine.scene()->setModel(blocker, "models/cube.obj");
+    engine.scene()->setModel(blocker, "towers/structures/primitives/cube.glb");
     engine.scene()->setRole(blocker, "grimlock.obstacle");
     Transform transform;
     transform.position = {-1, 1, 0};

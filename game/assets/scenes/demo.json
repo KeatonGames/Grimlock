@@ -32,7 +32,7 @@
   "objects": [
     {
       "id": "1",
-      "model": "models/assassin.glb",
+      "model": "heroes/other/assassin.glb",
       "name": "Character",
       "transform": {
         "position": [-2.413761615753174,-1.7821567058563232,0.46230044960975647],
@@ -42,7 +42,7 @@
     },
     {
       "id": "2",
-      "model": "models/dogcat.glb",
+      "model": "enemies/animals/dogcat.glb",
       "name": "Cat",
       "transform": {
         "position": [-1.2999999523162842,-0.41943594813346863,-0.7728592753410339],
@@ -52,7 +52,7 @@
     },
     {
       "id": "3",
-      "model": "models/bunny2.glb",
+      "model": "enemies/animals/bunny2.glb",
       "name": "Bunny",
       "transform": {
         "position": [1.2008931636810303,-0.49713581800460815,-0.7034978866577148],
@@ -74,7 +74,7 @@
         "clip": 0
       },
       "id": "5",
-      "model": "models/blackrat.glb",
+      "model": "enemies/animals/blackrat.glb",
       "name": "Rat static pose",
       "parent": "4",
       "transform": {
@@ -89,7 +89,7 @@
         "speed": 0.75
       },
       "id": "6",
-      "model": "models/blackrat.glb",
+      "model": "enemies/animals/blackrat.glb",
       "name": "Rat idle",
       "transform": {
         "position": [2.2181243896484375,0.03940904140472412,1.4646815061569214],
@@ -100,7 +100,7 @@
     {
       "id": "7",
       "material_override": 0,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 0",
       "transform": {
         "position": [-1.100000023841858,-1.100000023841858,0.4000000059604645],
@@ -111,7 +111,7 @@
     {
       "id": "8",
       "material_override": 1,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 1",
       "transform": {
         "position": [0,-1.100000023841858,0.4000000059604645],
@@ -122,7 +122,7 @@
     {
       "id": "9",
       "material_override": 2,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 2",
       "transform": {
         "position": [1.100000023841858,-1.100000023841858,0.4000000059604645],
@@ -133,7 +133,7 @@
     {
       "id": "10",
       "material_override": 3,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 3",
       "transform": {
         "position": [-1.100000023841858,-1.850000023841858,0.4000000059604645],
@@ -144,7 +144,7 @@
     {
       "id": "11",
       "material_override": 4,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 4",
       "transform": {
         "position": [0,-1.850000023841858,0.4000000059604645],
@@ -155,7 +155,7 @@
     {
       "id": "12",
       "material_override": 5,
-      "model": "models/pbr-comparison.glb",
+      "model": "environment/primitives/pbr-comparison.glb",
       "name": "PBR sphere 5",
       "transform": {
         "position": [1.100000023841858,-1.850000023841858,0.4000000059604645],

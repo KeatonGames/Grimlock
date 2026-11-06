@@ -255,8 +255,8 @@ void skinBroadPhase() {
 void selection() {
     Scene scene;
     const auto parent = scene.createObject(), a = scene.createObject("a", parent), b = scene.createObject("b");
-    scene.setModel(a, "models/cube.obj");
-    scene.setModel(b, "models/cube.obj");
+    scene.setModel(a, "towers/structures/primitives/cube.glb");
+    scene.setModel(b, "towers/structures/primitives/cube.glb");
     scene.selectObject(a);
     require(scene.selectedObject() == a, "stable selection missing");
 

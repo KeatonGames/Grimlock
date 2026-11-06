@@ -51,7 +51,7 @@ pieces are `ground_grass`, `ground_pathStraight`, `ground_pathBend`,
 bushes, rocks and flowers frame the playable area. The camp, signs, obelisk,
 columns and a small `platform_grass` detail identify the entrance and objective.
 Original mesh geometry, palette, material settings and GLBs are retained, under
-the supplied [CC0 license](../game/assets/models/kenney_nature/LICENSE.txt).
+the supplied [CC0 license](../game/assets/environment/nature/kenney/LICENSE.txt).
 
 The Editor discovers all 329 kit models in its existing **Add Model** picker.
 Use **Filter models** with `kenney_nature/tree`, `cliff`, `ground` or `rock`.

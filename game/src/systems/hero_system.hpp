@@ -77,6 +77,7 @@ private:
     bool navigate(Hero& hero, glm::dvec3 destination);
     void playAttack(Hero& hero);
     void finishAttack(Hero& hero);
+    [[nodiscard]] glm::dvec3 projectileOrigin(const Hero& hero);
     Hero* findMutable(HeroId id) noexcept;
     void updateModel(Hero& hero);
     void step(Hero& hero, double delta, std::span<const Enemy> enemies);
@@ -89,7 +90,9 @@ private:
         HeroDefinition definition;
         ModelId model;
         ModelInfo modelInfo;
-        std::optional<std::size_t> idleClip, movementClip, attackClip, deathClip;
+        std::optional<std::size_t> idleClip, movementClip, walkClip, attackClip, hitClip, deathClip;
+        std::optional<std::size_t> releaseClip, aimingClip, projectileNode;
+        std::unique_ptr<assets::ModelInstance> attackPose;
         NavMesh navigation;
     };
 

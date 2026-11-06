@@ -23,8 +23,8 @@ void require(bool value, const char* message) {
 int main(int argc, char** argv) {
     try {
         const bool smoke = argc > 1 && std::string_view{argv[1]} == "--smoke";
-        const auto path =
-            argc > 1 && !smoke ? std::filesystem::path{argv[1]} : std::filesystem::path{"assets/models/blackrat.glb"};
+        const auto path = argc > 1 && !smoke ? std::filesystem::path{argv[1]}
+                                             : std::filesystem::path{"assets/enemies/animals/blackrat.glb"};
         Engine engine{EngineConfig{.windowTitle = "Engine public API checks"}};
         const auto model = engine.loadModel(path);
         const auto again = engine.loadModel(path.parent_path() / "." / path.filename());

@@ -1,6 +1,6 @@
 {
-  "name": "Assassin",
-  "model": "models/assassin.glb",
+  "name": "Knight",
+  "model": "heroes/knight/knight.glb",
   "speed": 3.5,
   "radius": 0.28,
   "height": 1.4,
@@ -10,9 +10,11 @@
   "deceleration": 16,
   "turning_speed": 12,
   "stopping_distance": 0.08,
-  "idle_animation": "idle",
-  "walk_animation": "walk",
-  "run_animation": "run",
+  "idle_animation": "Idle_A",
+  "walk_animation": "Walking_A",
+  "run_animation": "Running_A",
+  "hit_animation": "Hit_A",
+  "death_animation": "Death_A",
   "forward_yaw": 0,
   "combat": {
     "damage": 25,
@@ -21,7 +23,8 @@
     "impact_time": 0.25,
     "acquisition_range": 3.5,
     "pursuit_range": 6,
-    "attack_animation": "attack",
+    "attack_animation": "Melee_1H_Attack_Slice_Horizontal",
+    "special_abilities": false,
     "cleave": {
       "damage": 45,
       "radius": 2,

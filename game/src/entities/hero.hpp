@@ -10,7 +10,8 @@ namespace grimlock::game {
 enum class HeroAttack {
     melee,
     ranged,
-    area
+    area,
+    rangedArea
 };
 
 struct CleaveDefinition {
@@ -25,7 +26,15 @@ struct HeroCombatDefinition {
     double range = 1.2, interval = 0.8, impactTime = 0.25;
     double acquisitionRange = 5, pursuitRange = 8;
     std::string attackAnimation = "attack";
+    std::string releaseAnimation, aimingAnimation, projectileSocket;
+    std::filesystem::path projectileModel;
+    glm::vec3 projectileOffset{0};
+    glm::vec4 projectileTint{1, 0.85F, 0.35F, 1};
+    float projectileScale = 0;
+    double splashRadius = 0;
+    double aimingTime = 0;
     CleaveDefinition cleave;
+    bool specialAbilities = true;
 };
 
 struct HeroCombatState {
@@ -41,6 +50,7 @@ struct HeroCombatState {
     bool returning = false;
     bool explicitTarget = false, playerMoving = false, swinging = false, abilitySwing = false;
     double cooldown = 0, impactRemaining = 0, cleaveCooldown = 0, feedbackRemaining = 0, retryDelay = 0;
+    double drawRemaining = -1;
 };
 
 using HeroId = ecs::Entity;
@@ -52,14 +62,15 @@ enum class HeroState {
 };
 
 struct HeroDefinition {
-    std::string id = "assassin";
+    std::string id = "assassin"; // Preserve the legacy type key for authored levels.
     HeroCombatDefinition combat;
-    std::string name = "Assassin";
-    std::filesystem::path model = "models/assassin.glb";
+    std::string name = "Knight";
+    std::filesystem::path model = "heroes/knight/knight.glb";
     double speed = 3.5, radius = 0.28, height = 1.4;
     double acceleration = 12, deceleration = 16, turningSpeed = 12, stoppingDistance = 0.08;
     float visualHeight = 1.25F, maximumHealth = 100;
     double forwardYaw = 0;
+    std::string hitAnimation, deathAnimation = "death";
     std::string idleAnimation = "idle", walkAnimation = "walk", runAnimation = "run";
 };
 
@@ -83,6 +94,8 @@ struct HeroRuntimeComponent : HealthComponent {
     std::optional<glm::dvec3> destination;
     NavigationPath path;
     bool animationMoving = false;
+    double hitAnimationRemaining = 0;
+    std::optional<std::size_t> locomotionClip;
 };
 
 using Hero = HeroRuntimeComponent;

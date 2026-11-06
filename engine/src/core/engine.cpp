@@ -225,7 +225,7 @@ struct Engine::Impl {
 
         if (activeScene->navigationGrid()) {
             if (!gridCubeAsset) {
-                const auto model = load(assetRoot / "models/cube.obj", false);
+                const auto model = load(assetRoot / "towers/structures/primitives/cube.glb", false);
                 gridCubeAsset = resources[model]->asset;
                 gridCubeGpuModel = resources[model]->gpuModel;
             }

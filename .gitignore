@@ -39,7 +39,7 @@ _deps/
 *.dylib
 *.spv
 
-# Do not ignore *.obj globally: game/assets/models contains Wavefront sources.
+# OBJ importer fixtures are generated under out; the shipped model library is GLB-only.
 /*.obj
 
 # Desktop metadata

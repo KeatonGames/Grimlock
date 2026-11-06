@@ -1,42 +1,31 @@
 [
   {
-    "id": "ranger",
-    "name": "Ranger",
-    "model": "models/assassin.glb",
-    "speed": 3.5,
-    "radius": 0.28,
-    "height": 1.4,
-    "visual_height": 1.25,
-    "maximum_health": 90,
+    "id": "ranger", "name": "Ranger", "model": "heroes/ranger/ranger.glb",
+    "speed": 3.5, "radius": 0.28, "height": 1.4, "visual_height": 1.25, "maximum_health": 90,
+    "idle_animation": "Ranged_Bow_Idle", "walk_animation": "Walking_A", "run_animation": "Running_HoldingBow",
+    "hit_animation": "Hit_A", "death_animation": "Death_A",
     "combat": {
-      "attack": "ranged",
-      "damage": 18,
-      "range": 5,
-      "attack_interval": 0.9,
-      "impact_time": 0.25,
-      "acquisition_range": 6,
-      "pursuit_range": 8,
-      "projectile_speed": 12,
-      "projectile_radius": 0.06
+      "attack": "ranged", "damage": 18, "range": 5, "attack_interval": 3,
+      "impact_time": 1.5333333333333333, "aiming_time": 0.2,
+      "acquisition_range": 6, "pursuit_range": 8, "projectile_speed": 12, "projectile_radius": 0.06,
+      "attack_animation": "Ranged_Bow_Draw", "release_animation": "Ranged_Bow_Release",
+      "aiming_animation": "Ranged_Bow_Aiming_Idle", "special_abilities": false,
+      "projectile_model": "towers/projectiles/kaykit/arrow_bow.glb",
+      "projectile_scale": 0.32, "projectile_tint": [1, 1, 1, 1],
+      "projectile_socket": "handslot.l", "projectile_offset": [0, 0, 0.1]
     }
   },
   {
-    "id": "warrior",
-    "name": "Warrior",
-    "model": "models/assassin.glb",
-    "speed": 3.2,
-    "radius": 0.32,
-    "height": 1.4,
-    "visual_height": 1.4,
-    "maximum_health": 160,
+    "id": "mage", "name": "Mage", "model": "heroes/mage/mage.glb",
+    "speed": 3.2, "radius": 0.32, "height": 1.4, "visual_height": 1.4, "maximum_health": 100,
+    "idle_animation": "Idle_A", "walk_animation": "Walking_A", "run_animation": "Running_A",
+    "hit_animation": "Hit_A", "death_animation": "Death_A",
     "combat": {
-      "attack": "area",
-      "damage": 20,
-      "range": 1.4,
-      "attack_interval": 1.1,
-      "impact_time": 0.3,
-      "acquisition_range": 4,
-      "pursuit_range": 6
+      "attack": "ranged_area", "damage": 20, "range": 4.5, "attack_interval": 1.1, "impact_time": 0.4,
+      "acquisition_range": 6, "pursuit_range": 8, "projectile_speed": 10, "projectile_radius": 0.09,
+      "splash_radius": 1.5, "projectile_tint": [0.45, 0.6, 1, 1],
+      "attack_animation": "Ranged_Magic_Shoot", "special_abilities": false,
+      "projectile_socket": "handslot.r", "projectile_offset": [0, 0.9, 0]
     }
   }
 ]

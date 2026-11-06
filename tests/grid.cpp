@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
 
         auto example = Scene::load(game / "assets/scenes/navigation.json");
         require(example->navigationGrid()->size() == 192 && !example->navigationGrid()->walkable({3, 3}) &&
-                    example->objects().size() == 4 && example->object(4).model == "models/blackrat.glb",
+                    example->objects().size() == 4 && example->object(4).model == "enemies/animals/blackrat.glb",
                 "Game test scene failed");
 
         std::ifstream stream(output / "grid.json");

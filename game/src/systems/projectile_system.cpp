@@ -5,6 +5,22 @@
 #include <stdexcept>
 
 namespace grimlock::game {
+namespace {
+glm::mat4 projectileTransform(const Projectile& projectile) {
+    glm::mat4 transform{1};
+    if (glm::length(projectile.velocity) > 1e-8) {
+        const glm::vec3 forward = glm::normalize(glm::vec3{projectile.velocity});
+        const auto reference = std::abs(forward.y) > 0.99F ? glm::vec3{0, 0, 1} : glm::vec3{0, 1, 0};
+        const auto right = glm::normalize(glm::cross(reference, forward));
+        transform[0] = glm::vec4{right, 0};
+        transform[1] = glm::vec4{glm::cross(forward, right), 0};
+        transform[2] = glm::vec4{forward, 0};
+    }
+    transform[3] = glm::vec4{projectile.position, 1};
+    const auto scale = projectile.visualScale > 0 ? projectile.visualScale : static_cast<float>(projectile.radius);
+    return glm::scale(transform, glm::vec3{scale});
+}
+} // namespace
 
 ProjectileSystem::~ProjectileSystem() {
     clear();
@@ -37,26 +53,29 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                              double lifetime) {
     if (!std::isfinite(glm::length(origin)) || !std::isfinite(definition.damage) || definition.damage <= 0 ||
         !std::isfinite(definition.speed) || definition.speed <= 0 || !std::isfinite(definition.radius) ||
-        definition.radius <= 0 || std::isnan(lifetime) || lifetime <= 0) {
+        definition.radius <= 0 || !std::isfinite(definition.splashRadius) || definition.splashRadius < 0 ||
+        !std::isfinite(definition.visualScale) || definition.visualScale < 0 || std::isnan(lifetime) || lifetime <= 0) {
         throw std::invalid_argument("Invalid projectile origin or statistics.");
     }
     if (!model_) {
-        model_ = engine_.loadModel(engine_.assetRoot() / "models/cube.obj");
+        model_ = engine_.loadModel(engine_.assetRoot() / "towers/structures/primitives/cube.glb");
     }
     const auto entity = registry_.create();
     std::optional<InstanceId> instance;
     try {
-        instance = engine_.createInstance(*model_, true);
+        const auto model =
+            definition.model.empty() ? *model_ : engine_.loadModel(engine_.assetRoot() / definition.model);
+        instance = engine_.createInstance(model, true);
         engine_.setTint(*instance, definition.tint);
-        engine_.setTransform(*instance,
-                             glm::translate(glm::mat4{1}, glm::vec3{origin}) *
-                                 glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(definition.radius)}));
         registry_.emplace<Projectile>(
             entity,
             Projectile{target, origin, definition.speed, definition.radius, definition.damage, *instance, source});
         registry_.emplace<ProjectileLifetimeComponent>(entity, ProjectileLifetimeComponent{0, lifetime});
         projectiles_.back().sourceEntity = attacker.id;
         projectiles_.back().sourceKind = attacker.kind;
+        projectiles_.back().splashRadius = definition.splashRadius;
+        projectiles_.back().visualScale = definition.visualScale;
+        engine_.setTransform(*instance, projectileTransform(projectiles_.back()));
     } catch (...) {
         if (instance) {
             engine_.removeInstance(*instance);
@@ -105,16 +124,31 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
             const DefensiveTarget attacker = projectile.sourceEntity
                                                  ? DefensiveTarget{projectile.sourceKind, projectile.sourceEntity}
                                                  : DefensiveTarget{};
-            if (enemies.applyDamage(projectile.target, projectile.damage, attacker)) {
+            victims_.clear();
+            if (projectile.splashRadius > 0) {
+                enemies.visitNearby(center, projectile.splashRadius, [&](const Enemy& enemy) {
+                    if (enemy.active && enemy.alive &&
+                        glm::length(combatAim(enemy) - center) <= projectile.splashRadius &&
+                        geometry->visible(center, combatAim(enemy))) {
+                        victims_.push_back(enemy.id);
+                    }
+                });
+            } else {
+                victims_.push_back(projectile.target);
+            }
+            bool hit = false;
+            // Collect stable IDs before lethal damage compacts enemy storage.
+            for (const auto victim : victims_) {
+                hit = enemies.applyDamage(victim, projectile.damage, attacker) || hit;
+            }
+            if (hit) {
                 ++impacts_;
             }
             removeAt(index);
             continue;
         }
         projectile.position = next;
-        engine_.setTransform(projectile.instance,
-                             glm::translate(glm::mat4{1}, glm::vec3{projectile.position}) *
-                                 glm::scale(glm::mat4{1}, glm::vec3{static_cast<float>(projectile.radius)}));
+        engine_.setTransform(projectile.instance, projectileTransform(projectile));
         ++index;
     }
 }

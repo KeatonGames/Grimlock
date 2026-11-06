@@ -363,7 +363,7 @@ int main(int argc, char** argv) {
                         "Euler/quaternion convention mismatch");
             }
 
-            const auto a = document.addModel("models/cube.obj"), b = document.duplicate(a);
+            const auto a = document.addModel("towers/structures/primitives/cube.glb"), b = document.duplicate(a);
             require(engine.scene()->animation(a).asset() == engine.scene()->animation(b).asset(),
                     "editor duplicated shared resource");
 
@@ -377,7 +377,7 @@ int main(int argc, char** argv) {
 
             const auto count = engine.scene()->objects().size();
             rejects([&] {
-                (void)document.addModel("models/missing.glb");
+                (void)document.addModel("environment/primitives/missing.glb");
             });
             require(engine.scene()->objects().size() == count, "failed addition left placeholder");
 
@@ -621,7 +621,8 @@ int main(int argc, char** argv) {
             editor::Editor editor{engine};
             auto& document = editor.document();
             document.newScene();
-            const auto group = document.createGroup(), model = document.addModel("models/cube.obj");
+            const auto group = document.createGroup(),
+                       model = document.addModel("towers/structures/primitives/cube.glb");
             tick(engine);
             int count = 0;
             auto windows = SDL_GetWindows(&count);
@@ -705,7 +706,7 @@ int main(int argc, char** argv) {
             editor::Editor editor{engine};
             auto& document = editor.document();
             document.newScene();
-            const auto a = document.addModel("models/blackrat.glb"), b = document.duplicate(a);
+            const auto a = document.addModel("enemies/animals/blackrat.glb"), b = document.duplicate(a);
             require(engine.scene()->availableAnimations(a).size() == 13, "actual imported animation list missing");
             require(engine.scene()->animation(a).asset() == engine.scene()->animation(b).asset(),
                     "editor animation instances did not share resources");
@@ -816,7 +817,7 @@ int main(int argc, char** argv) {
             require(SDL_SetWindowSize(window, 1280, 720), SDL_GetError());
 
             tick(engine, 6);
-            const auto staticModel = document.addModel("models/cube.obj");
+            const auto staticModel = document.addModel("towers/structures/primitives/cube.glb");
             tick(engine, 4);
             require(engine.scene()->availableAnimations(staticModel).empty(),
                     "static model unexpectedly has animations");

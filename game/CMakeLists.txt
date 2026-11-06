@@ -40,8 +40,11 @@ set_target_properties(Game PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>"
     CXX_EXTENSIONS OFF)
 add_custom_target(GrimlockAssets
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${PROJECT_BINARY_DIR}/$<CONFIG>/assets"
+    COMMAND ${CMAKE_COMMAND}
+        "-DSOURCE=${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "-DDESTINATION=${PROJECT_BINARY_DIR}/$<CONFIG>/assets"
+        "-DBINARY_ROOT=${PROJECT_BINARY_DIR}"
+        -P "${PROJECT_SOURCE_DIR}/cmake/stage_assets.cmake"
     COMMENT "Staging game assets"
     VERBATIM)
 add_dependencies(Game GrimlockAssets GrimlockShaders)

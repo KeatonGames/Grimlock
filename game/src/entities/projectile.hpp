@@ -9,6 +9,9 @@ struct ProjectileDefinition {
     float damage = 1;
     double speed = 12, radius = 0.06;
     glm::vec4 tint{1, 0.85F, 0.35F, 1};
+    double splashRadius = 0;
+    std::filesystem::path model;
+    float visualScale = 0;
 };
 
 struct ProjectileComponent {
@@ -21,6 +24,8 @@ struct ProjectileComponent {
     glm::dvec3 velocity{0};
     ecs::Entity sourceEntity = 0;
     DefensiveTargetKind sourceKind = DefensiveTargetKind::tower;
+    double splashRadius = 0;
+    float visualScale = 0;
 };
 
 using Projectile = ProjectileComponent;

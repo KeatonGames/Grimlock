@@ -27,7 +27,7 @@ struct Tower {
     std::string type = "basic";
     glm::dvec3 position{0}; // Center, not foot position.
     glm::dquat rotation{1, 0, 0, 0};
-    std::filesystem::path model = "models/cube.obj";
+    std::filesystem::path model = "towers/structures/primitives/cube.glb";
     glm::dvec3 halfExtent{0.45, 0.75, 0.45};
     glm::dvec3 visualScale{0.45, 0.75, 0.45};
 

@@ -820,7 +820,7 @@ void GameHud::heroControls() {
             runtime_.cancelHeroOrder();
         }
         ImGui::EndDisabled();
-        if (stats.attack == HeroAttack::melee) {
+        if (stats.attack == HeroAttack::melee && stats.specialAbilities) {
             const bool battle = runtime_.level().waves()->phase() == LevelPhase::battle;
             ImGui::BeginDisabled(!battle || hero->health <= 0 || hero->combat.cleaveCooldown > 1e-10 ||
                                  (hero->combat.swinging && hero->combat.abilitySwing));
