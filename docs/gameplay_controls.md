@@ -1,71 +1,41 @@
-# Gameplay controls and interaction priorities
+# Gameplay controls
 
-Camera controls are unchanged in both Game and Editor: **right drag pans**,
-**middle drag orbits**, and **wheel zooms**. Game continues distinguishing a short
-right-click from a camera drag using the existing five-pixel accumulated motion
-threshold. Camera bindings and camera code were left untouched in Phase 39.
+Knight, Ranger and Mage spawn automatically on clear, reachable ground near the
+defense objective whenever a level starts or restarts. There is no hero shop,
+roster panel or deployment step.
 
-- Left-click a hero or tower to select it; click empty ground to deselect. Unit
-  orders continue when switching selection or clicking empty ground.
-- During Battle, right-click ground to move the selected hero or an enemy to
-  attack. Orders are issued on release so a camera drag never becomes a move.
-- During Preparation, use Deploy Hero for positioning and the existing tower
-  construction/upgrade controls. Battle still prevents construction/deployment.
-- Escape first closes settings or resumes a paused game, otherwise cancels
-  placement, then cancels an explicit hero order and clears selection. With no
-  action/selection, Escape pauses. The Pause button remains available at any time.
-- Cancel Order stops the hero at its current position and uses that position as
-  its new defensive anchor. Automatic defense can still engage nearby enemies.
+- Left-click a hero to select it. The orange kit corner marker identifies the selected hero.
+- Left-click a position on the map to move the selected hero there. This works
+  during Preparation and Battle, with the same terrain-aware navigation.
+- A successful move deselects the hero and hides its square. Its yellow route
+  and destination arrows stay visible during movement. Click the hero again
+  before issuing another order.
+- A dashed yellow line previews the selected hero's route to the mouse. Yellow arrows
+  mark the destination after clicking and remain while the hero moves there.
+  These are visual guides; movement and attack commands work as before.
+- The dashed route follows movement steering and terrain height. Travelled sections
+  disappear behind the hero; the remaining dashes stay fixed rather than sliding.
+- Selected heroes keep their original material colors and use only the square
+  corner marker for selection.
+- Click another hero to select that hero. Click a tower to inspect or upgrade it.
+- During Battle, clicking an enemy with a hero selected issues an attack order.
+  Short right-click commands also remain supported; right-drag pans the camera.
+- The selected hero keeps its command while you move the camera. Manual commands
+  temporarily override autonomous combat; normal defense resumes afterward.
+- Middle-drag orbits and the mouse wheel zooms.
+- Escape cancels tower placement first, then clears selection/orders, then opens
+  Pause. Escape resumes paused gameplay or closes Settings.
 
-UI, focus loss, simultaneous selection clicks, placement mode, middle drag,
-zoom, and right-drag movement suppress hero order gestures. A UI button press
-cannot also select or place something in the world. Escape is not repeated while
-held and suppresses world interactions for its cancellation frame.
+The towers-only shop is centered at the bottom. Select a tower card, then click
+an available build zone to construct at its fixed point and facing. Each zone holds
+one tower; destroying it frees the zone. Gold and tower costs appear in the shop. Escape or Cancel
+Placement exits build mode. Tower placement takes precedence over hero movement.
 
-Heroes/towers have subtle hover and selection rings. Accepted moves/attacks show
-an eight-tenths-second destination marker; the selected hero's target retains its
-existing red indicator. Placement retains the last preview while interacting with
-UI or navigating the camera. Returning to the viewport updates it against the
-actual terrain; an invalid terrain point still clears/rejects the preview through
-the existing placement validators. Existing construction/upgrade confirmation,
-health bars, hit flashes, and death feedback remain in use.
+The top HUD has Round at the left, objective health in the center, and Start Wave
+at the right. Start Wave is enabled during Preparation. Pause, Settings, Restart,
+level selection and exit controls are available through Escape and the Pause menu.
+Hero statistics, portraits, health overlays and ability buttons are absent.
 
-## Movement and combat corrections
-
-- A manual move is path-validated before interrupting a valid move or attack.
-  Rejected destinations leave the current action intact and show the existing
-  command error. Repeated nearby move orders reuse the current valid path.
-- Cancelling a move no longer leaves its old destination as the defense point;
-  autonomous behavior therefore does not silently resume the cancelled order.
-- Movement steps stop at steering points rather than passing a nearby funnel
-  corner. Existing surface constraints, acceleration, deceleration, collision
-  clearance, and frame substeps remain responsible for movement.
-- Hero models blend toward their attack facing using the configured turning speed.
-  Logical attack facing and damage timing remain independent from visual smoothing.
-- Repeating an attack order on the same target preserves its animation, windup,
-  cooldown, and path. Existing target acquisition and retry pacing are preserved.
-
-Assassin, Ranger, and Warrior share these changes. Models, attack statistics,
-Recast/Detour, ECS ownership, and existing combat mechanics are unchanged.
-
-## Validation and limits
-
-`Hero.Runtime` covers atomic/repeated move orders, cancellation anchors, repeated
-attack windups, input gesture conflicts, all hero types, multiple frame rates,
-and existing melee/projectile/area behavior. `Game.Runtime` checks preview
-retention over UI, construction/upgrades, hero selection/orders, camera gestures,
-and UI capture. `Game.Ui` checks selection-first Escape and pause/resume.
-Terrain, battle, crowd, rendering, and Editor checks provide broader regression
-coverage. Local build/test logs are in `out/archive/phase39/`.
-
-Game and Editor built successfully in Release and Debug. The full Release suite
-passed 41/41 (146.26 s), followed by a 7/7 affected-check rerun after the final
-visual-turn adjustment. The full Debug suite passed 41/41 (297.77 s). Vulkan
-validation was enabled for runtime checks; formatting and diff checks passed.
-The authored playthrough retains its expected winning and losing defense plans.
-
-This pass does not alter camera feel, implement crowd avoidance, or replace
-navigation. Existing large-battle navigation spikes and physically crowded
-passages can still limit responsiveness. Runtime checks exercise real SDL/Vulkan
-interactions; an extended manual playthrough was not performed.
-
+UI clicks, camera gestures, paused gameplay and result screens suppress map
+commands. Invalid destinations preserve the selected hero and its current valid
+order. Hero selection and movement do not spend gold or modify authored level files.

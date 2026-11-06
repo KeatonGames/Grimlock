@@ -330,19 +330,27 @@ void HeroCombatSystem::returnToDefense(HeroSystem& heroes, Hero& hero) {
     state.returning = heroes.navigate(hero, hero.defensivePosition);
 }
 
-void HeroCombatSystem::update(HeroSystem& heroes, EnemySystem& enemies, double delta, bool battle) {
+void HeroCombatSystem::update(HeroSystem& heroes,
+                              EnemySystem& enemies,
+                              double delta,
+                              bool battle,
+                              bool allowManualMovement) {
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Hero combat delta must be finite and nonnegative.");
     }
     if (!battle) {
         heroes.projectiles_.clear();
         for (auto& hero : heroes.heroes_) {
-            abandon(heroes, hero);
-            hero.combat.playerMoving = false;
+            if (!allowManualMovement || !hero.combat.playerMoving) {
+                abandon(heroes, hero);
+            }
+            if (!allowManualMovement || hero.state != HeroState::moving) {
+                hero.combat.playerMoving = false;
+            }
             hero.combat.retryDelay = 0;
             hero.combat.feedbackRemaining = 0;
         }
-        heroes.update(delta, false);
+        heroes.update(delta, allowManualMovement);
         return;
     }
     do {

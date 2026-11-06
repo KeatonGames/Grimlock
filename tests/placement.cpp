@@ -56,9 +56,15 @@ void checkPersistence(const std::filesystem::path& path) {
     zone.position = {1.37, 0, -2.19};
     zone.dimensions = {4, 3};
     zone.yaw = glm::radians(25.0);
+    zone.constructionOffset = {0.25, 0, -0.3};
+    zone.constructionYaw = glm::radians(40.0);
     zone.object = PlacementSystem::createZone(scene, zone);
     placement.synchronize(&scene);
+    tower = zone.snap(tower);
     require(placement.check(tower).empty(), "authored zone not recognized");
+    auto freePlacement = tower;
+    freePlacement.position.x += 0.1;
+    require(!placement.check(freePlacement).empty(), "free placement inside a zone was accepted");
     zone.name = "Edited zone";
     zone.dimensions = {5, 4};
     PlacementSystem::editZone(scene, zone);
@@ -76,7 +82,9 @@ void checkPersistence(const std::filesystem::path& path) {
     require(placement.zones().size() == 1 && placement.zones()[0].name == zone.name &&
                 glm::length(placement.zones()[0].position - zone.position) < 1e-5 &&
                 glm::length(placement.zones()[0].dimensions - zone.dimensions) < 1e-5 &&
-                std::abs(placement.zones()[0].yaw - zone.yaw) < 1e-5,
+                std::abs(placement.zones()[0].yaw - zone.yaw) < 1e-5 &&
+                glm::length(placement.zones()[0].constructionOffset - zone.constructionOffset) < 1e-5 &&
+                std::abs(placement.zones()[0].constructionYaw - zone.constructionYaw) < 1e-5,
             "zone name, transform or dimensions did not round trip");
     require(loaded->object(id).role == "grimlock.tower:wide" && loaded->object(id).local.scale == transform.scale &&
                 glm::length(loaded->object(id).local.rotation - transform.rotation) < 1e-6,
@@ -95,6 +103,8 @@ void checkPersistence(const std::filesystem::path& path) {
 
     Scene adjacent;
     zone.position = {-1, 0, 0};
+    zone.constructionOffset = {0, 0, 0};
+    zone.constructionYaw = 0;
     zone.yaw = 0;
     zone.dimensions = {2, 2};
     (void)PlacementSystem::createZone(adjacent, zone);
@@ -102,7 +112,42 @@ void checkPersistence(const std::filesystem::path& path) {
     (void)PlacementSystem::createZone(adjacent, zone);
     placement.synchronize(&adjacent);
     tower.position = {0, 0.75, 0};
+    tower.buildZone = 0;
     require(!placement.check(tower).empty(), "footprint spanning two independent zones accepted");
+}
+
+void checkOccupancy() {
+    Scene scene;
+    BuildZone zone;
+    zone.position = {3, 2, 4};
+    zone.yaw = 0.4;
+    zone.object = PlacementSystem::createZone(scene, zone);
+    PlacementSystem placement;
+    placement.synchronize(&scene);
+    auto tower = zone.snap(Tower{});
+    require(placement.check(tower).empty(), "elevated fixed point rejected");
+    ecs::Registry registry;
+    tower.entity = registry.create();
+    std::vector<Tower> live{tower};
+    placement.synchronize(&scene, live);
+    require(placement.zones()[0].occupants == std::vector<ecs::Entity>{tower.entity} &&
+                !placement.check(zone.snap(Tower{})).empty(),
+            "occupied zone allowed another tower");
+    auto legacy = tower;
+    legacy.buildZone = 0;
+    legacy.entity = registry.create();
+    legacy.position.x += 0.8;
+    live.push_back(legacy);
+    placement.synchronize(&scene, live);
+    require(placement.zones()[0].occupants.size() == 2 && !placement.error().empty(),
+            "legacy towers were discarded or migration was not reported");
+    live.erase(live.begin());
+    placement.synchronize(&scene, live);
+    require(!placement.check(tower).empty(), "removing one legacy tower freed a still-occupied zone");
+    placement.synchronize(&scene);
+    require(placement.check(tower).empty(), "removing the last tower did not free its zone");
+    placement.synchronize(nullptr);
+    require(placement.zones().empty(), "leaving a scene retained occupancy");
 }
 } // namespace
 
@@ -115,6 +160,7 @@ int main(int argc, char** argv) {
                     definitions[1].instance().halfExtent != definitions[1].instance().visualScale,
                 "tower types/independent footprint configuration incorrect");
         checkContainment();
+        checkOccupancy();
         checkPersistence(argv[2]);
         std::cout << "PASS rotated zones, complete footprints, elevation, editing, persistence, disabled/deleted zones "
                      "and types.\n";

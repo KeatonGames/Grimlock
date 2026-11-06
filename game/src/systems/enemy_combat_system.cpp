@@ -125,9 +125,10 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         if (!target && state.searchDelay <= 0) {
             candidates_.clear();
             const auto consider = [&](const Target& candidate, std::size_t index) {
-                const int rank = priority(stats, candidate.reference.kind);
+                const int rank = stats.firstDetected ? 1 : priority(stats, candidate.reference.kind);
                 const double gap = meleeGap(enemy.position, enemy.radius, candidate.body);
                 if (hostile(team, candidate.team) && rank > 0 && gap <= stats.aggressionRange && relevant(candidate) &&
+                    (!stats.firstDetected || clearStrike(enemy, candidate.body, candidate.object)) &&
                     !(state.rejected == candidate.reference &&
                       (state.rejectDelay > 0 ||
                        (state.pursuitExhausted &&
@@ -143,15 +144,17 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                 meleeContact(mesh, enemy.position, enemy.radius, goal.body, stats.range)) {
                 candidates_.emplace_back(0, targets_.size());
             }
-            std::sort(candidates_.begin(), candidates_.end(), [&](const auto& a, const auto& b) {
-                if (a.first != b.first) {
-                    return a.first < b.first;
-                }
-                const auto& first = a.second == targets_.size() ? goal : targets_[a.second];
-                const auto& second = b.second == targets_.size() ? goal : targets_[b.second];
-                return meleeGap(enemy.position, enemy.radius, first.body) <
-                       meleeGap(enemy.position, enemy.radius, second.body);
-            });
+            if (!stats.firstDetected) {
+                std::sort(candidates_.begin(), candidates_.end(), [&](const auto& a, const auto& b) {
+                    if (a.first != b.first) {
+                        return a.first < b.first;
+                    }
+                    const auto& first = a.second == targets_.size() ? goal : targets_[a.second];
+                    const auto& second = b.second == targets_.size() ? goal : targets_[b.second];
+                    return meleeGap(enemy.position, enemy.radius, first.body) <
+                           meleeGap(enemy.position, enemy.radius, second.body);
+                });
+            }
             state.searchDelay = 0.4;
             const auto attempts = std::min<std::size_t>(4, candidates_.size());
             for (std::size_t attempt = 0; attempt < attempts; ++attempt) {

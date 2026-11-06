@@ -50,20 +50,14 @@ public:
     void cancelPlacement() noexcept;
     void updatePlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
     void selectObject(Engine& engine, const std::optional<Ray>& ray);
-    void beginHeroPlacement(std::size_t type = 0);
-    void updateHeroPlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm);
     [[nodiscard]] bool commandHero(const Ray& ray);
     [[nodiscard]] bool activateHeroAbility(HeroAbility ability);
     void cancelHeroOrder();
-    void clearSelection();
+    void clearSelection(bool cancelOrder = true);
     [[nodiscard]] const Hero* selectedHero() const noexcept;
 
     [[nodiscard]] HeroSystem* heroes() noexcept {
         return heroes_.get();
-    }
-
-    [[nodiscard]] bool deployingHero() const noexcept {
-        return deployingHero_;
     }
 
     [[nodiscard]] const std::string& heroError() const noexcept {
@@ -97,14 +91,13 @@ public:
     }
 
 private:
+    void spawnHeroesNearObjective();
     NavigationSession navigation_;
     LevelSession level_;
     std::unique_ptr<HeroSystem> heroes_;
     HeroCombatSystem heroCombat_;
     Engine* engine_ = nullptr;
-    std::optional<HeroId> selectedHero_, deployingId_;
-    bool deployingHero_ = false;
-    std::size_t deployingType_ = 0;
+    std::optional<HeroId> selectedHero_;
     std::string heroError_;
     std::filesystem::path levelPath_;
     std::string selectedTower_ = "basic", placementError_, rejectedError_;

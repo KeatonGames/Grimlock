@@ -8,6 +8,8 @@ add_library(GameLogic STATIC
     src/entities/level_definition.cpp
     src/entities/tower_definition.cpp
     src/systems/placement_system.cpp
+    src/systems/build_zone_markers.cpp
+    src/ui/hero_route_visual.cpp
     src/systems/wave_system.cpp
     src/systems/level_session.cpp
     src/systems/economy_system.cpp

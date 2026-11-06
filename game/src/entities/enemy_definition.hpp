@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace grimlock::game {
@@ -13,6 +15,7 @@ struct EnemyCombatDefinition {
     int heroPriority = 3, towerPriority = 2, objectivePriority = 1;
     std::string attackAnimation = "attack";
     bool objectiveFirst = false;
+    bool firstDetected = false;
     double obstructionRange = 0.8, threatMemory = 2;
     float heroDamageModifier = 1, towerDamageModifier = 1;
 };
@@ -21,6 +24,12 @@ using EnemyTypeId = std::size_t;
 
 struct EnemyDefinition {
     std::string name = "Chicken";
+    std::vector<std::string> aliases;
+
+    [[nodiscard]] bool matchesName(std::string_view requested) const {
+        return name == requested || std::find(aliases.begin(), aliases.end(), requested) != aliases.end();
+    }
+
     std::filesystem::path model = "enemies/animals/chicken.glb";
     double speed = 1.5;
     double radius = 0.195;
@@ -33,6 +42,7 @@ struct EnemyDefinition {
     float visualHeight = 0.36F; // Independent of the physical radius and headroom.
     float maximumHealth = 100;
     std::string movementAnimation = "walk";
+    std::string idleAnimation, runAnimation, deathAnimation;
     float animationSpeed = 1;
     double forwardYaw = 0;
     bool despawnOnArrival = true;

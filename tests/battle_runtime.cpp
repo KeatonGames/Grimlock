@@ -242,7 +242,7 @@ void archetypes(Engine& engine) {
     EnemyCombatSystem combat;
     const auto type = [&](const std::string& name) {
         EnemyTypeId result = 0;
-        while (result < enemies.typeCount() && enemies.definition(result).name != name) {
+        while (result < enemies.typeCount() && !enemies.definition(result).matchesName(name)) {
             ++result;
         }
         require(result < enemies.typeCount(), "missing archetype");
@@ -253,22 +253,16 @@ void archetypes(Engine& engine) {
     };
     const auto grunt = spawn(engine, navigation, {-2, 0}, type("Grunt"));
     prepare(0.4);
-    require(enemies.find(grunt)->combat.target.kind == DefensiveTargetKind::none &&
-                enemies.find(grunt)->destination == std::optional{glm::dvec2{12, 0}},
-            "grunt abandoned objective for a non-obstructing defender");
+    const DefensiveTarget firstDetected{DefensiveTargetKind::tower, navigation.towers().entityForObject(towerId)};
+    require(enemies.find(grunt)->combat.target == firstDetected, "Goblin did not acquire the first visible defender");
     HeroCombatSystem heroCombat;
     require(heroCombat.attack(heroes, enemies, hero, grunt), "hero interception command failed");
     prepare(0.4);
-    require(enemies.find(grunt)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, hero},
-            "grunt ignored an engaging nearby hero");
-    require(heroes.command(hero, {5, 0, -2}), "hero disengagement command failed");
-    prepare(0.4);
-    require(enemies.find(grunt)->combat.target.kind == DefensiveTargetKind::none,
-            "grunt did not resume objective after threat disappeared");
+    require(enemies.find(grunt)->combat.target == firstDetected, "Goblin switched targets when attacked by a hero");
     (void)heroes.deploy({-1.3, 0, 0}, hero);
     prepare(2.1);
-    require(enemies.find(grunt)->combat.target == DefensiveTarget{DefensiveTargetKind::hero, hero},
-            "grunt ignored defender directly obstructing its advance");
+    require(enemies.find(grunt)->combat.target == firstDetected,
+            "Goblin switched to a closer hero while its target remained valid");
     enemies.clear();
 
     (void)heroes.deploy({0, 0, -2}, hero);
@@ -372,7 +366,7 @@ void archetypeWaves(Engine& engine) {
             runtime.update(engine, 0.1);
             for (const auto& enemy : runtime.navigation().enemies()->enemies()) {
                 const auto& name = runtime.navigation().enemies()->definition(enemy.type).name;
-                grunt = grunt || name == "Grunt";
+                grunt = grunt || name == "Goblin";
                 siege = siege || name == "Siege";
                 hunter = hunter || name == "Hunter";
                 elevated = elevated || enemy.position.y > 1.5;

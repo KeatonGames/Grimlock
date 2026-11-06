@@ -14,6 +14,36 @@ std::filesystem::path assetRootForLevel(const std::filesystem::path& level) {
                                                                              : std::filesystem::path{"assets"};
 }
 
+void LevelRuntime::spawnHeroesNearObjective() {
+    const auto& levelDefinition = level_.waves()->definition();
+    const glm::dvec3 objective{levelDefinition.objectivePosition.x,
+                               levelDefinition.objectiveHeight,
+                               levelDefinition.objectivePosition.y};
+    for (std::size_t type = 0; type < heroes_->typeCount(); ++type) {
+        const auto& mesh = heroes_->navigation(type);
+        const auto anchor = mesh.project(objective, 2);
+        bool spawned = false;
+        NavigationPath path;
+        for (double radius = 1.2; anchor && radius <= 6 && !spawned; radius += 0.6) {
+            for (int step = 0; step < 24 && !spawned; ++step) {
+                const auto angle = 2 * std::acos(-1.0) *
+                                   (static_cast<double>(type) / heroes_->typeCount() + static_cast<double>(step) / 24);
+                const auto desired = objective + glm::dvec3{std::cos(angle) * radius, 0, std::sin(angle) * radius};
+                const auto point = mesh.project(desired, 0.4);
+                if (point && std::abs(point->position.y - objective.y) < 0.6 &&
+                    heroes_->validPosition(point->position, {}, type) &&
+                    mesh.findPath(anchor->position, point->position, path)) {
+                    (void)heroes_->deploy(point->position, {}, type);
+                    spawned = true;
+                }
+            }
+        }
+        if (!spawned) {
+            throw std::runtime_error("No clear ground near the objective for " + heroes_->definition(type).name);
+        }
+    }
+}
+
 void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     const auto path = level.is_absolute() ? level : engine.assetRoot().parent_path() / level;
     auto definition = loadLevelDefinition(path);
@@ -26,9 +56,7 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
         heroes_ = std::make_unique<HeroSystem>(engine);
         heroes_->shareCombatGeometry(navigation_.combatGeometry());
         heroes_->synchronize(navigation_.towers());
-        for (const auto& position : level_.waves()->definition().heroSpawns) {
-            (void)heroes_->deploy(position);
-        }
+        spawnHeroesNearObjective();
         levelPath_ = path;
         if (progress_) {
             progress_->startAttempt(level_.waves()->definition().id);
@@ -94,7 +122,8 @@ void LevelRuntime::update(Engine& engine, double delta) {
             heroCombat_.update(*heroes_,
                                *navigation_.enemies(),
                                step,
-                               level_.waves() && level_.waves()->phase() == LevelPhase::battle);
+                               level_.waves() && level_.waves()->phase() == LevelPhase::battle,
+                               level_.waves() && level_.waves()->phase() == LevelPhase::preparation);
         }
         delta -= step;
         const auto current = level_.waves()->phase();
@@ -171,60 +200,12 @@ const Hero* LevelRuntime::selectedHero() const noexcept {
     return heroes_ && selectedHero_ ? heroes_->find(*selectedHero_) : nullptr;
 }
 
-void LevelRuntime::beginHeroPlacement(std::size_t type) {
-    if (!heroes_ || !level_.waves() || level_.waves()->phase() != LevelPhase::preparation) {
-        throw std::invalid_argument("Deploy heroes during preparation.");
-    }
-    (void)heroes_->definition(type);
-    std::optional<HeroId> previous;
-    if (const auto* selected = selectedHero(); selected && selected->type == type) {
-        previous = selected->id;
-    } else {
-        for (const auto& hero : heroes_->heroes()) {
-            if (hero.type == type && hero.health > 0) {
-                previous = hero.id;
-                break;
-            }
-        }
-    }
-    bool hasType = false;
-    for (const auto& hero : heroes_->heroes()) {
-        hasType = hasType || hero.type == type;
-    }
-    if ((previous && heroes_->find(*previous)->health <= 0) || (!previous && hasType)) {
-        heroError_ = "A dead hero cannot be redeployed. Restart the level to restore heroes.";
-        return;
-    }
-    cancelPlacement();
-    inspectedTower_.reset();
-    deployingId_ = previous;
-    deployingType_ = type;
-    deployingHero_ = true;
-    heroError_.clear();
-}
-
-void LevelRuntime::updateHeroPlacement(Engine& engine, const std::optional<Ray>& ray, bool confirm) {
-    if (!deployingHero_ || !heroes_) {
-        return;
-    }
-    heroes_->synchronize(navigation_.towers());
-    const auto point = ray ? heroes_->ground(*ray) : std::nullopt;
-    const bool valid = point && heroes_->validPosition(*point, deployingId_, deployingType_);
-    heroError_ = valid ? "" : "Deploy on clear navigable ground.";
-    heroes_->preview(point, valid, deployingType_);
-    if (valid && confirm) {
-        selectedHero_ = heroes_->deploy(*point, deployingId_, deployingType_);
-        engine.scene()->selectObject(heroes_->find(*selectedHero_)->object);
-        deployingHero_ = false;
-        heroes_->preview({});
-    }
-}
-
 bool LevelRuntime::commandHero(const Ray& ray) {
-    if (!selectedHero() || !level_.waves() || level_.waves()->phase() != LevelPhase::battle) {
+    if (paused_ || !selectedHero() || !level_.waves() ||
+        (level_.waves()->phase() != LevelPhase::battle && level_.waves()->phase() != LevelPhase::preparation)) {
         return false;
     }
-    if (engine_ && navigation_.enemies()) {
+    if (engine_ && navigation_.enemies() && level_.waves()->phase() == LevelPhase::battle) {
         auto visibleRay = ray;
         if (const auto ground = heroes_->ground(ray)) {
             visibleRay.maximum = std::min(ray.maximum, glm::length(*ground - ray.origin));
@@ -255,8 +236,9 @@ void LevelRuntime::cancelHeroOrder() {
     }
 }
 
-void LevelRuntime::clearSelection() {
-    if (const auto* hero = selectedHero(); hero && (hero->combat.playerMoving || hero->combat.explicitTarget)) {
+void LevelRuntime::clearSelection(bool cancelOrder) {
+    if (const auto* hero = selectedHero();
+        cancelOrder && hero && (hero->combat.playerMoving || hero->combat.explicitTarget)) {
         cancelHeroOrder();
     }
     selectedHero_.reset();
@@ -272,8 +254,6 @@ const Tower* LevelRuntime::inspectedTower() const noexcept {
 }
 
 void LevelRuntime::cancelPlacement() noexcept {
-    deployingHero_ = false;
-    deployingId_.reset();
     if (heroes_) {
         heroes_->preview({});
     }

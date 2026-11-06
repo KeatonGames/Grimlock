@@ -13,24 +13,24 @@
   ],
   "waves": [
     {"name": "Scouts on the trail", "gold_reward": 30, "groups": [
-      {"enemy": "Chicken", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4}
+      {"enemy": "Goblin", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4}
     ]},
     {"name": "Beneath the roots", "gold_reward": 40, "groups": [
-      {"enemy": "Chicken", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
-      {"enemy": "Black Rat", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3}
+      {"enemy": "Goblin", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Goblin", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3}
     ]},
     {"name": "The woodland raiders", "gold_reward": 50, "groups": [
-      {"enemy": "Grunt", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
-      {"enemy": "Dog", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3},
+      {"enemy": "Goblin", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Goblin", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3},
       {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 13, "batch_size": 1, "interval": 5}
     ]},
     {"name": "Hold the ascent", "gold_reward": 70, "groups": [
-      {"enemy": "Grunt", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Goblin", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
       {"enemy": "Hunter", "count": 4, "spawn": "Woodland entrance", "start": 5, "batch_size": 2, "interval": 4},
       {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 12, "batch_size": 1, "interval": 5}
     ]},
     {"name": "The Iron Stag", "gold_reward": 0, "groups": [
-      {"enemy": "Grunt", "count": 8, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Goblin", "count": 8, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
       {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 9, "batch_size": 1, "interval": 5},
       {"enemy": "Iron Stag", "count": 1, "spawn": "Iron Stag entrance", "start": 19, "batch_size": 1, "interval": 1}
     ]}

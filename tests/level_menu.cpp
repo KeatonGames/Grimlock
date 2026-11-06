@@ -60,7 +60,18 @@ void control(Engine& engine,
              const std::filesystem::path& scope = {}) {
     if (std::string_view{panelName} == "Game Status" &&
         (std::string_view{label} == "Restart Level" || std::string_view{label} == "Choose Level")) {
-        control(engine, runtime, window, "Game Status", "Pause");
+        for (int step = 0; step < 3 && !runtime.paused(); ++step) {
+            SDL_Event event{};
+            event.type = SDL_EVENT_KEY_DOWN;
+            event.key.windowID = window;
+            event.key.key = SDLK_ESCAPE;
+            event.key.scancode = SDL_SCANCODE_ESCAPE;
+            require(SDL_PushEvent(&event), SDL_GetError());
+            tick(engine, runtime, 1);
+            event.type = SDL_EVENT_KEY_UP;
+            require(SDL_PushEvent(&event), SDL_GetError());
+            tick(engine, runtime, 1);
+        }
         control(engine, runtime, window, "Pause Menu", label);
         return;
     }
@@ -164,9 +175,8 @@ int main() {
         control(engine, runtime, window, "Level Selection", first.name.c_str(), a);
         const auto authored = contents(a);
         control(engine, runtime, window, "Level Selection", "Play");
-        require(runtime.level().economy().gold() == 123 &&
-                    runtime.heroes()->heroes().size() == first.heroSpawns.size() && engine.scene()->navigationGrid() &&
-                    !runtime.navigation().placement().zones().empty(),
+        require(runtime.level().economy().gold() == 123 && runtime.heroes()->heroes().size() == 3 &&
+                    engine.scene()->navigationGrid() && !runtime.navigation().placement().zones().empty(),
                 "selected level was incompletely initialized");
         runtime.update(engine, 1.25);
         require(std::abs(runtime.completionSeconds() - 1.25) < 1e-8 && progress.find(first.id)->attempts == 1,

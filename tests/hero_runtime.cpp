@@ -419,42 +419,36 @@ void heroTypeChecks(Engine& engine) {
 void heroDeploymentChecks(Engine& engine) {
     LevelRuntime runtime;
     runtime.load(engine, "assets/levels/first_watch.json");
-    const auto originalCount = runtime.heroes()->heroes().size();
+    auto& heroes = *runtime.heroes();
     const auto gold = runtime.level().economy().gold();
-    for (std::size_t type = 1; type < runtime.heroes()->typeCount(); ++type) {
-        runtime.beginHeroPlacement(type);
-        bool placed = false;
-        for (int x = -8; x <= 8 && !placed; ++x) {
-            for (int z = -5; z <= 5 && !placed; ++z) {
-                const Ray ray{{x, 15, z}, {0, -1, 0}, 0, 30};
-                const auto point = runtime.heroes()->ground(ray);
-                if (point && runtime.heroes()->validPosition(*point, {}, type)) {
-                    runtime.updateHeroPlacement(engine, ray, true);
-                    placed = !runtime.deployingHero();
-                }
-            }
-        }
-        require(placed && runtime.selectedHero() && runtime.selectedHero()->type == type &&
-                    runtime.level().economy().gold() == gold,
-                "typed hero placement failed or changed existing economy rules");
-        const auto id = runtime.selectedHero()->id;
-        runtime.beginHeroPlacement(type);
-        const auto position = runtime.selectedHero()->position;
-        runtime.updateHeroPlacement(engine, Ray{position + glm::dvec3{0, 10, 0}, {0, -1, 0}, 0, 20}, true);
-        require(runtime.selectedHero()->id == id && runtime.heroes()->heroes().size() == originalCount + type,
-                "typed redeployment duplicated or replaced the hero");
+    const auto& definition = runtime.level().waves()->definition();
+    const glm::dvec3 objective{definition.objectivePosition.x,
+                               definition.objectiveHeight,
+                               definition.objectivePosition.y};
+    require(heroes.heroes().size() == 3, "Full party did not spawn automatically");
+    for (std::size_t type = 0; type < 3; ++type) {
+        const auto& hero = heroes.heroes()[type];
+        require(hero.type == type && heroes.navigation(type).contains(hero.position) &&
+                    glm::length(hero.position - objective) <= 6.5,
+                "Hero spawned outside clear ground near the objective");
     }
-    runtime.startWave();
-    bool rejected = false;
-    try {
-        runtime.beginHeroPlacement(1);
-    } catch (const std::invalid_argument&) {
-        rejected = true;
-    }
-    require(rejected, "typed hero deployment bypassed preparation restriction");
+    const auto first = heroes.heroes().front().id;
+    const auto initial = heroes.find(first)->position;
+    const auto second = heroes.heroes()[1].position;
+    require(runtime.selectHero(first), "Automatic hero was not selectable");
+    require(runtime.commandHero({{-3, 15, -1}, {0, -1, 0}, 0, 30}), "Preparation move rejected");
+    runtime.update(engine, 0.5);
+    require(glm::length(heroes.find(first)->position - initial) > 0.1 && heroes.heroes()[1].position == second,
+            "Preparation move failed or moved the other heroes");
+    runtime.update(engine, 8);
+    require(!heroes.find(first)->destination &&
+                glm::length(heroes.find(first)->position - glm::dvec3{-3, 0, -1}) < 0.15 &&
+                runtime.level().economy().gold() == gold,
+            "Hero failed to complete its free preparation move");
     runtime.restart(engine);
-    require(runtime.heroes()->heroes().size() == originalCount && runtime.level().economy().gold() == gold,
-            "restart retained runtime hero types or changed gold");
+    require(runtime.heroes()->heroes().size() == 3 && !runtime.selectedHero() &&
+                runtime.level().economy().gold() == gold,
+            "Restart did not restore the full party");
     runtime.unload(engine);
 }
 } // namespace

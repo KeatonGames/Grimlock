@@ -93,6 +93,7 @@ public:
     void setTransform(InstanceId instance, const Transform& transform);
     [[nodiscard]] glm::mat4 transform(InstanceId instance) const;
     void setTint(InstanceId instance, const glm::vec4& color);
+    void setDissolve(InstanceId instance, float amount);
     void setMaterialOverride(InstanceId instance, std::optional<std::size_t> material);
 
     // Playback controls are CPU-only; update() advances every instance automatically.

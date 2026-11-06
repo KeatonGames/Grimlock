@@ -13,8 +13,9 @@ enum class PlacementMode {
 class PlacementSystem final {
 public:
     static constexpr const char* zoneRole = "grimlock.build_zone";
-    void synchronize(const Scene* scene);
+    void synchronize(const Scene* scene, std::span<const Tower> towers = {});
     [[nodiscard]] std::string check(const Tower& tower) const;
+    [[nodiscard]] const BuildZone* zoneAt(glm::dvec3 foot) const;
 
     [[nodiscard]] std::span<const BuildZone> zones() const noexcept {
         return zones_;
@@ -26,6 +27,7 @@ public:
 
     [[nodiscard]] static ObjectId createZone(Scene& scene, const BuildZone& zone);
     static void editZone(Scene& scene, const BuildZone& zone);
+    [[nodiscard]] static ObjectId ensureConstructionPoint(Scene& scene, const BuildZone& zone);
 
 private:
     std::vector<BuildZone> zones_, scratch_;

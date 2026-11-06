@@ -33,7 +33,7 @@ void NavigationSession::synchronize(Engine& engine) {
     }
     towers_.synchronize(engine);
     combatGeometry_.synchronize(engine, towers_.towers());
-    placement_.synchronize(engine.scene());
+    placement_.synchronize(engine.scene(), towers_.towers());
     levelGeometry_.synchronize(engine);
     const auto* scene = engine.scene();
     const auto* grid = scene && !levelGeometry_.imported() ? scene->navigationGrid() : nullptr;
@@ -200,14 +200,16 @@ void NavigationSession::shutdown() noexcept {
     ++navigationRevision_;
 }
 
-std::optional<Tower> NavigationSession::towerAt(const Ray& ray, const std::string& type, double yaw) const {
+std::optional<Tower> NavigationSession::towerAt(const Ray& ray, const std::string& type) const {
     const auto hit = levelGeometry_.intersect(ray);
     if (!hit) {
         return {};
     }
     Tower tower = towers_.definition(type).instance();
-    tower.rotation = glm::angleAxis(yaw, glm::dvec3{0, 1, 0});
     tower.position = *hit + glm::dvec3{0, tower.halfExtent.y, 0};
+    if (const auto* zone = placement_.zoneAt(*hit)) {
+        tower = zone->snap(std::move(tower));
+    }
     return tower;
 }
 
@@ -357,7 +359,12 @@ ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower, Place
     }
     auto prepared = std::move(*candidate_);
     candidate_.reset();
-    const auto id = towers_.create(engine, tower);
+    const auto zone = std::find_if(placement_.zones().begin(), placement_.zones().end(), [&](const BuildZone& item) {
+        return item.contains(tower) && (!tower.buildZone || item.object == tower.buildZone);
+    });
+    const auto point = PlacementSystem::ensureConstructionPoint(*engine.scene(), *zone);
+    const auto id = towers_.create(engine, tower, point);
+    placement_.synchronize(engine.scene(), towers_.towers());
     for (auto& profile : prepared.profiles) {
         navigationFor(profile.type).replaceWith(std::move(*profile.mesh));
     }

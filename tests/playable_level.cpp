@@ -34,7 +34,9 @@ Result play(Engine& engine, Strategy strategy) {
     auto& navigation = runtime.navigation();
     const auto build = [&](const char* type, glm::dvec2 position) {
         auto tower = navigation.towers().definition(type).instance();
-        tower.position = {position.x, tower.halfExtent.y, position.y};
+        const auto* zone = navigation.placement().zoneAt({position.x, 0, position.y});
+        require(zone, "playable plan has no build zone");
+        tower = zone->snap(tower);
         require(runtime.heroes()->towerError(tower).empty(), "playable plan overlaps a hero");
         return session.buildTower(engine, navigation, tower);
     };
@@ -47,14 +49,14 @@ Result play(Engine& engine, Strategy strategy) {
         (void)runtime.heroes()->deploy({-0.3, 0, 1.5}, hero);
     } else if (strategy == Strategy::small) {
         first = build("basic", {-3.3, 0});
-        second = build("basic", {0.1, -2.5});
-        third = build("basic", {0.1, 2.5});
+        second = build("basic", {0.1, 0});
+        third = build("basic", {5.3, 0});
         runtime.heroes()->synchronize(navigation.towers());
-        (void)runtime.heroes()->deploy({-0.3, 0, 0}, hero);
+        (void)runtime.heroes()->deploy({-0.3, 0, 1.5}, hero);
     } else if (strategy == Strategy::rear) {
-        (void)runtime.heroes()->deploy({4, 0, 0}, hero);
-        first = build("basic", {4, -2.5});
-        second = build("wide", {4, 2.5});
+        (void)runtime.heroes()->deploy({4, 0, -1.5}, hero);
+        first = build("basic", {3.7, 0});
+        second = build("wide", {5.3, 0});
     }
     const auto upgrade = [&](ObjectId tower) {
         if (navigation.towers().contains(tower) && session.upgradeError(navigation, tower).empty()) {
@@ -72,12 +74,12 @@ Result play(Engine& engine, Strategy strategy) {
                 upgrade(first);
                 upgrade(second);
                 upgrade(third);
-                // Solid walls remove the old cross-map shots; replace lost central defenses on the open exits.
+                // Rebuild destroyed defenses at their original, now available construction points.
                 if (wave >= 3 && !navigation.towers().contains(second) && session.economy().gold() >= 30) {
-                    second = build("basic", {5, -2.5});
+                    second = build("basic", {0.1, 0});
                 }
                 if (wave >= 3 && !navigation.towers().contains(third) && session.economy().gold() >= 30) {
-                    third = build("basic", {5, 2.5});
+                    third = build("basic", {5.3, 0});
                 }
             } else if (strategy == Strategy::mixed) {
                 if (wave == 1) {
@@ -95,7 +97,7 @@ Result play(Engine& engine, Strategy strategy) {
                 upgrade(second);
                 upgrade(first);
                 if (!navigation.towers().contains(first) && session.economy().gold() >= 30) {
-                    first = build("basic", {4, -2.5});
+                    first = build("basic", {3.7, 0});
                     upgrade(first);
                 }
             }

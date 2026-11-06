@@ -42,7 +42,7 @@ public:
     [[nodiscard]] std::optional<ObjectId> pick(const Ray& ray) const;
     void synchronize(Engine& engine);
     void clear() noexcept;
-    [[nodiscard]] ObjectId create(Engine& engine, const Tower& tower);
+    [[nodiscard]] ObjectId create(Engine& engine, const Tower& tower, ObjectId constructionPoint = 0);
     [[nodiscard]] bool remove(Engine& engine, ObjectId object);
     [[nodiscard]] bool contains(ObjectId object) const noexcept;
     [[nodiscard]] const TowerProgress& progress(ObjectId object) const;

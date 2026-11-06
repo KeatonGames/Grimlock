@@ -20,6 +20,17 @@ bool validSpeed(double speed) {
     return std::isfinite(speed) && speed >= 0 && speed <= 20;
 }
 
+std::optional<std::size_t> namedClip(const std::vector<std::string>& names, const std::string& requested) {
+    if (requested.empty()) {
+        return {};
+    }
+    const auto found = std::find(names.begin(), names.end(), requested);
+    if (found == names.end()) {
+        throw std::invalid_argument("Enemy model is missing configured clip: " + requested);
+    }
+    return static_cast<std::size_t>(found - names.begin());
+}
+
 std::optional<std::size_t> deathClip(const std::vector<std::string>& names) {
     for (std::size_t index = 0; index < names.size(); ++index) {
         auto name = names[index];
@@ -77,8 +88,13 @@ void EnemySystem::attackAnimation(Enemy& enemy, bool attacking) {
     auto& playback = engine_.animation(*enemy.instance);
     const auto& animal = types_[enemy.type];
     if (attacking && animal.attackClip) {
+        enemy.locomotionClip.reset();
         playback.setSpeed(1);
         playback.play(*animal.attackClip, false);
+    } else if (animal.idleClip) {
+        playback.setSpeed(animal.definition.animationSpeed);
+        playback.play(*animal.idleClip);
+        enemy.locomotionClip = animal.idleClip;
     } else {
         if (animal.movementClip) {
             playback.setSpeed(animal.definition.animationSpeed);
@@ -104,7 +120,10 @@ void EnemySystem::loadModel(EnemyTypeId type) {
         throw std::runtime_error("Enemy model needs finite, nonempty framing bounds.");
     }
     animal.movementClip = movementClip(info.animationNames, definition.movementAnimation);
-    animal.deathClip = deathClip(info.animationNames);
+    animal.idleClip = namedClip(info.animationNames, definition.idleAnimation);
+    animal.runClip = namedClip(info.animationNames, definition.runAnimation);
+    animal.deathClip = definition.deathAnimation.empty() ? deathClip(info.animationNames)
+                                                         : namedClip(info.animationNames, definition.deathAnimation);
     for (std::size_t i = 0; i < info.animationNames.size(); ++i) {
         auto name = info.animationNames[i];
         std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
@@ -117,6 +136,10 @@ void EnemySystem::loadModel(EnemyTypeId type) {
             animal.attackClip = i;
             break;
         }
+    }
+    if (animal.idleClip) {
+        animal.movementClip = namedClip(info.animationNames, definition.movementAnimation);
+        animal.attackClip = namedClip(info.animationNames, definition.combat.attackAnimation);
     }
     animal.info = std::move(info);
     animal.model = model;
@@ -209,7 +232,10 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             spawnNeighbors_.insert(enemies_.size() - 1, position);
             auto& playback = engine_.animation(*enemies_.back().instance);
             playback.setSpeed(definition.animationSpeed);
-            if (animal.movementClip) {
+            if (animal.idleClip) {
+                playback.play(*animal.idleClip);
+                enemies_.back().locomotionClip = animal.idleClip;
+            } else if (animal.movementClip) {
                 playback.play(*animal.movementClip);
                 const auto& clip = playback.model().animations[*animal.movementClip];
                 playback.seek(clip.start + (clip.end - clip.start) *
@@ -234,7 +260,18 @@ void EnemySystem::updateModel(Enemy& enemy) {
         glm::translate(glm::mat4{1}, glm::vec3{-center.x, -animal.info.minimum.y, -center.z});
     engine_.setTransform(*enemy.instance, matrix);
     const bool moving = enemy.movement == MovementStatus::moving;
-    if (!enemy.combat.swinging && animal.movementClip && moving != enemy.animationMoving) {
+    if (!enemy.combat.swinging && animal.idleClip) {
+        const auto selected =
+            moving ? (animal.runClip && glm::length(enemy.velocity) > enemy.speed * 0.7 ? animal.runClip
+                                                                                        : animal.movementClip)
+                   : animal.idleClip;
+        if (selected && selected != enemy.locomotionClip) {
+            auto& playback = engine_.animation(*enemy.instance);
+            playback.setSpeed(definition.animationSpeed);
+            playback.play(*selected);
+            enemy.locomotionClip = selected;
+        }
+    } else if (!enemy.combat.swinging && animal.movementClip && moving != enemy.animationMoving) {
         auto& playback = engine_.animation(*enemy.instance);
         if (moving) {
             playback.resume();
@@ -293,6 +330,21 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     enemy.active = enemy.alive = false;
     enemy.velocity = enemy.desiredVelocity = {0, 0};
     enemy.path.valid = false;
+    if (!coinModel_) {
+        coinModel_ = engine_.loadModel(engine_.assetRoot() / "environment/dungeon/coin.glb");
+    }
+    const auto coin = engine_.createInstance(*coinModel_, true);
+    try {
+        coins_.push_back({coin, enemy.position + glm::dvec3{0, definition(enemy.type).visualHeight * 0.55, 0}});
+    } catch (...) {
+        engine_.removeInstance(coin);
+        throw;
+    }
+    Transform coinTransform;
+    coinTransform.position = coins_.back().origin;
+    coinTransform.scale = glm::dvec3{0.7};
+    engine_.setTransform(coin, coinTransform);
+    engine_.setTint(*enemy.instance, glm::vec4{1});
     auto& playback = engine_.animation(*enemy.instance);
     double duration = 0.25;
     if (const auto clip = types_[enemy.type].deathClip) {
@@ -304,7 +356,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
         playback.pause();
     }
     // The render-only effect retains the instance; dead enemies leave navigation and targeting immediately.
-    deaths_.push_back({*enemy.instance, duration});
+    deaths_.push_back({*enemy.instance, duration, !types_[enemy.type].definition.deathAnimation.empty()});
     enemy.instance.reset();
     ++metrics_.defeated;
     removeAt(index);
@@ -326,13 +378,37 @@ void EnemySystem::updateEffects(double delta) {
     for (std::size_t index = 0; index < deaths_.size();) {
         auto& death = deaths_[index];
         death.remaining -= delta;
-        if (death.remaining > 0) {
+        if (death.remaining > 0 || (death.finishAnimation && engine_.animation(death.instance).running())) {
+            ++index;
+            continue;
+        }
+        death.dissolveTime += delta;
+        if (death.dissolveTime < 0.65) {
+            engine_.setDissolve(death.instance, static_cast<float>(death.dissolveTime / 0.65));
             ++index;
             continue;
         }
         engine_.removeInstance(death.instance);
         death = deaths_.back();
         deaths_.pop_back();
+    }
+    for (std::size_t index = 0; index < coins_.size();) {
+        auto& coin = coins_[index];
+        coin.age += delta;
+        constexpr double duration = 1.25;
+        if (coin.age >= duration) {
+            engine_.removeInstance(coin.instance);
+            coin = coins_.back();
+            coins_.pop_back();
+            continue;
+        }
+        const auto progress = coin.age / duration;
+        Transform transform;
+        transform.position = coin.origin + glm::dvec3{0, 1.4 * (1 - (1 - progress) * (1 - progress)), 0};
+        transform.rotation = glm::angleAxis(coin.age * 9, glm::dvec3{0, 1, 0});
+        transform.scale = glm::dvec3{0.7 * std::min(1.0, (1 - progress) / 0.25)};
+        engine_.setTransform(coin.instance, transform);
+        ++index;
     }
 }
 
@@ -362,6 +438,10 @@ void EnemySystem::clear() noexcept {
         engine_.removeInstance(death.instance);
     }
     deaths_.clear();
+    for (const auto& coin : coins_) {
+        engine_.removeInstance(coin.instance);
+    }
+    coins_.clear();
     metrics_ = {};
 }
 

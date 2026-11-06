@@ -277,8 +277,14 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
             (info.maximum - info.minimum) * (system.definition(type).visualHeight / (info.maximum.y - info.minimum.y));
         std::cout << system.definition(type).name << " visual bounds " << size.x << ',' << size.y << ',' << size.z
                   << "; physical radius " << system.definition(type).radius << '\n';
-        require(system.definition(type).radius >= glm::length(glm::dvec2{size.x, size.z}) * 0.5,
-                "configured footprint does not cover the animal's framed XZ dimensions");
+        if (system.definition(type).idleAnimation.empty()) {
+            require(system.definition(type).radius >= glm::length(glm::dvec2{size.x, size.z}) * 0.5,
+                    "configured footprint does not cover the animal's framed XZ dimensions");
+        } else {
+            // Extended humanoid arms in the bind pose do not define navigation clearance.
+            require(a.radius == system.definition(type).radius && a.height == system.definition(type).height,
+                    "animated character collision dimensions changed with visual framing");
+        }
         require(engine.update([&](double) {
             session.update(engine, 1.0 / 60);
         }),
@@ -358,9 +364,16 @@ void checkTowers(Engine& engine,
     scene->setNavigationGrid(GridConfiguration{12, 8, 1, {0, 0, 0}});
     game::BuildZone buildZone;
     buildZone.name = "Corridor construction area";
-    buildZone.position = {6, 0, 4};
-    buildZone.dimensions = {12, 8};
-    (void)game::PlacementSystem::createZone(*scene, buildZone);
+    for (const auto point : {glm::dvec3{5.37, 0, 3.55},
+                             glm::dvec3{5.5, 0, 4.55},
+                             glm::dvec3{8.2, 0, 2.3},
+                             glm::dvec3{7.8, 0, 4.1},
+                             glm::dvec3{8, 0, 6},
+                             glm::dvec3{5.5, 0, 1.5}}) {
+        buildZone.position = point;
+        buildZone.dimensions = point.x == 8.2 ? glm::dvec2{2, 1.5} : glm::dvec2{0.98, 0.98};
+        (void)game::PlacementSystem::createZone(*scene, buildZone);
+    }
     for (std::uint32_t z = 0; z < 8; ++z) {
         if (z < 3 || z >= 5) {
             scene->navigationGrid()->setWalkable({5, z}, false);
@@ -413,9 +426,10 @@ void checkTowers(Engine& engine,
     require(session.checkTower(engine, cached).empty(), "removed animals left a stale placement rejection");
     const auto previewStart = std::chrono::steady_clock::now();
     for (int i = 0; i < 1000; ++i) {
-        auto position = cached;
-        position.position.x += (i % 21 - 10) * 0.01;
-        require(session.checkTower(engine, position, false).empty(), "instant footprint check rejected clear terrain");
+        const auto position =
+            session.towerAt({{cached.position.x + (i % 21 - 10) * 0.01, 10, cached.position.z}, {0, -1, 0}, 0, 30});
+        require(position && session.checkTower(engine, *position, false).empty(),
+                "instant fixed-point check rejected clear terrain");
     }
     std::cout << "1000 tower hover checks: "
               << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - previewStart).count()
@@ -975,7 +989,8 @@ int main(int argc, char** argv) {
         navigationControl(engine, id, "Level", "Load Cover Watch");
         tick(engine, 3);
         engine.scene()->selectObject(11);
-        require(debug.lines().empty(), "combat debugging was enabled by default");
+        const auto zoneLines = debug.lines().size();
+        require(zoneLines == 0 && debug.quads().empty(), "Obsolete build-zone facing or rectangle overlays remain");
         navigationControl(engine, id, "Show Combat Visibility");
         tick(engine);
         require(debug.lines().size() >= 192, "Editor did not draw the selected tower's 3D attack sphere");
@@ -985,11 +1000,11 @@ int main(int argc, char** argv) {
         require(debug.lines().size() > 192, "Editor did not draw visibility rays to spawned targets");
         navigationControl(engine, id, "Show Combat Visibility");
         tick(engine);
-        require(debug.lines().empty(), "combat debugging remained visible after disabling it");
+        require(debug.lines().size() == zoneLines, "combat debugging remained visible after disabling it");
         navigationControl(engine, id, "Level", "Load Rival Watch");
         tick(engine, 3);
         require(debug.level().waves() && debug.level().waves()->definition().waves.size() == 4 &&
-                    debug.level().waves()->definition().waves.front().groups.front().enemy == "Grunt",
+                    debug.level().waves()->definition().waves.front().groups.front().enemy == "Goblin",
                 "Editor could not load handcrafted archetype waves");
         navigationControl(engine, id, "Level", "Load Boss Watch");
         tick(engine, 3);

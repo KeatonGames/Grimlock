@@ -21,6 +21,11 @@ void readCombat(const nlohmann::json& source, EnemyCombatDefinition& combat) {
     combat.objectivePriority = source.value("objective_priority", combat.objectivePriority);
     combat.attackAnimation = source.value("attack_animation", combat.attackAnimation);
     combat.objectiveFirst = source.value("objective_first", combat.objectiveFirst);
+    const auto targeting = source.value("targeting", std::string{"priority"});
+    if (targeting != "priority" && targeting != "first_detected") {
+        throw std::invalid_argument("Unknown enemy targeting policy: " + targeting);
+    }
+    combat.firstDetected = targeting == "first_detected";
     combat.obstructionRange = source.value("obstruction_range", combat.obstructionRange);
     combat.threatMemory = source.value("threat_memory", combat.threatMemory);
     combat.heroDamageModifier = source.value("hero_damage_modifier", combat.heroDamageModifier);
@@ -116,24 +121,47 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
             names.insert(definition.name);
         }
         for (const auto& entry : entries) {
-            const auto animal = entry.at("animal").get<std::string>();
-            std::size_t index = 0;
-            while (index < animalCount && definitions[index].name != animal) {
-                ++index;
+            EnemyDefinition d;
+            if (entry.contains("model")) {
+                d.model = entry.at("model").get<std::string>();
+                bool safe = !d.model.is_absolute() && !d.model.has_root_name() && d.model.extension() == ".glb";
+                for (const auto& part : d.model) {
+                    safe = safe && part != "..";
+                }
+                if (!safe || !std::filesystem::is_regular_file(assetRoot / d.model)) {
+                    throw std::invalid_argument("Archetype requires an available relative GLB model.");
+                }
+            } else {
+                const auto animal = entry.at("animal").get<std::string>();
+                std::size_t index = 0;
+                while (index < animalCount && definitions[index].name != animal) {
+                    ++index;
+                }
+                if (index == animalCount) {
+                    throw std::invalid_argument("Unknown archetype animal: " + animal);
+                }
+                d = definitions[index];
             }
-            if (index == animalCount) {
-                throw std::invalid_argument("Unknown archetype animal: " + animal);
-            }
-            auto d = definitions[index];
             d.name = entry.at("name").get<std::string>();
             if (!names.insert(d.name).second) {
                 throw std::invalid_argument("Duplicate enemy definition: " + d.name);
+            }
+            d.aliases = entry.value("aliases", std::vector<std::string>{});
+            for (const auto& alias : d.aliases) {
+                if (alias.empty() || !names.insert(alias).second) {
+                    throw std::invalid_argument("Duplicate or empty enemy alias: " + alias);
+                }
             }
             d.maximumHealth = entry.at("maximum_health").get<float>();
             d.speed = entry.at("speed").get<double>();
             d.radius = entry.value("radius", d.radius);
             d.height = entry.value("height", d.height);
             d.visualHeight = entry.value("visual_height", d.visualHeight);
+            d.idleAnimation = entry.value("idle_animation", d.idleAnimation);
+            d.movementAnimation = entry.value("movement_animation", d.movementAnimation);
+            d.runAnimation = entry.value("run_animation", d.runAnimation);
+            d.deathAnimation = entry.value("death_animation", d.deathAnimation);
+            d.forwardYaw = entry.value("forward_yaw", d.forwardYaw);
             d.boss = entry.value("boss", false);
             d.showHealthBar = true;
             const auto attackAnimation = d.combat.attackAnimation;

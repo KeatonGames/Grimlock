@@ -1,6 +1,10 @@
 #include "navigation/nav_mesh.hpp"
 
+#include "ui/hero_route_visual.hpp"
+
+#include <algorithm>
 #include <cmath>
+#include <glm/geometric.hpp>
 #include <grimlock/terrain.hpp>
 #include <iostream>
 #include <limits>
@@ -85,6 +89,52 @@ void checkObstacles() {
             "disconnected route was treated as complete");
     require(navigation.build(floor()) && navigation.findPath({0, 0, 0}, {10, 0, 0}, path),
             "wall removal did not restore navigation");
+}
+
+void checkRouteVisual() {
+    auto geometry = floor();
+    geometry.addBox({3, 0, -10}, {5, 1.5F, 8}, false);
+    NavMesh mesh;
+    require(mesh.build(geometry), "visual route fixture failed");
+    NavigationPath path;
+    require(mesh.findPath({0, 0, 0}, {10, 0, 0}, path), "visual route path failed");
+    const auto polygons = path.polygons;
+    HeroRouteVisual visual;
+    visual.update(mesh, {0, 0, 0}, path);
+    const std::vector<glm::dvec3> route{visual.points().begin(), visual.points().end()};
+    require(route.size() > 3 && path.polygons == polygons && glm::distance(route.back(), path.destination) < 1e-6,
+            "visual trace changed the live corridor or failed to reach the destination around a corner");
+    require(std::all_of(route.begin(),
+                        route.end(),
+                        [&](glm::dvec3 point) {
+                            return mesh.contains(point);
+                        }),
+            "visual route escaped the movement surface");
+    const auto dashes = visual.dashes();
+    require(!dashes.empty(), "visual route has no dashes");
+    double routeLength = 0, inkLength = 0;
+    for (std::size_t i = 1; i < route.size(); ++i) {
+        routeLength += glm::distance(route[i - 1], route[i]);
+    }
+    for (const auto& dash : dashes) {
+        inkLength += glm::distance(dash.from, dash.to);
+    }
+    require(inkLength > routeLength * 0.4 && inkLength < routeLength * 0.8,
+            "dashes have no visible gaps or lost most of the route");
+    auto previousSize = route.size();
+    for (std::size_t i = 1; i + 1 < route.size(); ++i) {
+        visual.update(mesh, route[i], path);
+        require(!visual.points().empty() && visual.points().front() == route[i] &&
+                    visual.points().size() <= previousSize && visual.points().back() == route.back(),
+                "walking retained travelled points or made the remaining route grow/flip at a turn");
+        const auto remainingDashes = visual.dashes();
+        require(!remainingDashes.empty() && glm::distance(remainingDashes.front().from, dashes.front().from) < 1e-6,
+                "walking slid the dash pattern instead of consuming it");
+        previousSize = visual.points().size();
+    }
+    require(mesh.build(floor()), "visual route rebuild failed");
+    visual.update(mesh, {0, 0, 0}, path);
+    require(visual.points().empty() && visual.dashes().empty(), "visual route retained invalid polygons after rebuild");
 }
 
 void checkConfiguration() {
@@ -176,6 +226,7 @@ int main() {
     try {
         checkQueries();
         checkObstacles();
+        checkRouteVisual();
         checkConfiguration();
         checkTerrainAdapter();
         std::cout << "PASS NavMesh geometry, projection, funnel paths, clearance, radius/height/slope/climb, invalid "

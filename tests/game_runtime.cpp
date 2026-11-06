@@ -17,6 +17,18 @@ void require(bool value, const char* message) {
     }
 }
 
+bool hasOverlayColor(ImU32 color) {
+    const auto* data = ImGui::GetDrawData();
+    for (const auto* list : data->CmdLists) {
+        for (const auto& vertex : list->VtxBuffer) {
+            if (vertex.col == color) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 std::string contents(const std::filesystem::path& path) {
     std::ifstream file{path};
     return {std::istreambuf_iterator<char>{file}, {}};
@@ -62,10 +74,6 @@ void control(Engine& engine,
              const char* panelName,
              const char* label,
              const char* scope = nullptr) {
-    if (std::string_view{panelName} == "Game Status" && std::string_view{label} == "Start Wave") {
-        control(engine, runtime, window, "Build Towers", label, scope);
-        return;
-    }
     auto* panel = ImGui::FindWindowByName(panelName);
     require(panel && panel->Active, "game HUD panel missing");
     const auto seed = scope ? ImHashStr(scope, 0, panel->ID) : panel->ID;
@@ -77,9 +85,6 @@ void control(Engine& engine,
         float x = panel->DC.CursorStartPos.x + 50;
         if (std::string_view{label} == "Large Tower") {
             x = panel->DC.CursorStartPos.x + 200 * ImGui::GetStyle().FontScaleMain;
-        }
-        if (std::string_view{label} == "Deploy Hero") {
-            x = panel->DC.CursorStartPos.x + 150 * ImGui::GetStyle().FontScaleMain;
         }
         const glm::vec2 point{x, y};
         mouse(window, SDL_EVENT_MOUSE_MOTION, point);
@@ -132,6 +137,7 @@ glm::vec2 heroPoint(Engine& engine, SDL_Window* window, const Hero& hero) {
 int main() {
     try {
         Engine engine{EngineConfig{.windowTitle = "Game runtime checks"}};
+        engine.setPerformanceEnabled(true);
         const auto assetRoot = engine.assetRoot();
         auto definition = loadLevelDefinition(assetRoot / "levels/first_watch.json");
         definition.id = createLevelId();
@@ -188,7 +194,9 @@ int main() {
         tick(engine, runtime);
         require(runtime.preview() && runtime.placementError().empty(), "game placement preview is not valid");
         const auto previewBeforeUi = runtime.preview();
-        mouse(id, SDL_EVENT_MOUSE_MOTION, {50, 40});
+        const auto healthCenter = ImGui::FindWindowByName("Objective Health")->Rect().GetCenter();
+        const glm::vec2 uiPoint{healthCenter.x, healthCenter.y};
+        mouse(id, SDL_EVENT_MOUSE_MOTION, uiPoint);
         tick(engine, runtime);
         require(runtime.preview() == previewBeforeUi && runtime.navigation().towers().towers().empty() &&
                     runtime.level().economy().gold() == 200,
@@ -260,27 +268,38 @@ int main() {
                     runtime.level().economy().gold() == expectedGold,
                 "Large Tower upgrade incorrect");
         rejectUpgrade(largeTower);
-        require(runtime.heroes() && runtime.heroes()->heroes().size() == 1, "configured hero spawn missing");
+        require(runtime.heroes() && runtime.heroes()->heroes().size() == 3, "Full party did not spawn");
         const auto heroId = runtime.heroes()->heroes().front().id;
         const auto heroObject = runtime.heroes()->heroes().front().object;
-        const auto goldBeforeDeploy = runtime.level().economy().gold();
-        control(engine, runtime, id, "Build Towers", "Deploy Hero");
-        require(runtime.deployingHero(), "Deploy Hero did not enter placement");
-        const auto deployment = screen(engine, window, {4, 0, -3});
-        mouse(id, SDL_EVENT_MOUSE_MOTION, deployment);
-        tick(engine, runtime);
-        require(runtime.heroError().empty(), "valid hero placement rejected");
-        click(engine, runtime, id, deployment);
-        require(!runtime.deployingHero() && runtime.selectedHero() && runtime.selectedHero()->id == heroId &&
-                    runtime.selectedHero()->object == heroObject &&
-                    runtime.level().economy().gold() == goldBeforeDeploy &&
-                    glm::length(glm::dvec2{runtime.selectedHero()->position.x - 4,
-                                           runtime.selectedHero()->position.z + 3}) < 0.05,
-                "free hero repositioning, identity or selection failed");
-        const auto initialHeroPosition = runtime.selectedHero()->position;
+        const auto goldBeforeMove = runtime.level().economy().gold();
+        const auto heroClick = heroPoint(engine, window, *runtime.heroes()->find(heroId));
+        click(engine, runtime, id, heroClick);
+        require(runtime.selectedHero() && runtime.selectedHero()->id == heroId, "World hero click did not select");
+        require(engine.selectedObject() == heroObject && !engine.scene()->object(heroObject).selectionHighlight,
+                "Hero selection was lost or retained the blue renderer highlight");
+        const auto prepDestination = screen(engine, window, {4, 0, -3});
+        const auto selectedInstances = engine.performance().instances;
+        click(engine, runtime, id, prepDestination);
+        require(!runtime.selectedHero() && !engine.selectedObject() &&
+                    runtime.heroes()->find(heroId)->combat.playerMoving &&
+                    engine.performance().instances + 1 == selectedInstances &&
+                    hasOverlayColor(IM_COL32(255, 215, 40, 230)) && hasOverlayColor(IM_COL32(255, 215, 40, 255)),
+                "Move did not deselect/remove the square while preserving the yellow route and arrows");
+        const auto confirmedDestination = runtime.heroes()->find(heroId)->destination;
+        click(engine, runtime, id, screen(engine, window, {4, 0, -2.5}));
+        require(!runtime.selectedHero() && runtime.heroes()->find(heroId)->destination == confirmedDestination,
+                "An unselected hero accepted another movement order");
+        runtime.update(engine, 3);
+        require(glm::length(glm::dvec2{runtime.heroes()->find(heroId)->position.x - 4,
+                                       runtime.heroes()->find(heroId)->position.z + 3}) < 0.15 &&
+                    runtime.level().economy().gold() == goldBeforeMove,
+                "Preparation click-to-move failed or charged gold");
+        const auto initialHeroPosition = runtime.heroes()->find(heroId)->position;
         runtime.update(engine, 1);
-        require(runtime.selectedHero()->position == initialHeroPosition, "preparation hero moved");
-        control(engine, runtime, id, "Game Status", "Start Wave");
+        require(runtime.heroes()->find(heroId)->position == initialHeroPosition, "Idle preparation hero drifted");
+        require(!ImGui::FindWindowByName("Hero Info") && !ImGui::FindWindowByName("Game Status"),
+                "Removed hero/status panels remained visible");
+        control(engine, runtime, id, "Wave Controls", "Start Wave");
         require(runtime.level().waves()->phase() == LevelPhase::battle, "HUD did not start the wave");
         require(runtime.level().upgradeError(runtime.navigation(), largeTower) ==
                     "Upgrades are only available during preparation.",
@@ -290,24 +309,34 @@ int main() {
         require(runtime.selectedHero() && engine.selectedObject() == heroObject, "hero picking/highlighting failed");
         const auto destination = screen(engine, window, {-5, 0, -1});
         const auto cameraBeforeClick = engine.scene()->resolvedCamera();
+        const auto destinationBeforeHover = runtime.selectedHero()->destination;
+        const auto pathBeforeHover = runtime.selectedHero()->path.polygons;
         mouse(id, SDL_EVENT_MOUSE_MOTION, destination);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, destination, SDL_BUTTON_RIGHT);
+        require(hasOverlayColor(IM_COL32(255, 215, 40, 230)) &&
+                    runtime.selectedHero()->destination == destinationBeforeHover &&
+                    runtime.selectedHero()->path.polygons == pathBeforeHover,
+                "Yellow path preview was missing or changed the hero's movement order");
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, destination, SDL_BUTTON_LEFT);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, destination, SDL_BUTTON_RIGHT);
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, destination, SDL_BUTTON_LEFT);
         tick(engine, runtime);
-        require(runtime.selectedHero()->destination &&
+        require(!runtime.selectedHero() && runtime.heroes()->find(heroId)->destination &&
                     engine.scene()->resolvedCamera().position == cameraBeforeClick.position,
-                "short right click failed to command hero or panned camera");
-        for (int frame = 0; frame < 1000 && runtime.selectedHero()->state == HeroState::moving; ++frame) {
+                "left-click ground failed to command hero or panned camera");
+        require(hasOverlayColor(IM_COL32(255, 215, 40, 255)), "Clicked movement destination has no yellow arrows");
+        for (int frame = 0; frame < 1000 && runtime.heroes()->find(heroId)->state == HeroState::moving; ++frame) {
             runtime.update(engine, 1.0 / 60);
-            require(runtime.heroes()->navigation().contains(runtime.selectedHero()->position),
+            require(runtime.heroes()->navigation().contains(runtime.heroes()->find(heroId)->position),
                     "hero crossed an obstacle");
         }
-        require(runtime.selectedHero()->state == HeroState::reached &&
-                    glm::length(glm::dvec2{runtime.selectedHero()->position.x + 5,
-                                           runtime.selectedHero()->position.z + 1}) < 0.15,
+        require(runtime.heroes()->find(heroId)->state == HeroState::reached &&
+                    glm::length(glm::dvec2{runtime.heroes()->find(heroId)->position.x + 5,
+                                           runtime.heroes()->find(heroId)->position.z + 1}) < 0.15,
                 "game hero failed to navigate around towers/walls");
+        click(engine, runtime, id, heroPoint(engine, window, *runtime.heroes()->find(heroId)));
+        require(runtime.selectedHero() && runtime.selectedHero()->id == heroId,
+                "Hero could not be selected again after completing a move");
         const glm::vec2 gesturePoint{700, 400};
         const auto drag = [&](Uint8 button, glm::vec2 motion) {
             mouse(id, SDL_EVENT_MOUSE_MOTION, gesturePoint);
@@ -350,11 +379,11 @@ int main() {
         require(glm::length(zoomed.position - zoomed.target) < glm::length(afterOrbit.position - afterOrbit.target) &&
                     !runtime.selectedHero()->destination,
                 "zoom changed hero destination or failed");
-        mouse(id, SDL_EVENT_MOUSE_MOTION, {50, 40});
+        mouse(id, SDL_EVENT_MOUSE_MOTION, uiPoint);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, {50, 40}, SDL_BUTTON_RIGHT);
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, uiPoint, SDL_BUTTON_RIGHT);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, {50, 40}, SDL_BUTTON_RIGHT);
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, uiPoint, SDL_BUTTON_RIGHT);
         tick(engine, runtime);
         require(!runtime.selectedHero()->destination && runtime.selectedHero()->state == HeroState::reached,
                 "gameplay UI right click commanded hero");
@@ -388,7 +417,7 @@ int main() {
         tick(engine, runtime);
         require(!runtime.activateHeroAbility(HeroAbility::cleave), "Knight retained a special ability");
         require(enemies.remove(enemyId), "Game hero target cleanup failed");
-        control(engine, runtime, id, "Hero Info", "Cancel Order");
+        runtime.cancelHeroOrder();
         require(!runtime.selectedHero()->combat.swinging && !runtime.selectedHero()->combat.playerMoving &&
                     !runtime.selectedHero()->combat.target && runtime.selectedHero()->combat.cleaveCooldown == 0,
                 "Game cancel order failed or Knight acquired an ability cooldown");
@@ -418,12 +447,10 @@ int main() {
                 runtime.navigation().enemies()->deathEffectCount() == 0 &&
                 runtime.level().combat()->shotsFired() == 0 && runtime.navigation().navigation().contains({-3.3, 0, 0}),
             "game restart retained runtime state");
-        require(runtime.heroes()->heroes().size() == 1 && !runtime.selectedHero() &&
+        require(runtime.heroes()->heroes().size() == 3 && !runtime.selectedHero() &&
                     runtime.heroes()->heroes().front().health == 100 &&
-                    runtime.heroes()->heroes().front().state == HeroState::idle &&
-                    glm::length(glm::dvec2{runtime.heroes()->heroes().front().position.x - 4,
-                                           runtime.heroes()->heroes().front().position.z - 2}) < 0.05,
-                "restart did not restore configured hero position/state");
+                    runtime.heroes()->heroes().front().state == HeroState::idle,
+                "Restart did not restore the automatic party");
         auto rebuilt = runtime.navigation().towers().definition("basic").instance();
         rebuilt.position = {-3.3, rebuilt.halfExtent.y, 0};
         const auto rebuiltId = runtime.level().buildTower(engine, runtime.navigation(), rebuilt);
@@ -433,6 +460,7 @@ int main() {
         definition.startingGold = 20;
         saveLevelDefinition(levelPath, definition);
         runtime.restart(engine);
+        runtime.heroes()->clear(); // Explicit undefended defeat fixture.
         bool unaffordable = false;
         try {
             runtime.beginPlacement("basic");
@@ -441,7 +469,7 @@ int main() {
         }
         require(unaffordable && !runtime.placing(), "Game bypassed construction costs");
         tick(engine, runtime);
-        control(engine, runtime, id, "Game Status", "Start Wave");
+        control(engine, runtime, id, "Wave Controls", "Start Wave");
         finishBattle(engine, runtime);
         require(runtime.level().waves()->phase() == LevelPhase::defeat && runtime.level().economy().gold() == 20,
                 "Game defeat or reward handling incorrect");

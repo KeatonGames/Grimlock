@@ -1,6 +1,7 @@
 #pragma once
 
 #include "navigation/navigation_session.hpp"
+#include "systems/build_zone_markers.hpp"
 #include "systems/level_session.hpp"
 
 #include <grimlock/grid_debug.hpp>
@@ -31,13 +32,14 @@ public:
     }
 
     [[nodiscard]] std::span<const editor::DebugQuad> quads() const noexcept override {
-        return zoneQuads_;
+        return {};
     }
 
     void shutdown(Engine& engine) noexcept override {
         engine.setPerformanceEnabled(false);
         level_.setPerformanceEnabled(false);
         placingTower_ = showPreview_ = false;
+        buildZoneMarkers_.clear();
         level_.stop(session_);
         session_.shutdown();
     }
@@ -82,9 +84,8 @@ private:
     bool gameplayPlacement_ = false;
     const Scene* placementScene_ = nullptr;
     std::string towerType_ = "basic";
-    float towerYaw_ = 0;
     bool showZones_ = true;
-    std::vector<editor::DebugQuad> zoneQuads_;
+    BuildZoneMarkers buildZoneMarkers_;
 
     struct PreviewKey {
         Tower tower;

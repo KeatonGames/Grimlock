@@ -139,7 +139,7 @@ void NavigationDebug::towerMenu(Engine& engine) {
             }
             ImGui::EndCombo();
         }
-        ImGui::InputFloat("Tower Rotation (degrees)", &towerYaw_, 5, 15, "%.1f");
+        ImGui::TextUnformatted("Tower position and facing are set by the selected build zone.");
         if (ImGui::Button("Place Tower")) {
             gameplayPlacement_ = false;
             placingTower_ = true;
@@ -165,12 +165,11 @@ void NavigationDebug::towerMenu(Engine& engine) {
 bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& input) {
     const bool changed = std::exchange(sceneChanged_, false);
     session_.synchronize(engine);
-    zoneQuads_.clear();
     combatDebug(engine);
     if (showZones_ || placingTower_) {
-        for (const auto& zone : session_.placement().zones()) {
-            zoneQuads_.push_back({zone.corners()});
-        }
+        buildZoneMarkers_.synchronize(engine, session_.placement().zones());
+    } else {
+        buildZoneMarkers_.clear();
     }
     showPreview_ = false;
     if (input.cancel || placementScene_ != engine.scene() ||
@@ -184,8 +183,7 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
     }
     session_.synchronize(engine);
     const auto ray = input.pressRay ? input.pressRay : input.ray;
-    const auto tower =
-        ray ? session_.towerAt(*ray, towerType_, glm::radians(static_cast<double>(towerYaw_))) : std::nullopt;
+    const auto tower = ray ? session_.towerAt(*ray, towerType_) : std::nullopt;
     if (!tower) {
         previewKey_.reset();
         return changed;
@@ -729,6 +727,18 @@ void NavigationDebug::buildZoneMenu(Engine& engine) {
         double degrees = glm::degrees(zone->yaw);
         edited = ImGui::InputDouble("Zone Rotation (degrees)", &degrees, 5, 15, "%.1f") || edited;
         zone->yaw = glm::radians(degrees);
+        edited = ImGui::InputScalarN("Construction Offset (metres)",
+                                     ImGuiDataType_Double,
+                                     &zone->constructionOffset.x,
+                                     3,
+                                     nullptr,
+                                     nullptr,
+                                     "%.3f") ||
+                 edited;
+        double facing = glm::degrees(zone->constructionYaw);
+        edited = ImGui::InputDouble("Construction Facing (degrees)", &facing, 5, 15, "%.1f") || edited;
+        zone->constructionYaw = glm::radians(facing);
+        ImGui::Text("%s (%zu towers)", zone->occupants.empty() ? "Available" : "Occupied", zone->occupants.size());
         edited = ImGui::InputScalarN("Zone Width / Depth",
                                      ImGuiDataType_Double,
                                      &zone->dimensions.x,

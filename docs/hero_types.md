@@ -1,15 +1,16 @@
 # Hero types
 
-Choose **Knight**, **Ranger**, or **Mage** beside **Deploy Hero** during Preparation,
-then click clear navigable ground. Escape cancels placement. Deploying a living
-hero of an existing type repositions it without changing its entity identity or
-restoring health. Dead heroes remain unavailable until level restart.
+Knight, Ranger and Mage spawn automatically near the defense objective at level
+start and restart. The runtime finds clear connected ground at the objective's
+elevation, with separate collision dimensions and independent entity identities.
+Legacy authored hero spawn positions remain readable in the level schema; playable
+Game levels use objective-based party placement.
 
-Select a hero through its roster button or in the world. Right-click enemies to
-attack, right-click ground to move, and right-drag to pan the camera. Manual orders
-override autonomous targeting temporarily. Each hero resumes defense after orders
-finish. All three share one ECS HeroSystem and can fight simultaneously.
-
+Click a hero in the world, then click ground to move it in Preparation or Battle.
+Clicking another hero selects it, and clicking an enemy during Battle orders an
+attack. Manual orders temporarily override autonomous combat. Camera controls
+remain right-drag pan, middle-drag orbit and wheel zoom. Hero deployment controls,
+roster buttons, health overlays and the hero details panel have been removed.
 | Hero | Health | Damage | Reach | Attack interval |
 | --- | --- | --- | --- | --- |
 | Knight | 100 | 25, melee single target | 1.2 | 0.8 s |
@@ -26,8 +27,7 @@ visibility to each victim; geometry absorbs projectiles without splash.
 `game/assets/config/hero.json` defines Knight. Its legacy `assassin` type key and
 first catalog slot remain unchanged. `config/heroes.json` defines Ranger and Mage
 in slots two and three. Mage replaces the previous placeholder Warrior; authored
-level spawn positions, free deployment limits, selection and scene roles remain
-compatible. Existing custom `area` attack definitions still parse with their
+legacy spawn data remains readable while Game uses objective-based party placement. Existing custom `area` attack definitions still parse with their
 original instant-area behavior; Mage uses the new `ranged_area` basic attack.
 There is no serialized class-specific entity implementation to migrate.
 
@@ -68,6 +68,8 @@ from MovementAdvanced and all four requested bow clips from CombatRanged. Its no
 idle is `Ranged_Bow_Idle`. Mage imports only the basic magic shooting clip, without
 spellcasting. Weapon geometry uses the corresponding character material and authored
 grip origin/scale. The bow's existing draw morph animates during draw and release.
+The Ranger bow attachment rotates 180 degrees around its local long axis (Z),
+correcting its facing while preserving its grip, vertical alignment and draw morph.
 
 Ranger arrows load `towers/projectiles/kaykit/arrow_bow.glb`, with geometry and
 texture embedded. The native +Z arrow axis follows projectile velocity; visual
@@ -99,14 +101,13 @@ existing animation player switches clips without crossfading.
 
 ## Validation
 
-Debug Game and Editor builds succeed. The full suite passes 42 of 43 checks; the
-only failure is the existing Level.Playable regression described below. Final focused
-hero, terrain, combat, Game HUD and Editor runtime checks pass. Hero checks cover all three models, animated attachments,
-bow morphs and attack phases, hit/death lifecycle, independent commands and damage,
-lethal splash compaction, stale projectile generations and 1/5/60 FPS splash timing.
+Debug Game and Editor builds succeed. Across the complete suite and focused
+reruns, 44 of 45 checks pass. The updated checks cover automatic three-hero party
+placement, real click-to-select/click-to-move input in Preparation and Battle,
+independent orders, HUD input capture, kit selection-marker lifecycle, pause,
+restart and responsive layout. Existing animation, combat and terrain checks pass.
 No extended manual visual playthrough was performed.
-
 The Phase 42 `Level.Playable` small-tower strategy regression remains: that old
 strategy relied on Assassin Cleave. The mixed-defense strategy still wins. Its
 original assertion is retained; this phase does not rebalance Knight or the levels.
-Current build and test logs are under `out/phase43_*.log`.
+Current build and test logs are under `out/simple_hud_*.log`.

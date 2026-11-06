@@ -31,6 +31,8 @@ GameHud::GameHud(Engine& engine, LevelRuntime& runtime, bool startInMenu, const 
 }
 
 GameHud::~GameHud() {
+    clearSelectionMarker();
+    buildZoneMarkers_.clear();
     engine_.detachOverlay();
 }
 
@@ -44,13 +46,11 @@ void GameHud::updateLayout() {
     const float scale = std::clamp(automatic * uiScale_, 0.75F, 1.25F);
     layout_.scale = scale;
     layout_.gap = 14 * scale;
-    const bool saveWarning = runtime_.progress() && !runtime_.progress()->error().empty();
-    layout_.top = (saveWarning ? 112 : 92) * scale;
-    layout_.contextWidth = std::min(320 * scale, size.x * 0.42F);
-    layout_.contextHeight = std::min(310 * scale, size.y - layout_.top - 3 * layout_.gap - 100 * scale);
-    layout_.dockWidth = std::min(760 * scale, size.x - layout_.contextWidth - 3 * layout_.gap);
-    const bool feedback = runtime_.placing() || runtime_.deployingHero() || !runtime_.heroError().empty();
-    layout_.dockHeight = std::min((feedback ? 252 : 212) * scale, size.y * 0.48F);
+    layout_.top = 62 * scale;
+    layout_.dockWidth = std::min(420 * scale, size.x - 2 * layout_.gap);
+    layout_.dockHeight = (runtime_.placing() ? 190 : 124) * scale;
+    layout_.contextWidth = std::min(320 * scale, size.x - 2 * layout_.gap);
+    layout_.contextHeight = std::min(270 * scale, size.y - layout_.top - layout_.dockHeight - 4 * layout_.gap);
     presentation::scale(scale);
 }
 
@@ -100,7 +100,7 @@ OverlayInput GameHud::frame() {
             settingsOpen_ = false;
         } else if (runtime_.paused()) {
             runtime_.setPaused(false);
-        } else if (runtime_.placing() || runtime_.deployingHero()) {
+        } else if (runtime_.placing()) {
             runtime_.cancelPlacement();
         } else if (runtime_.selectedHero() || runtime_.inspectedTower()) {
             runtime_.clearSelection();
@@ -138,19 +138,25 @@ OverlayInput GameHud::frame() {
         construction();
     }
     towerInfo();
-    heroControls();
     bossHealth();
     notifications();
     const bool overUi = io.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
     viewportMouse_ = !runtime_.paused() && !relative && !overUi && !cancelWorldInput_;
-    const bool commandsAllowed = !cancelWorldInput_ && !runtime_.placing() && !runtime_.deployingHero();
+    const bool commandsAllowed = !cancelWorldInput_ && !runtime_.placing();
     commandCursor_ = commandGesture_.update(engine_.input(), commandsAllowed && (relative || !overUi));
-    return {!relative && overUi, io.WantCaptureKeyboard, false, runtime_.placing() || runtime_.deployingHero()};
+    return {!relative && overUi, io.WantCaptureKeyboard, false, runtime_.placing()};
 }
 
 void GameHud::clearFeedback() {
+    clearSelectionMarker();
+    buildZoneMarkers_.clear();
     hoveredObject_.reset();
     orderPosition_.reset();
+    orderHero_ = previewHero_ = 0;
+    hoverDestination_.reset();
+    hoverPath_.valid = false;
+    hoverRoute_.clear();
+    orderedRoutes_.clear();
     orderRemaining_ = 0;
     settingsOpen_ = false;
     entrance_ = 0;
@@ -384,8 +390,9 @@ void GameHud::settings() {
         ImGui::Checkbox("World health bars", &worldHealthBars_);
         ImGui::TextDisabled("Boss health is always visible during an encounter.");
         ImGui::Separator();
-        ImGui::TextWrapped("Right-click: hero command\nRight drag: pan\nMiddle drag: orbit\nWheel: zoom\nEscape: "
-                           "cancel placement/selection, then pause");
+        ImGui::TextWrapped(
+            "Click hero, then click ground to move\nRight drag: pan\nMiddle drag: orbit\nWheel: zoom\nEscape: "
+            "cancel placement/selection, then pause");
         if (presentation::action("Back", {-1, 36 * s}) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
             settingsOpen_ = false;
         }
@@ -437,61 +444,44 @@ void GameHud::status() {
     if (!waves) {
         return;
     }
-    const auto* v = ImGui::GetMainViewport();
-    const auto& def = waves->definition();
-    const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + layout_.gap, v->Pos.y + layout_.gap});
-    ImGui::SetNextWindowSize({v->Size.x - 2 * layout_.gap, layout_.top});
-    if (ImGui::Begin("Game Status", nullptr, hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
-        if (ImGui::BeginTable("Status metrics", 4, ImGuiTableFlags_SizingStretchProp)) {
-            ImGui::TableSetupColumn("Wave", ImGuiTableColumnFlags_WidthStretch, 0.34F);
-            ImGui::TableSetupColumn("Objective", ImGuiTableColumnFlags_WidthStretch, 0.34F);
-            ImGui::TableSetupColumn("Gold", ImGuiTableColumnFlags_WidthStretch, 0.20F);
-            ImGui::TableSetupColumn("Menu", ImGuiTableColumnFlags_WidthStretch, 0.12F);
-            ImGui::TableNextColumn();
-            ImGui::TextDisabled("%s", waves->phase() == LevelPhase::preparation ? "PREPARATION" : "BATTLE");
-            ImGui::Text("Wave %zu / %zu", std::min(waves->wave() + 1, def.waves.size()), def.waves.size());
-            if (ImGui::IsItemHovered()) {
-                ImGui::BeginTooltip();
-                ImGui::TextUnformatted(def.name.c_str());
-                const auto& wave = def.waves[std::min(waves->wave(), def.waves.size() - 1)];
-                ImGui::TextUnformatted(wave.name.c_str());
-                for (const auto& group : wave.groups) {
-                    ImGui::Text("%zu %s", group.count, group.enemy.c_str());
-                }
-                ImGui::Text("Reward: %llu gold", static_cast<unsigned long long>(wave.goldReward));
-                ImGui::EndTooltip();
-            }
-            ImGui::TableNextColumn();
-            ImGui::TextDisabled("DEFENSE OBJECTIVE");
-            char health[64];
-            std::snprintf(health,
-                          sizeof(health),
-                          "%llu / %llu",
-                          static_cast<unsigned long long>(waves->health()),
-                          static_cast<unsigned long long>(def.objectiveHealth));
-            presentation::meter(static_cast<float>(waves->health()) / def.objectiveHealth, {-1, 22 * s}, health);
-            ImGui::TableNextColumn();
-            ImGui::TextDisabled("GOLD");
-            ImGui::TextColored(presentation::gold,
-                               "%llu",
-                               static_cast<unsigned long long>(runtime_.level().economy().gold()));
-            if (runtime_.progress() && !runtime_.progress()->error().empty()) {
-                ImGui::TextColored(presentation::red, "Save unavailable");
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", runtime_.progress()->error().c_str());
-                }
-            }
-            ImGui::TableNextColumn();
-            if (presentation::action("Pause", {-1, 40 * s})) {
-                runtime_.setPaused(true);
-                SDL_SetWindowRelativeMouseMode(native_.window, false);
-            }
-            ImGui::EndTable();
-        }
+    const auto* viewport = ImGui::GetMainViewport();
+    const float scale = layout_.scale;
+    const auto flags = hudFlags | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoFocusOnAppearing;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+    ImGui::SetNextWindowPos({viewport->Pos.x + layout_.gap, viewport->Pos.y + layout_.gap + 9 * scale});
+    if (ImGui::Begin("Round", nullptr, flags)) {
+        ImGui::Text("Round %zu / %zu",
+                    std::min(waves->wave() + 1, waves->definition().waves.size()),
+                    waves->definition().waves.size());
     }
-    statusSize_ = {ImGui::GetWindowSize().x, ImGui::GetWindowSize().y};
     ImGui::End();
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + layout_.gap + 8 * scale},
+                            ImGuiCond_Always,
+                            {0.5F, 0});
+    if (ImGui::Begin("Objective Health", nullptr, flags)) {
+        char health[64];
+        std::snprintf(health,
+                      sizeof(health),
+                      "%llu / %llu",
+                      static_cast<unsigned long long>(waves->health()),
+                      static_cast<unsigned long long>(waves->definition().objectiveHealth));
+        presentation::meter(static_cast<float>(waves->health()) / waves->definition().objectiveHealth,
+                            {std::min(320 * scale, viewport->Size.x * 0.38F), 24 * scale},
+                            health);
+    }
+    ImGui::End();
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - layout_.gap, viewport->Pos.y + layout_.gap},
+                            ImGuiCond_Always,
+                            {1, 0});
+    if (ImGui::Begin("Wave Controls", nullptr, flags)) {
+        ImGui::BeginDisabled(waves->phase() != LevelPhase::preparation);
+        if (presentation::action("Start Wave", {std::min(160 * scale, viewport->Size.x * 0.23F), 40 * scale}, true)) {
+            runtime_.startWave();
+        }
+        ImGui::EndDisabled();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
 }
 
 void GameHud::bossHealth() {
@@ -529,7 +519,7 @@ void GameHud::bossHealth() {
     const float width = std::max(100.0F, std::min(560.0F, viewport->Size.x - 36));
     const float left = (viewport->Size.x - width) * 0.5F;
     const float top = layout_.gap + layout_.top + 10 * layout_.scale;
-    const bool contextual = runtime_.selectedHero() || runtime_.inspectedTower();
+    const bool contextual = runtime_.inspectedTower() != nullptr;
     const float lower = viewport->Size.y - layout_.gap - (contextual ? layout_.contextHeight : layout_.dockHeight) - 12;
     const float rowHeight = ImGui::GetTextLineHeightWithSpacing() + 32 + ImGui::GetStyle().ItemSpacing.y;
     const float height = std::min(24 + rowHeight * static_cast<float>(bossBars_.size()),
@@ -560,15 +550,21 @@ void GameHud::bossHealth() {
 void GameHud::construction() {
     const auto* waves = runtime_.level().waves();
     const bool preparing = waves && waves->phase() == LevelPhase::preparation;
-    const auto* v = ImGui::GetMainViewport();
-    const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + layout_.gap, v->Pos.y + v->Size.y - layout_.gap}, ImGuiCond_Always, {0, 1});
+    const auto* viewport = ImGui::GetMainViewport();
+    const float scale = layout_.scale;
+    ImGui::SetNextWindowPos(
+        {viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + viewport->Size.y - layout_.gap},
+        ImGuiCond_Always,
+        {0.5F, 1});
     ImGui::SetNextWindowSize({layout_.dockWidth, layout_.dockHeight});
-    const auto flags = (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar));
+    const auto flags = hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
     if (ImGui::Begin("Build Towers", nullptr, flags)) {
-        ImGui::TextDisabled(preparing ? "BUILD YOUR DEFENSE" : "DEFENSE COMMAND");
-        const float cardWidth =
-            std::min(168 * s, (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5F);
+        ImGui::TextDisabled("TOWERS");
+        ImGui::SameLine();
+        ImGui::TextColored(presentation::gold,
+                           "Gold %llu",
+                           static_cast<unsigned long long>(runtime_.level().economy().gold()));
+        const float cardWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5F;
         std::size_t index = 0;
         for (const auto& definition : runtime_.navigation().towers().definitions()) {
             if (index++ % 2) {
@@ -580,7 +576,7 @@ void GameHud::construction() {
             if (presentation::towerCard(definition.name.c_str(),
                                         definition.constructionCost,
                                         runtime_.placing() && runtime_.selectedTower() == definition.id,
-                                        {cardWidth, 62 * s})) {
+                                        {cardWidth, 62 * scale})) {
                 runtime_.beginPlacement(definition.id);
             }
             ImGui::EndDisabled();
@@ -597,77 +593,15 @@ void GameHud::construction() {
             }
             ImGui::PopID();
         }
-        if (runtime_.heroes()) {
-            for (const auto& hero : runtime_.heroes()->heroes()) {
-                if (ImGui::GetContentRegionAvail().x < 130 * s) {
-                    ImGui::NewLine();
-                }
-                ImGui::PushID(static_cast<int>(hero.id));
-                ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.85F, 0.5F});
-                const bool selected = runtime_.selectedHero() && runtime_.selectedHero()->id == hero.id;
-                if (presentation::action(runtime_.heroes()->definition(hero).name.c_str(),
-                                         {130 * s, 30 * s},
-                                         selected)) {
-                    (void)runtime_.selectHero(hero.id);
-                }
-                ImGui::PopStyleVar();
-                const auto p = ImGui::GetItemRectMin();
-                presentation::icon(presentation::Icon::hero,
-                                   {p.x + 20 * s, p.y + 15 * s},
-                                   22 * s,
-                                   ImGui::ColorConvertFloat4ToU32(presentation::gold));
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("Select hero | Health %.0f / %.0f", hero.health, hero.maximumHealth);
-                }
-                ImGui::PopID();
-                ImGui::SameLine();
-            }
-        }
-        ImGui::BeginDisabled(!preparing);
-        if (ImGui::GetContentRegionAvail().x < 248 * s) {
-            ImGui::NewLine();
-        }
-        if (presentation::action("Deploy Hero", {110 * s, 30 * s})) {
-            runtime_.beginHeroPlacement(heroType_);
-        }
-        if (runtime_.heroes()) {
-            ImGui::SameLine();
-            const auto& heroes = *runtime_.heroes();
-            ImGui::SetNextItemWidth(130 * s);
-            if (ImGui::BeginCombo("##heroType", heroes.definition(heroType_).name.c_str())) {
-                for (std::size_t type = 0; type < heroes.typeCount(); ++type) {
-                    if (ImGui::Selectable(heroes.definition(type).name.c_str(), heroType_ == type)) {
-                        heroType_ = type;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-        }
-        ImGui::EndDisabled();
-        if (runtime_.placing() || runtime_.deployingHero()) {
-            if (presentation::action(runtime_.placing() ? "Cancel Placement" : "Cancel Deployment", {-1, 28 * s})) {
+        if (runtime_.placing()) {
+            if (presentation::action("Cancel Placement", {-1, 28 * scale})) {
                 runtime_.cancelPlacement();
             }
-            const auto& reason = runtime_.placing() ? runtime_.placementError() : runtime_.heroError();
-            if (!reason.empty()) {
-                ImGui::PushStyleColor(ImGuiCol_Text, presentation::red);
-                ImGui::TextWrapped("%s", reason.c_str());
-                ImGui::PopStyleColor();
+            if (!runtime_.placementError().empty()) {
+                ImGui::TextWrapped("%s", runtime_.placementError().c_str());
             } else {
-                ImGui::TextDisabled("Left-click to confirm | Esc to cancel");
+                ImGui::TextDisabled("Click the map to build | Esc to cancel");
             }
-        } else if (preparing) {
-            if (presentation::action("Start Wave", {-1, 34 * s}, true)) {
-                runtime_.startWave();
-            }
-        } else {
-            const auto active = runtime_.navigation().enemies()->enemies().size();
-            ImGui::TextDisabled("%zu active | %zu arriving", active, waves->pending());
-        }
-        if (!runtime_.placing() && !runtime_.deployingHero() && !runtime_.heroError().empty()) {
-            ImGui::PushStyleColor(ImGuiCol_Text, presentation::red);
-            ImGui::TextWrapped("%s", runtime_.heroError().c_str());
-            ImGui::PopStyleColor();
         }
     }
     ImGui::End();
@@ -685,9 +619,10 @@ void GameHud::towerInfo() {
     const auto& current = def.statistics(progress.level);
     const auto* v = ImGui::GetMainViewport();
     const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + v->Size.x - layout_.gap, v->Pos.y + v->Size.y - layout_.gap},
-                            ImGuiCond_Always,
-                            {1, 1});
+    ImGui::SetNextWindowPos(
+        {v->Pos.x + v->Size.x - layout_.gap, v->Pos.y + v->Size.y - 2 * layout_.gap - layout_.dockHeight},
+        ImGuiCond_Always,
+        {1, 1});
     ImGui::SetNextWindowSize({layout_.contextWidth, layout_.contextHeight});
     if (ImGui::Begin("Tower Info",
                      nullptr,
@@ -784,79 +719,13 @@ void GameHud::result() {
     ImGui::End();
 }
 
-void GameHud::heroControls() {
-    const auto* hero = runtime_.selectedHero();
-    if (!hero) {
-        return;
-    }
-    const auto* v = ImGui::GetMainViewport();
-    const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + v->Size.x - layout_.gap, v->Pos.y + v->Size.y - layout_.gap},
-                            ImGuiCond_Always,
-                            {1, 1});
-    ImGui::SetNextWindowSize({layout_.contextWidth, layout_.contextHeight});
-    if (ImGui::Begin("Hero Info",
-                     nullptr,
-                     (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar)))) {
-        presentation::heading(runtime_.heroes()->definition(*hero).name.c_str());
-        char health[64];
-        std::snprintf(health, sizeof(health), "%.0f / %.0f", hero->health, hero->maximumHealth);
-        presentation::meter(hero->health / hero->maximumHealth, {-1, 18 * s}, health);
-        const char* state = hero->health <= 0                   ? "Fallen"
-                            : hero->state == HeroState::blocked ? "Destination unreachable"
-                            : hero->combat.playerMoving         ? "Following movement order"
-                            : hero->combat.explicitTarget       ? "Attacking ordered target"
-                            : hero->combat.returning            ? "Returning to position"
-                                                                : "Defending this position";
-        ImGui::TextColored(presentation::gold, "%s", state);
-        const auto& stats = runtime_.heroes()->definition(*hero).combat;
-        ImGui::TextDisabled("DMG %.0f | RNG %.1f | %.1f/s", stats.damage, stats.range, 1 / stats.interval);
-        if (const auto* target =
-                hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr) {
-            ImGui::Text("Target: %s", runtime_.navigation().enemies()->definition(target->type).name.c_str());
-        }
-        ImGui::BeginDisabled(hero->health <= 0);
-        if (presentation::action("Cancel Order", {-1, 28 * s})) {
-            runtime_.cancelHeroOrder();
-        }
-        ImGui::EndDisabled();
-        if (stats.attack == HeroAttack::melee && stats.specialAbilities) {
-            const bool battle = runtime_.level().waves()->phase() == LevelPhase::battle;
-            ImGui::BeginDisabled(!battle || hero->health <= 0 || hero->combat.cleaveCooldown > 1e-10 ||
-                                 (hero->combat.swinging && hero->combat.abilitySwing));
-            if (presentation::action("Cleave", {-1, 34 * s}, true)) {
-                (void)runtime_.activateHeroAbility(HeroAbility::cleave);
-            }
-            const auto abilityPosition = ImGui::GetItemRectMin();
-            auto abilityColor = presentation::gold;
-            abilityColor.w = ImGui::GetStyle().Alpha;
-            presentation::icon(presentation::Icon::sword,
-                               {abilityPosition.x + 18 * s, abilityPosition.y + 17 * s},
-                               20 * s,
-                               ImGui::ColorConvertFloat4ToU32(abilityColor));
-            ImGui::EndDisabled();
-            char cooldown[64];
-            std::snprintf(cooldown,
-                          sizeof(cooldown),
-                          hero->combat.cleaveCooldown > 0 ? "%.1f s remaining" : "Ready | %.0f damage",
-                          hero->combat.cleaveCooldown > 0 ? hero->combat.cleaveCooldown : stats.cleave.damage);
-            presentation::meter(1 - static_cast<float>(hero->combat.cleaveCooldown / stats.cleave.cooldown),
-                                {-1, 16 * s},
-                                cooldown,
-                                presentation::gold);
-        }
-        if (!runtime_.heroError().empty()) {
-            ImGui::TextWrapped("%s", runtime_.heroError().c_str());
-        }
-    }
-    ImGui::End();
-}
-
 void GameHud::finishFrame(const Camera& camera) {
     ImGui::SetCurrentContext(context_);
     if (modalFrame_ || screen_ != Screen::gameplay || runtime_.paused() ||
         (runtime_.level().waves() && (runtime_.level().waves()->phase() == LevelPhase::victory ||
                                       runtime_.level().waves()->phase() == LevelPhase::defeat))) {
+        clearSelectionMarker();
+        buildZoneMarkers_.clear();
         ImGui::Render();
         return;
     }
@@ -879,11 +748,33 @@ void GameHud::finishFrame(const Camera& camera) {
             confirm = true;
         }
     }
-    if (!runtime_.placing() && !runtime_.deployingHero() && confirm) {
-        runtime_.selectObject(engine_, ray);
+    const auto issueOrder = [&](const Ray& commandRay) {
+        if (!runtime_.commandHero(commandRay)) {
+            return;
+        }
+        const auto* hero = runtime_.selectedHero();
+        const auto* enemy = hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr;
+        orderAttack_ = enemy != nullptr;
+        orderHero_ = hero->id;
+        orderPosition_ = enemy ? std::optional{enemy->position} : hero->destination;
+        orderRemaining_ = 0.8F;
+        if (!orderAttack_) {
+            // Release selection without cancelling the move that was just confirmed.
+            runtime_.clearSelection(false);
+        }
+    };
+    if (!runtime_.placing() && confirm) {
+        const auto object = ray ? engine_.pickObject(*ray) : std::nullopt;
+        const bool selectable = object && ((runtime_.heroes() && runtime_.heroes()->fromObject(*object)) ||
+                                           runtime_.navigation().towers().contains(*object));
+        if (selectable || !runtime_.selectedHero()) {
+            runtime_.selectObject(engine_, ray);
+        } else if (ray) {
+            issueOrder(*ray);
+        }
     }
     hoveredObject_.reset();
-    if (ray && !runtime_.placing() && !runtime_.deployingHero()) {
+    if (ray && !runtime_.placing()) {
         const auto object = confirm ? engine_.selectedObject() : engine_.pickObject(*ray);
         if (object && ((runtime_.heroes() && runtime_.heroes()->fromObject(*object)) ||
                        runtime_.navigation().towers().contains(*object))) {
@@ -893,22 +784,191 @@ void GameHud::finishFrame(const Camera& camera) {
     // UI hover and camera gestures retain the last preview instead of recreating it.
     if (worldPointer) {
         runtime_.updatePlacement(engine_, ray, confirm);
-        runtime_.updateHeroPlacement(engine_, ray, confirm);
     }
-    if (commandCursor_ && !runtime_.placing() && !runtime_.deployingHero()) {
+    if (commandCursor_ && !runtime_.placing()) {
         if (const auto commandRay = mouseRay(camera, *commandCursor_, logical, drawable)) {
-            if (runtime_.commandHero(*commandRay)) {
-                const auto* hero = runtime_.selectedHero();
-                const auto* enemy =
-                    hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr;
-                orderAttack_ = enemy != nullptr;
-                orderPosition_ = enemy ? std::optional{enemy->position} : hero->destination;
-                orderRemaining_ = 0.8F;
+            issueOrder(*commandRay);
+        }
+    }
+    updateSelectionMarker();
+    buildZoneMarkers_.synchronize(engine_, runtime_.navigation().placement().zones());
+    updateHeroPathPreview(ray);
+    placementOverlay(camera);
+    heroMovementOverlay(camera);
+    ImGui::Render();
+}
+
+void GameHud::updateHeroPathPreview(const std::optional<Ray>& ray) {
+    const auto* hero = runtime_.selectedHero();
+    const auto invalidate = [&] {
+        hoverPath_.valid = false;
+        hoverDestination_.reset();
+        hoverRoute_.clear();
+    };
+    if (!hero || hero->health <= 0 || !hero->controllable || !ray || !runtime_.level().waves() || runtime_.placing() ||
+        hoveredObject_) {
+        invalidate();
+        return;
+    }
+    const auto ground = runtime_.heroes()->ground(*ray);
+    const auto& mesh = runtime_.heroes()->navigation(hero->type);
+    if (!ground || !mesh.contains(*ground)) {
+        invalidate();
+        return;
+    }
+    if (runtime_.level().waves()->phase() == LevelPhase::battle && runtime_.navigation().enemies()) {
+        auto visibleRay = *ray;
+        visibleRay.maximum = std::min(ray->maximum, glm::length(*ground - ray->origin));
+        if (HeroCombatSystem::pick(engine_, *runtime_.navigation().enemies(), visibleRay)) {
+            invalidate();
+            return;
+        }
+    }
+    const bool changedHero = previewHero_ != hero->id || hoverPath_.revision != mesh.revision();
+    const bool changedPosition = !hoverDestination_ || glm::distance(*ground, *hoverDestination_) > 0.02 ||
+                                 glm::distance(hero->position, hoverOrigin_) > 0.12;
+    const auto now = ImGui::GetTime();
+    if (!changedHero && (!changedPosition || now - hoverQueryTime_ < 0.04)) {
+        return;
+    }
+    previewHero_ = hero->id;
+    if (changedHero) {
+        hoverRoute_.clear();
+    }
+    hoverOrigin_ = hero->position;
+    hoverDestination_ = ground;
+    hoverQueryTime_ = now;
+    (void)mesh.findPath(hero->position, *ground, hoverPath_);
+}
+
+void GameHud::clearSelectionMarker() {
+    if (selectionMarker_) {
+        engine_.removeInstance(*selectionMarker_);
+        selectionMarker_.reset();
+    }
+}
+
+void GameHud::heroMovementOverlay(const Camera& camera) {
+    if (!runtime_.heroes()) {
+        orderedRoutes_.clear();
+        return;
+    }
+    glm::ivec2 drawable{};
+    SDL_GetWindowSizeInPixels(native_.window, &drawable.x, &drawable.y);
+    if (drawable.x <= 0 || drawable.y <= 0) {
+        return;
+    }
+    const auto matrix =
+        glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
+    auto* viewport = ImGui::GetMainViewport();
+    auto* draw = ImGui::GetBackgroundDrawList(viewport);
+    const auto line = [&](glm::dvec3 from, glm::dvec3 to, double width, ImU32 color) {
+        const glm::dvec2 direction{to.x - from.x, to.z - from.z};
+        if (glm::length(direction) < 1e-6) {
+            return;
+        }
+        const auto side = glm::normalize(glm::dvec3{-direction.y, 0, direction.x}) * width * 0.5;
+        const glm::dvec3 lift{0, 0.065, 0};
+        const std::array<glm::dvec3, 4> vertices{from + lift - side,
+                                                 to + lift - side,
+                                                 to + lift + side,
+                                                 from + lift + side};
+        std::array<ImVec2, 12> points;
+        const auto count = ui::projectPolygon(matrix, vertices, viewport->Pos, viewport->Size, points);
+        if (count) {
+            draw->AddConvexPolyFilled(points.data(), count, color);
+        }
+    };
+    std::erase_if(orderedRoutes_, [&](const auto& entry) {
+        const auto* hero = runtime_.heroes()->find(entry.first);
+        return !hero || hero->health <= 0 || !hero->combat.playerMoving || !hero->destination || !hero->path.valid;
+    });
+    for (const auto& movingHero : runtime_.heroes()->heroes()) {
+        const auto* hero = &movingHero;
+        if (hero->health <= 0) {
+            continue;
+        }
+        const auto& mesh = runtime_.heroes()->navigation(hero->type);
+        const auto arrows = [&](glm::dvec3 center, ImU32 color) {
+            const auto surface = [&](glm::dvec3 position) {
+                const auto projected = mesh.project(position, 0.15);
+                return projected ? glm::dvec3{position.x, projected->position.y, position.z} : position;
+            };
+            for (int i = 0; i < 4; ++i) {
+                const double angle = glm::half_pi<double>() * i;
+                const glm::dvec3 direction{std::cos(angle), 0, std::sin(angle)};
+                const glm::dvec3 side{-direction.z, 0, direction.x};
+                const auto tip = surface(center + direction * 0.16);
+                line(surface(center + direction * 0.4 + side * 0.15), tip, 0.075, color);
+                line(tip, surface(center + direction * 0.4 - side * 0.15), 0.075, color);
+            }
+        };
+        const bool hovering = runtime_.selectedHero() && runtime_.selectedHero()->id == hero->id && hoverPath_.valid &&
+                              previewHero_ == hero->id;
+        const bool moving = hero->combat.playerMoving && hero->destination && hero->path.valid;
+        const auto* path = hovering ? &hoverPath_ : moving ? &hero->path : nullptr;
+        if (path) {
+            auto& visual = hovering ? hoverRoute_ : orderedRoutes_[hero->id];
+            visual.update(mesh,
+                          hero->position,
+                          *path,
+                          hero->avoidanceEnemy ? std::optional{hero->avoidancePoint} : std::nullopt);
+            for (const auto& dash : visual.dashes()) {
+                line(dash.from, dash.to, 0.075, IM_COL32(255, 215, 40, 230));
+            }
+            if (hovering && (!moving || glm::distance(path->destination, *hero->destination) > 0.1)) {
+                arrows(path->destination, IM_COL32(255, 215, 40, 150));
+            }
+        }
+        if (moving) {
+            arrows(*hero->destination, IM_COL32(255, 215, 40, 255));
+        } else if (orderHero_ == hero->id && !orderAttack_ && orderPosition_ && orderRemaining_ > 0) {
+            arrows(*orderPosition_, IM_COL32(255, 215, 40, 230));
+        }
+    }
+}
+
+void GameHud::updateSelectionMarker() {
+    const auto* hero = runtime_.selectedHero();
+    const auto* tower = runtime_.inspectedTower();
+    if ((!hero || hero->health <= 0) && !tower) {
+        clearSelectionMarker();
+        return;
+    }
+    glm::dvec3 position;
+    double radius = 0;
+    const NavMesh* surface = nullptr;
+    if (hero && hero->health > 0) {
+        position = hero->position;
+        radius = runtime_.heroes()->definition(*hero).radius + 0.16;
+        surface = &runtime_.heroes()->navigation(hero->type);
+    } else {
+        position = tower->position - glm::dvec3{0, tower->halfExtent.y, 0};
+        radius = std::max(tower->halfExtent.x, tower->halfExtent.z) + 0.16;
+    }
+    glm::vec3 right{1, 0, 0}, up{0, 1, 0}, forward{0, 0, 1};
+    if (surface) {
+        const auto x = surface->project(position + glm::dvec3{radius, 0, 0}, 0.25);
+        const auto z = surface->project(position + glm::dvec3{0, 0, radius}, 0.25);
+        if (x && z) {
+            const auto normal = glm::cross(glm::vec3{z->position - position}, glm::vec3{x->position - position});
+            if (glm::length(normal) > 1e-4F && glm::normalize(normal).y > 0.5F) {
+                up = glm::normalize(normal);
+                right = glm::normalize(glm::cross(up, glm::vec3{0, 0, 1}));
+                forward = glm::normalize(glm::cross(right, up));
             }
         }
     }
-    placementOverlay(camera);
-    ImGui::Render();
+    if (!selectionMarker_) {
+        const auto model = engine_.loadModel(engine_.assetRoot() / "towers/structures/tower_defense/selection-a.glb");
+        selectionMarker_ = engine_.createInstance(model, true);
+    }
+    glm::mat4 transform{1};
+    transform[0] = glm::vec4{right * static_cast<float>(2 * radius), 0};
+    transform[1] = glm::vec4{up, 0};
+    transform[2] = glm::vec4{forward * static_cast<float>(2 * radius), 0};
+    transform[3] = glm::vec4{glm::vec3{position} + up * 0.015F, 1};
+    engine_.setTransform(*selectionMarker_, transform);
 }
 
 void GameHud::placementOverlay(const Camera& camera) {
@@ -951,14 +1011,6 @@ void GameHud::placementOverlay(const Camera& camera) {
                           3 * s);
         }
     };
-    if (runtime_.heroes()) {
-        for (const auto& hero : runtime_.heroes()->heroes()) {
-            healthBar(hero.position + glm::dvec3{0, runtime_.heroes()->definition(hero).visualHeight + 0.12, 0},
-                      hero.health,
-                      hero.maximumHealth,
-                      hero.hitFlashRemaining);
-        }
-    }
     for (const auto& tower : runtime_.navigation().towers().towers()) {
         const auto& progress = runtime_.navigation().towers().progress(tower.object);
         healthBar(tower.position + glm::dvec3{0, tower.halfExtent.y + 0.12, 0},
@@ -1005,7 +1057,7 @@ void GameHud::placementOverlay(const Camera& camera) {
     if (runtime_.heroes()) {
         for (const auto& hero : runtime_.heroes()->heroes()) {
             const bool selectedHero = runtime_.selectedHero() && runtime_.selectedHero()->id == hero.id;
-            if (selectedHero || hoveredObject_ == hero.object) {
+            if (!selectedHero && hoveredObject_ == hero.object) {
                 ring(hero.position,
                      runtime_.heroes()->definition(hero).radius + 0.12,
                      selectedHero ? IM_COL32(90, 220, 180, 190) : IM_COL32(225, 210, 160, 130));
@@ -1014,20 +1066,20 @@ void GameHud::placementOverlay(const Camera& camera) {
     }
     for (const auto& tower : runtime_.navigation().towers().towers()) {
         const bool selectedTower = runtime_.inspectedTower() && runtime_.inspectedTower()->object == tower.object;
-        if (selectedTower || hoveredObject_ == tower.object) {
+        if (!selectedTower && hoveredObject_ == tower.object) {
             const auto center = tower.position - glm::dvec3{0, tower.halfExtent.y, 0};
             ring(center,
                  std::max(tower.halfExtent.x, tower.halfExtent.z) + 0.12,
                  selectedTower ? IM_COL32(90, 220, 180, 190) : IM_COL32(225, 210, 160, 130));
         }
     }
-    if (orderPosition_ && orderRemaining_ > 0) {
+    if (orderAttack_ && orderPosition_ && orderRemaining_ > 0) {
         const auto center = *orderPosition_ + glm::dvec3{0, 0.03, 0};
         const std::array<glm::dvec3, 4> marker{center + glm::dvec3{-0.12, 0, 0},
                                                center + glm::dvec3{0, 0, 0.12},
                                                center + glm::dvec3{0.12, 0, 0},
                                                center + glm::dvec3{0, 0, -0.12}};
-        polygon(marker, orderAttack_ ? IM_COL32(240, 90, 65, 180) : IM_COL32(70, 200, 185, 180));
+        polygon(marker, IM_COL32(240, 90, 65, 180));
     }
     if (const auto* hero = runtime_.selectedHero()) {
         const auto* enemy = hero->combat.target ? runtime_.navigation().enemies()->find(*hero->combat.target) : nullptr;
@@ -1057,13 +1109,6 @@ void GameHud::placementOverlay(const Camera& camera) {
                     center + glm::dvec3{std::sin(b), 0, std::cos(b)} * cleave.radius};
                 polygon(vertices, IM_COL32(240, 200, 100, 65), false);
             }
-        }
-    }
-    if (runtime_.placing()) {
-        for (const auto& zone : runtime_.navigation().placement().zones()) {
-            const auto corners = zone.corners();
-            const std::array<glm::dvec3, 4> vertices{corners[0], corners[1], corners[2], corners[3]};
-            polygon(vertices, IM_COL32(35, 130, 90, 35));
         }
     }
     const auto* rangeTower = runtime_.preview() ? &*runtime_.preview() : runtime_.inspectedTower();

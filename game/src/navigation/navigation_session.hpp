@@ -35,7 +35,7 @@ public:
     void setDestination(std::optional<glm::dvec2> destination);
     void setDestinationHeight(double height);
     void selectAnimal(Engine& engine, EnemyTypeId type);
-    [[nodiscard]] std::optional<Tower> towerAt(const Ray& ray, const std::string& type = "basic", double yaw = 0) const;
+    [[nodiscard]] std::optional<Tower> towerAt(const Ray& ray, const std::string& type = "basic") const;
 
     void setPlacementEnabled(bool enabled) noexcept {
         placementEnabled_ = enabled;

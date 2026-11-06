@@ -106,6 +106,13 @@ void TowerSystem::synchronize(Engine& engine) {
                 tower = definition(type).instance();
             }
             tower.object = id;
+            tower.buildZone = 0;
+            for (auto parent = object.parent; parent; parent = scene->object(*parent).parent) {
+                if (scene->object(*parent).role == "grimlock.build_zone") {
+                    tower.buildZone = *parent;
+                    break;
+                }
+            }
             tower.position = world[3];
             glm::dmat3 orientation{world};
             for (int axis = 0; axis < 3; ++axis) {
@@ -206,14 +213,15 @@ void TowerSystem::synchronize(Engine& engine) {
     }
 }
 
-ObjectId TowerSystem::create(Engine& engine, const Tower& tower) {
+ObjectId TowerSystem::create(Engine& engine, const Tower& tower, ObjectId constructionPoint) {
     if (!engine.scene()) {
         throw std::logic_error("Tower creation requires an active scene.");
     }
     synchronize(engine);
     auto& scene = *engine.scene();
     const auto& configured = definition(tower.type);
-    const auto id = scene.createObject(configured.name);
+    const auto id =
+        scene.createObject(configured.name, constructionPoint ? std::optional{constructionPoint} : std::nullopt);
     try {
         scene.setRole(id, tower.type == "basic" ? towerRole : "grimlock.tower:" + tower.type);
         scene.setModel(id, tower.model);
@@ -221,6 +229,10 @@ ObjectId TowerSystem::create(Engine& engine, const Tower& tower) {
         transform.position = tower.position;
         transform.rotation = tower.rotation;
         transform.scale = tower.visualScale;
+        if (constructionPoint) {
+            transform.position = {0, tower.halfExtent.y, 0};
+            transform.rotation = {1, 0, 0, 0};
+        }
         scene.setTransform(id, transform);
         scene.setTint(id, configured.tint);
         engine.prepareScene(scene);

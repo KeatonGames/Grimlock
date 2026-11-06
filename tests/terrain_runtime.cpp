@@ -2,6 +2,7 @@
 #include "runtime/level_runtime.hpp"
 #include "systems/melee_navigation.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -167,6 +168,26 @@ void terrain(Engine& engine) {
     require(mesh.revision() == meshRevision, "debug grid changes rebuilt imported terrain navigation");
     NavigationPath path;
     require(mesh.findPath({-6, 0, 0}, {10, 2, 0}, path), "ramp did not connect lower and upper surfaces");
+    const auto surfaceCorners = mesh.corners({-6, 0, 0}, path, true);
+    const auto rampRoute = mesh.movementRoute({-6, 0, 0}, path);
+    require(!rampRoute.empty() &&
+                std::all_of(rampRoute.begin(),
+                            rampRoute.end(),
+                            [&](glm::dvec3 point) {
+                                return mesh.contains(point);
+                            }) &&
+                std::any_of(rampRoute.begin(),
+                            rampRoute.end(),
+                            [](glm::dvec3 point) {
+                                return point.y > 0.5 && point.y < 1.5;
+                            }),
+            "Movement route visual floated above the ramp or omitted its intermediate heights");
+    require(surfaceCorners.size() > 2 && std::all_of(surfaceCorners.begin(),
+                                                     surfaceCorners.end(),
+                                                     [&](glm::vec3 point) {
+                                                         return mesh.contains(point, 0.1);
+                                                     }),
+            "Visual path omitted ramp crossings or left the navigable surface");
     require(!mesh.findPath({-6, 0, 0}, {-2, 3, 11}, path), "agents jumped to an isolated overlook");
     require(meleeContact(mesh, {4, 1.05, 0}, 0.16, {{4.8, 1.45, 0}, 0.16}, 0.8),
             "valid melee contact on a connected ramp was rejected");
@@ -192,8 +213,10 @@ void terrain(Engine& engine) {
     slope.position = {4, 1 + slope.halfExtent.y, 0};
     require(!geometry.supportError(slope).empty(), "steep ramp accepted an upright tower foundation");
     const auto object = navigation.placeTower(engine, *tower);
-    require(!navigation.navigation().contains({7.7, 2, 1.2}), "hill tower did not obstruct navigation");
-    require(navigation.removeTower(engine, object) && navigation.navigation().contains({7.7, 2, 1.2}),
+    require(!navigation.navigation().contains({tower->position.x, 2, tower->position.z}),
+            "hill tower did not obstruct navigation");
+    require(navigation.removeTower(engine, object) &&
+                navigation.navigation().contains({tower->position.x, 2, tower->position.z}),
             "removing a hill tower did not restore navigation");
 
     HeroSystem heroes{engine};

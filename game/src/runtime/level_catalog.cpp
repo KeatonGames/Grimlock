@@ -17,6 +17,7 @@ LevelCatalog discoverLevels(const std::filesystem::path& assetRoot) {
         for (const auto& enemy : loadAnimalDefinitions(assetRoot)) {
             if (enemy.despawnOnArrival) {
                 enemies.insert(enemy.name);
+                enemies.insert(enemy.aliases.begin(), enemy.aliases.end());
             }
         }
     } catch (const std::exception& error) {

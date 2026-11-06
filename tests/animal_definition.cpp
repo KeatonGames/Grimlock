@@ -48,10 +48,11 @@ int main(int argc, char** argv) {
         require(boss.boss && !grunt.boss && boss.maximumHealth > siege.maximumHealth && boss.radius > siege.radius &&
                     boss.height > siege.height && boss.visualHeight > siege.visualHeight,
                 "boss marker/statistics/independent dimensions missing");
-        require(grunt.name == "Grunt" && grunt.combat.objectiveFirst && grunt.model == definitions[0].model &&
+        require(grunt.name == "Goblin" && grunt.matchesName("Grunt") && grunt.combat.firstDetected &&
+                    !grunt.combat.objectiveFirst && grunt.model == "enemies/orcs/character-orc.glb" &&
                     siege.name == "Siege" && siege.maximumHealth > grunt.maximumHealth && siege.speed < grunt.speed &&
                     siege.combat.towerPriority > siege.combat.heroPriority && siege.combat.towerDamageModifier == 2 &&
-                    hunter.name == "Hunter" && hunter.maximumHealth < grunt.maximumHealth &&
+                    hunter.name == "Hunter" && hunter.maximumHealth > grunt.maximumHealth &&
                     hunter.speed > grunt.speed && hunter.combat.heroPriority > hunter.combat.towerPriority,
                 "archetype statistics or independent animal inheritance incorrect");
         auto invalid = definitions.front();

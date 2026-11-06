@@ -19,8 +19,9 @@ and development tools. Game does not link Editor or GameDebug.
 - Scene editor with model placement, grouping, duplication/deletion, transform editing, scene saving/loading and animation controls.
 - Optional XZ navigation grid with configurable dimensions/origin/cell size, walkability painting, revision tracking and scene serialization.
 - Imported 3D terrain with elevation-aware Recast navigation, tower placement and combat; see [terrain authoring](docs/terrain.md).
+- One tower per Editor-authored construction zone, with fixed construction points and facing; see [build zones](docs/build_zones.md).
 - Terrain-aware targeting and swept projectile collision, with optional Editor visibility rays; see [combat and cover](docs/combat.md).
-- Data-driven Grunt, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
+- Data-driven Goblin, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
 - Boss definitions reuse enemy combat/navigation and add stacked Game HUD health bars; see [boss encounters](docs/bosses.md).
 - Main menu and automatic discovery of Editor-authored levels, with in-game switching and restart; see [level selection](docs/level_selection.md).
 - Persistent attempts, victories, completion records and last played in user data; see [progression](docs/progression.md).

@@ -209,6 +209,10 @@ void Scene::setEnabled(ObjectId id, bool enabled) {
     (void)selectedObject();
 }
 
+void Scene::setSelectionHighlight(ObjectId id, bool enabled) {
+    objects_.at(id).selectionHighlight = enabled;
+}
+
 void Scene::setSelectable(ObjectId id, bool selectable) {
     objects_.at(id).selectable = selectable;
     (void)selectedObject();

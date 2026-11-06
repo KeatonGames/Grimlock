@@ -430,7 +430,7 @@ glm::dvec3 NavMesh::move(glm::dvec3 position, glm::dvec2 displacement) const {
     return result;
 }
 
-std::vector<glm::vec3> NavMesh::corners(glm::dvec3 position, const NavigationPath& path) const {
+std::vector<glm::vec3> NavMesh::corners(glm::dvec3 position, const NavigationPath& path, bool surfaceCrossings) const {
     std::vector<glm::vec3> result;
     if (!data_ || !path.valid || path.revision != revision_ || path.polygons.empty() || !finite(position) ||
         path.polygons.size() > maximumPath || !finite(path.destination)) {
@@ -447,13 +447,58 @@ std::vector<glm::vec3> NavMesh::corners(glm::dvec3 position, const NavigationPat
                                                        nullptr,
                                                        nullptr,
                                                        &count,
-                                                       maximumPath))) {
+                                                       maximumPath,
+                                                       surfaceCrossings ? DT_STRAIGHTPATH_ALL_CROSSINGS : 0))) {
         result.reserve(count);
         for (int i = 0; i < count; ++i) {
             result.emplace_back(points[i * 3], points[i * 3 + 1], points[i * 3 + 2]);
         }
     }
     return result;
+}
+
+std::vector<glm::dvec3> NavMesh::movementRoute(glm::dvec3 position,
+                                               const NavigationPath& path,
+                                               std::optional<glm::dvec3> waypoint) const {
+    if (!path.valid || path.revision != revision_ || !contains(position)) {
+        return {};
+    }
+    auto corridor = path;
+    std::vector<glm::dvec3> result{position};
+    constexpr double sampleDistance = 0.08;
+    for (int sample = 0; sample < 8192; ++sample) {
+        double remaining = 0;
+        auto target = steering(position, corridor, &remaining);
+        if (!target && findPath(position, path.destination, corridor)) {
+            target = steering(position, corridor, &remaining);
+        }
+        if (!target) {
+            return {};
+        }
+        if (remaining <= 0.02) {
+            if (glm::distance(result.back(), path.destination) > 1e-6) {
+                result.push_back(path.destination);
+            }
+            return result;
+        }
+        if (waypoint && glm::length(glm::dvec2{*waypoint - position}) > 0.12 && visible(position, *waypoint)) {
+            target = waypoint;
+        } else {
+            waypoint.reset();
+        }
+        const glm::dvec2 offset{target->x - position.x, target->z - position.z};
+        const auto distance = glm::length(offset);
+        if (distance < 1e-8) {
+            return {};
+        }
+        const auto next = move(position, offset / distance * std::min({sampleDistance, distance, remaining}));
+        if (glm::distance(next, position) < 1e-7) {
+            return {};
+        }
+        result.push_back(next);
+        position = next;
+    }
+    return {};
 }
 
 } // namespace grimlock::game

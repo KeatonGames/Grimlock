@@ -206,7 +206,7 @@ void selection(Engine& engine) {
     for (const auto* path :
          {"assets/levels/first_watch.json", "assets/levels/hill_watch.json", "assets/levels/first_watch.json"}) {
         runtime.load(engine, path);
-        require(runtime.heroes()->heroes().size() == runtime.level().waves()->definition().heroSpawns.size() &&
+        require(runtime.heroes()->heroes().size() == runtime.heroes()->typeCount() &&
                     runtime.navigation().enemies()->registry().size() == 0 && !runtime.selectedHero() &&
                     !runtime.inspectedTower(),
                 "repeated level load retained entities or selection");

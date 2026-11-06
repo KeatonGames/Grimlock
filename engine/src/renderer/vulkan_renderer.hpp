@@ -32,6 +32,7 @@ struct ModelDraw {
     std::optional<std::size_t> materialOverride; // Share geometry in the PBR comparison scene.
     const assets::ModelPose* pose = nullptr;     // Instance-owned; immutable for the duration of drawFrame.
     bool selected = false;
+    float dissolve = 0;
 };
 
 struct GridDraw {

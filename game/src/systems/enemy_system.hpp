@@ -35,6 +35,9 @@ public:
     [[nodiscard]] std::size_t deathEffectCount() const noexcept {
         return deaths_.size();
     }
+    [[nodiscard]] std::size_t coinEffectCount() const noexcept {
+        return coins_.size();
+    }
 
     void setSpeed(double speed, EnemyTypeId type = 0);
     void setSpawnSpeed(double speed, EnemyTypeId type);
@@ -107,11 +110,19 @@ private:
         std::optional<std::size_t> movementClip;
         std::optional<std::size_t> deathClip;
         std::optional<std::size_t> attackClip;
+        std::optional<std::size_t> idleClip, runClip;
     };
 
     struct DeathEffect {
         InstanceId instance;
         double remaining;
+        bool finishAnimation = false;
+        double dissolveTime = 0;
+    };
+    struct CoinEffect {
+        InstanceId instance;
+        glm::dvec3 origin;
+        double age = 0;
     };
 
     void loadModel(EnemyTypeId type);
@@ -126,6 +137,8 @@ private:
     mutable EnemyNeighbors queryNeighbors_;
     mutable bool neighborsDirty_ = true;
     std::vector<DeathEffect> deaths_;
+    std::vector<CoinEffect> coins_;
+    std::optional<ModelId> coinModel_;
     std::uint64_t nextSpawnOrder_ = 1;
     CrowdMovement movement_;
     EnemyNeighbors spawnNeighbors_;

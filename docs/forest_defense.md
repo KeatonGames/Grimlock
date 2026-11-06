@@ -74,17 +74,15 @@ continues to report them and omit zero-area triangles.
 
 ## Handcrafted waves and economy
 
-The player starts with **120 gold** and an Assassin in the clearing. Ranger and
-Warrior deployment remains available through the current hero selector. The
-objective has **10 health**, with one point lost per arriving enemy.
+The player starts with **120 gold** and Knight, Ranger and Mage near the objective. The objective has **10 health**, with one point lost per arriving enemy.
 
 | Wave | Exact composition | Fixed reward |
 | --- | --- | --- |
-| Scouts on the trail | 6 Chickens | 30 |
-| Beneath the roots | 6 Chickens, 4 Black Rats | 40 |
-| The woodland raiders | 6 Grunts, 4 Dogs, 2 Siege | 50 |
-| Hold the ascent | 6 Grunts, 4 Hunters, 2 Siege | 70 |
-| The Iron Stag | 8 Grunts, 2 Siege, 1 Iron Stag | 0 |
+| Scouts on the trail | 6 Goblins | 30 |
+| Beneath the roots | 10 Goblins | 40 |
+| The woodland raiders | 10 Goblins, 2 Siege | 50 |
+| Hold the ascent | 6 Goblins, 4 Hunters, 2 Siege | 70 |
+| The Iron Stag | 8 Goblins, 2 Siege, 1 Iron Stag | 0 |
 
 All 51 enemies, batch sizes, intervals and group start times are explicit in the
 level JSON. The final boss starts 19 seconds into wave five. Tower/enemy/hero
@@ -93,9 +91,9 @@ existing **Start Wave** button; preparation, rewards, victory, defeat, retry and
 level selection retain their normal lifecycle.
 
 One verified defense uses a Small Tower at (-8, 0, -2), Large Tower at (0, 0, 0),
-and Small Tower at (6.8, 2, 10.5). Reposition the Assassin near (-6, 0, -2), deploy
-Ranger near (2, 0, 0) and Warrior near (-4, 0, 0), and improve surviving towers
-between waves. Cleave helps against clustered attackers. This plan completes all
+and Small Tower at (6.8, 2, 10.5). Reposition the Knight near (-6, 0, -2), move
+Ranger near (2, 0, 0) and Mage near (-4, 0, 0), and improve surviving towers
+between waves. Mage uses its basic splash attack against clustered attackers. This plan completes all
 five waves and kills the boss with the objective intact; leaving the initial hero
 without tower construction loses. These checks establish playable win/lose paths,
 not that every placement combination is equally effective.

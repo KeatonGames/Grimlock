@@ -4,7 +4,7 @@ struct DrawData {
     float4x4 model;
     float4 normalColumn0; // W = sign of model determinant.
     float4 normalColumn1; // W = selection highlight; XYZ still stores the normal matrix.
-    float4 normalColumn2;
+    float4 normalColumn2; // W = instance disintegration amount.
     float4 baseColor;
 };
 struct PointLight { float4 positionRange; float4 colorIntensity; };
@@ -160,6 +160,13 @@ float3 selectionHighlight(float3 color, VertexOutput input) {
 [shader("fragment")]
 float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Target0 {
     float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
+    if (draw.normalColumn2.w > 0) {
+        float3 cell = floor(input.worldPosition * 28);
+        float noise = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+        if (noise < draw.normalColumn2.w) discard;
+        float edge = 1 - smoothstep(draw.normalColumn2.w, draw.normalColumn2.w + 0.08, noise);
+        base.rgb = lerp(base.rgb, float3(1, 0.55, 0.08), edge);
+    }
     if (material.state.x > 0.5 && material.state.x < 1.5 && base.a < material.factors.w) discard;
     if (material.state.x < 1.5) base.a = 1;
     if (material.state.z > 0.5) return float4(selectionHighlight(base.rgb,input), base.a);

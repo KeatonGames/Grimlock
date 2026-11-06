@@ -140,7 +140,7 @@ int main() {
         runtimeChecks(engine);
         LevelRuntime runtime;
         runtime.load(engine, "assets/levels/cover_watch.json");
-        require(runtime.navigation().combatGeometry().revision() > 0 && runtime.heroes()->heroes().size() == 1,
+        require(runtime.navigation().combatGeometry().revision() > 0 && runtime.heroes()->heroes().size() == 3,
                 "terrain combat scene did not load");
         require(!runtime.navigation().combatGeometry().visible({7.7, 3.3, 1.2}, {3, 0.8, 1.2}, 11),
                 "authored mountain did not shelter the valley");

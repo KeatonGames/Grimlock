@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <iomanip>
 #include <iostream>
 #include <numeric>
@@ -25,11 +26,27 @@ using namespace grimlock::game;
 
 namespace {
 void measure(Engine& engine, LevelRuntime& runtime, SDL_Window* window, const char* name, int samples, bool world) {
+    if (!world && runtime.level().waves()) {
+        for (int frame = 0; frame < 4; ++frame) {
+            if (!engine.update()) {
+                throw std::runtime_error("Gameplay stress window closed before HUD measurement");
+            }
+        }
+    }
     SDL_Event event{};
     event.type = SDL_EVENT_MOUSE_MOTION;
     event.motion.windowID = SDL_GetWindowID(window);
     event.motion.x = world ? 480 : 35;
     event.motion.y = world ? 220 : 35;
+    if (!world && runtime.level().waves()) {
+        const auto* health = ImGui::FindWindowByName("Objective Health");
+        if (!health || !health->Active) {
+            throw std::runtime_error("Gameplay stress objective HUD is missing");
+        }
+        const auto center = health->Rect().GetCenter();
+        event.motion.x = center.x;
+        event.motion.y = center.y;
+    }
     SDL_WarpMouseInWindow(window, event.motion.x, event.motion.y);
     SDL_PushEvent(&event);
     std::vector<double> frames;
@@ -129,11 +146,11 @@ int main(int argc, char** argv) {
             runtime.load(engine, "assets/levels/first_watch.json");
             for (std::size_t type = 1; type < runtime.heroes()->typeCount(); ++type) {
                 const glm::dvec3 point{6, 0, type == 1 ? -2 : 2};
-                (void)runtime.heroes()->deploy(point, {}, type);
+                (void)runtime.heroes()->deploy(point, runtime.heroes()->heroes()[type].id);
             }
             for (const auto* type : {"basic", "wide"}) {
                 auto tower = runtime.navigation().towers().definition(type).instance();
-                tower.position = {0, tower.halfExtent.y, tower.type == "basic" ? 2.5 : -2.5};
+                tower = runtime.navigation().placement().zones()[tower.type == "basic" ? 0 : 1].snap(tower);
                 (void)runtime.level().buildTower(engine, runtime.navigation(), tower);
             }
             if (pass == 0) {

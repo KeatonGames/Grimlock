@@ -1,84 +1,51 @@
-# Game interface
+# Game UI
 
-Grimlock Game uses a slate, warm gold and muted teal palette, vector command icons,
-rounded borders and clear type sizes. Main menu, selection, results, command cards,
-health meters and pause/settings share `ui/game_style.*`. Button outlines animate
-on hover, menus have a short entrance motion, and battle notices fade out. No art
-download, new UI framework or Vulkan rendering feature is required.
+Game uses its own HUD and input routing without Editor dependencies.
 
-## HUD and controls
+## Main layout
 
-- The top strip shows phase, wave, objective health, gold and **Pause**. The level
-  name, authored wave composition and reward are available on hover. Boss health stays below this strip, with individual
-  named crimson bars and overflow scrolling.
-- The bottom-left command dock contains tower cards with icons/costs, affordability
-  and selection states, hero selection, deployment and **Start Wave** during
-  Preparation. Hover a tower card for its combat values or disabled reason.
-- Selecting a tower opens its bottom-right health/statistics/upgrade card. It shows
-  next-level improvements, the actual upgrade cost, a disabled reason or MAX LEVEL.
-  The existing attack-range overlay and upgrade flash remain active.
-- Select a hero from its command portrait or the world. Its contextual card shows
-  health, current orders/target, combat statistics, Cancel Order and Cleave with a
-  readiness meter/countdown. Right-click orders and camera gestures are unchanged.
-- Placement keeps the existing terrain-aware checks and translucent preview, with
-  softer pulsing valid/invalid colors and a contextual rejection explanation.
-  Health bars have a contrasting frame, low-health tint and brief damage outline.
-- Wave-start/clear notices use real wave/reward data and do not intercept world
-  input. Existing target markers, hero orders and ability feedback are preserved.
+- Top left: round number.
+- Top center: objective health bar.
+- Top right: Start Wave, enabled during Preparation.
+- Bottom center: towers-only shop, with gold, prices and tower cards.
 
-**Escape** first cancels an active placement/deployment. Otherwise it pauses or
-resumes an active level. Pause also provides Resume, Settings, Restart Level,
-Choose Level, Main Menu and Quit. Leaving/restarting resets pause state. Result
-screens keep Retry, Next Level and level selection, with existing progression.
+The three top widgets have transparent backgrounds; the old status rectangle is
+removed. The shop has no hero roster, deployment controls, hero information or wave
+controls. Tower placement feedback remains inside the shop. Selecting a tower opens
+its upgrade/details panel above the shop. Boss encounters retain their health bars
+below the top row; transient wave notices and result screens keep their existing
+behavior.
 
-Escape resumes a paused placement without cancelling it; another Escape cancels
-the placement once gameplay resumes. Save failures keep a visible status warning
-with details on hover, and the strip grows to accommodate it without clipping.
+Knight, Ranger and Mage spawn near the objective automatically. Click a hero, then
+click ground to move it in Preparation or Battle. The Tower Defense kit corner marker and destination
+markers provide feedback without hero panels or world-space hero health bars.
+Clicking another hero changes selection; clicking a tower opens tower information.
+The marker uses `towers/structures/tower_defense/selection-a.glb` with its original
+orange material. It follows the selected unit, aligns to hero navigation slopes,
+and is a render-only instance removed on deselection, menus and HUD shutdown.
+Camera gestures and UI interactions do not issue map orders.
 
-Pause freezes navigation/movement, combat, cooldowns, wave scheduling, progression
-time and animation clocks while continuing to render UI. `LevelRuntime` owns the
-paused simulation flag. A small generic Engine animation-clock pause hook avoids
-altering individual playback settings; it defaults off and Editor never enables it.
+Escape cancels placement, clears selection/orders, then opens Pause. The Pause menu
+provides Resume, Settings, Restart Level, Choose Level, Main Menu and Quit. Settings
+controls session UI scale and world health bars. Pausing freezes simulation and
+animation clocks while allowing UI rendering. Result screens retain Retry, Next
+Level and level selection.
 
-Settings are available from the main menu and Pause. UI Scale and World Health
-Bars are session preferences. Boss health remains visible regardless of the world
-bar setting. Settings does not introduce gameplay, graphics or progression options.
+## Layout and validation
 
-## Responsive layout and input
+The shop stays horizontally centered as the window and UI scale change. Top widgets
+remain anchored to their respective corners/center, without a full-width panel.
+Tower details have a separate area above the shop and can scroll when space is
+limited. Noninteractive wave notices remain transparent to world input.
 
-Font size and spacing scale together from logical window size and the UI scale
-preference. The status strip, bottom dock, selected-unit card and boss region have
-separate bounds. Smaller windows give contextual cards/long explanations scrolling
-instead of extending beyond the viewport. Selected-unit cards remain contextual;
-camera instructions and construction details live in Settings/tooltips rather than
-permanent debug text.
+Runtime checks cover automatic party placement, independent movement during
+Preparation, real click-to-select/click-to-move input, UI command capture, tower
+purchase/upgrade, pause/settings/restart, level switching and responsive bounds from
+640x480 through 1920x1080. Current build/test results are in
+`out/simple_hud_*.log`.
 
-UI hover and modal state explicitly suppress world selection and commands. Pause,
-settings and results capture input, release relative mouse mode and clear pending
-ground gestures. Returning to play restores camera navigation. Noninteractive
-notifications remain transparent to input.
 
-Editor keeps its own context, style and tools. Game UI does not reference or link
-Editor controls. Player saves, level discovery and combat definitions are unchanged.
-
-## Verification
-
-`Game.Ui` exercises actual Vulkan-rendered controls, pause/resume/restart, settings
-and real UI scaling, and verifies frozen movement, timing and animation while
-paused. It checks status/dock/hero/boss bounds and non-overlap at 1920x1080,
-1280x720, 960x540, 800x600 and 640x480, including an increased UI scale. Existing
-Game runtime tests cover tower purchase/upgrades, hero commands/abilities,
-selection, camera gestures and victory/defeat. Boss, menu/progression and Editor
-checks remain separate.
-
-Desktop screenshot capture was unavailable in this execution session (invalid
-desktop handle), so no screenshot is presented as a visual review. To inspect
-locally, launch Grimlock normally; `GameUiChecks.exe --preview` also holds a HUD
-scene and then the main menu for inspection. Verification logs are in
-`out/archive/phase33/`.
-
-Game and Editor builds pass in Debug and Release. Full suites passed 38/38 in each
-configuration (269.18 seconds Debug, 131.82 seconds Release); focused UI regressions
-were rerun after the final warning/escape refinements. Vulkan validation was enabled.
-A pre-existing C4456 shadow warning in `game/src/navigation/level_geometry.cpp`
-was observed during the full rebuild; this UI phase leaves that module unchanged.
+Debug Game and Editor builds pass. Across the full 45-check run and focused reruns,
+44 checks pass; the known Cleave-dependent Level.Playable small-tower strategy
+failure remains. Marker lifecycle, input, layout, forest, level-menu and gameplay
+stress checks pass on the final implementation.

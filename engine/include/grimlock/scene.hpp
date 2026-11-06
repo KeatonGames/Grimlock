@@ -45,7 +45,8 @@ struct SceneObject {
     std::optional<ObjectId> parent;
     std::optional<std::filesystem::path> model;
     bool enabled = true;
-    bool selectable = true; // Runtime policy only; intentionally not serialized.
+    bool selectable = true;         // Runtime policy only; intentionally not serialized.
+    bool selectionHighlight = true; // Independent of picking/selection; runtime visual policy only.
     glm::vec4 tint{1};
     std::optional<std::size_t> materialOverride;
     std::optional<AnimationSettings> initialAnimation;
@@ -106,6 +107,7 @@ public:
     void setParent(ObjectId id, std::optional<ObjectId> parent);
     void setEnabled(ObjectId id, bool enabled);
     void setSelectable(ObjectId id, bool selectable);
+    void setSelectionHighlight(ObjectId id, bool enabled);
 
     // Including inactive/empty objects is useful for tools; mouse picking keeps the default policy.
     void selectObject(std::optional<ObjectId> id, bool includeInactive = false);

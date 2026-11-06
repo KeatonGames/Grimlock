@@ -3,6 +3,8 @@
 #include "input/ground_command.hpp"
 #include "runtime/level_catalog.hpp"
 #include "runtime/level_runtime.hpp"
+#include "systems/build_zone_markers.hpp"
+#include "ui/hero_route_visual.hpp"
 
 #include <grimlock/imgui_overlay.hpp>
 
@@ -27,7 +29,6 @@ public:
     }
 
 private:
-    std::size_t heroType_ = 0;
     void configureUi() override;
     void transitions();
     void menu();
@@ -38,9 +39,12 @@ private:
     void bossHealth();
     void construction();
     void towerInfo();
-    void heroControls();
     void result();
     void placementOverlay(const Camera& camera);
+    void updateSelectionMarker();
+    void clearSelectionMarker();
+    void updateHeroPathPreview(const std::optional<Ray>& ray);
+    void heroMovementOverlay(const Camera& camera);
     void pauseMenu();
     void settings();
     void notifications();
@@ -54,7 +58,16 @@ private:
     GroundCommandGesture commandGesture_;
     std::optional<glm::vec2> commandCursor_;
     std::optional<ObjectId> hoveredObject_;
+    std::optional<InstanceId> selectionMarker_;
+    BuildZoneMarkers buildZoneMarkers_;
     std::optional<glm::dvec3> orderPosition_;
+    HeroId orderHero_ = 0, previewHero_ = 0;
+    NavigationPath hoverPath_;
+    HeroRouteVisual hoverRoute_;
+    std::map<HeroId, HeroRouteVisual> orderedRoutes_;
+    std::optional<glm::dvec3> hoverDestination_;
+    glm::dvec3 hoverOrigin_{0};
+    double hoverQueryTime_ = 0;
     float orderRemaining_ = 0;
     bool orderAttack_ = false, cancelWorldInput_ = false;
 
@@ -64,7 +77,6 @@ private:
     };
 
     std::vector<BossBar> bossBars_;
-    glm::vec2 statusSize_{0};
     enum class Screen {
         mainMenu,
         levels,
@@ -79,8 +91,8 @@ private:
     bool resultCatalogReady_ = false;
 
     struct Layout {
-        float scale = 1, gap = 16, top = 92;
-        float dockWidth = 760, dockHeight = 212, contextWidth = 320, contextHeight = 270;
+        float scale = 1, gap = 14, top = 62;
+        float dockWidth = 420, dockHeight = 124, contextWidth = 320, contextHeight = 270;
     } layout_;
 
     float uiScale_ = 1, entrance_ = 0;

@@ -24,6 +24,7 @@ struct TowerProgress : HealthComponent {
 struct Tower {
     ObjectId object = 0;
     ecs::Entity entity = 0; // Runtime identity; object is the Scene/Editor bridge only.
+    ObjectId buildZone = 0;
     std::string type = "basic";
     glm::dvec3 position{0}; // Center, not foot position.
     glm::dquat rotation{1, 0, 0, 0};

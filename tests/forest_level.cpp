@@ -184,8 +184,8 @@ void play(Engine& engine, bool defended) {
     };
     if (defended) {
         (void)heroes.deploy({-6, 0, -2}, assassin);
-        (void)heroes.deploy({2, 0, 0}, {}, 1);
-        (void)heroes.deploy({-4, 0, 0}, {}, 2);
+        (void)heroes.deploy({2, 0, 0}, heroes.heroes()[1].id);
+        (void)heroes.deploy({-4, 0, 0}, heroes.heroes()[2].id);
         west = build("basic", {-8, 0, -2});
         center = build("wide", {0, 0, 0});
         (void)build("basic", {6.8, 2, 10.5});
@@ -273,7 +273,7 @@ void play(Engine& engine, bool defended) {
             "Forest results did not persist through the shared progression system");
     runtime.restart(engine);
     require(session.waves()->phase() == LevelPhase::preparation && session.economy().gold() == 120 &&
-                navigation.towers().towers().empty() && runtime.heroes()->heroes().size() == 1,
+                navigation.towers().towers().empty() && runtime.heroes()->heroes().size() == 3,
             "Forest restart retained runtime state");
     runtime.unload(engine);
     require(engine.update() && engine.performance().instances == 0, "Forest unload retained render instances");

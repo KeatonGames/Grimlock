@@ -51,6 +51,15 @@ void click(Engine& engine, LevelRuntime& runtime, SDL_WindowID window, ImVec2 p)
     tick(engine, runtime);
 }
 
+void escape(Engine& engine, LevelRuntime& runtime, SDL_WindowID window);
+
+void pause(Engine& engine, LevelRuntime& runtime, SDL_WindowID window) {
+    for (int step = 0; step < 3 && !runtime.paused(); ++step) {
+        escape(engine, runtime, window);
+    }
+    require(runtime.paused(), "Escape did not open pause menu");
+}
+
 void control(Engine& engine, LevelRuntime& runtime, SDL_WindowID window, const char* panelName, const char* label) {
     auto* panel = ImGui::FindWindowByName(panelName);
     require(panel && panel->Active, "polished UI panel missing");
@@ -106,8 +115,8 @@ bool overlaps(const ImGuiWindow& a, const ImGuiWindow& b) {
 
 void layout() {
     const auto* v = ImGui::GetMainViewport();
-    const char* names[]{"Game Status", "Build Towers", "Hero Info", "Boss Health"};
-    for (int i = 0; i < 4; ++i) {
+    const char* names[]{"Round", "Objective Health", "Wave Controls", "Build Towers", "Boss Health"};
+    for (int i = 0; i < 5; ++i) {
         const auto* panel = ImGui::FindWindowByName(names[i]);
         require(panel && panel->Active, "responsive panel missing");
         require(panel->Pos.x >= v->Pos.x && panel->Pos.y >= v->Pos.y &&
@@ -124,6 +133,7 @@ void layout() {
 int main(int argc, char**) {
     try {
         Engine engine{EngineConfig{.windowTitle = "Game UI visual checks", .width = 1280, .height = 720}};
+        engine.setPerformanceEnabled(true);
         PlayerProgress unavailable;
         LevelRuntime runtime;
         runtime.load(engine, "assets/levels/first_watch.json");
@@ -135,14 +145,63 @@ int main(int argc, char**) {
         auto* window = windows[0];
         const auto id = SDL_GetWindowID(window);
         SDL_free(windows);
+        const auto frameModel =
+            engine.loadModel(engine.assetRoot() / "towers/structures/tower_defense/construction-zone.glb");
+        const auto frameInfo = engine.modelInfo(frameModel);
+        require(frameInfo.maximum.y - frameInfo.minimum.y <= 0.051F,
+                "Construction frame is an upright ribbon instead of matching the low selection corners");
+        const auto frameTriangles = engine.modelTriangles(frameModel);
+        const auto covered = [&](glm::vec2 point) {
+            return std::any_of(frameTriangles.begin(), frameTriangles.end(), [&](const auto& triangle) {
+                if (glm::cross(triangle[1] - triangle[0], triangle[2] - triangle[0]).y <= 1e-5F ||
+                    triangle[0].y < 0.049F || triangle[1].y < 0.049F || triangle[2].y < 0.049F) {
+                    return false;
+                }
+                const auto side = [&](glm::vec3 a, glm::vec3 b) {
+                    return (b.x - a.x) * (point.y - a.z) - (b.z - a.z) * (point.x - a.x);
+                };
+                const float a = side(triangle[0], triangle[1]), b = side(triangle[1], triangle[2]),
+                            c = side(triangle[2], triangle[0]);
+                return (a >= -1e-5F && b >= -1e-5F && c >= -1e-5F) || (a <= 1e-5F && b <= 1e-5F && c <= 1e-5F);
+            });
+        };
+        require(covered({0.435F, 0}) && covered({-0.435F, 0}) && covered({0, 0.435F}) && covered({0, -0.435F}) &&
+                    !covered({0, 0}),
+                "Construction frame is not a complete square with an open center");
+        const auto availableZoneInstances = engine.performance().instances;
+        const auto buildPoint = runtime.navigation().placement().zones().front();
+        const auto tower = buildPoint.snap(runtime.navigation().towers().definition("basic").instance());
+        const auto built = runtime.level().buildTower(engine, runtime.navigation(), tower);
+        tick(engine, runtime);
+        require(engine.performance().instances + 1 == availableZoneInstances,
+                "Constructing a tower did not remove its available-zone frame");
+        require(runtime.navigation().towers().applyDamage(engine, built, 10000),
+                "Build-zone marker death fixture failed");
+        tick(engine, runtime);
+        require(engine.performance().instances == availableZoneInstances,
+                "Destroying a tower did not restore its build-zone frame");
+        runtime.restart(engine);
+        tick(engine, runtime);
         runtime.beginPlacement("basic");
-        control(engine, runtime, id, "Game Status", "Pause");
         escape(engine, runtime, id);
-        require(!runtime.paused() && runtime.placing(), "Escape did not resume a paused placement");
+        require(!runtime.paused() && !runtime.placing(), "Escape did not cancel tower placement");
         escape(engine, runtime, id);
-        require(!runtime.paused() && !runtime.placing(), "Escape did not cancel placement before pausing");
+        require(runtime.paused(), "Escape did not pause after placement was canceled");
+        escape(engine, runtime, id);
+        require(!runtime.paused(), "Escape did not resume");
         const auto hero = runtime.heroes()->heroes().front().id;
+        const auto instancesBeforeSelection = engine.performance().instances;
+        const auto objectsBeforeSelection = engine.scene()->objects().size();
         require(runtime.selectHero(hero), "hero roster selection failed");
+        tick(engine, runtime);
+        require(engine.performance().instances == instancesBeforeSelection + 1 &&
+                    engine.scene()->objects().size() == objectsBeforeSelection,
+                "Kit selection marker was not a separate render instance");
+        runtime.clearSelection();
+        tick(engine, runtime);
+        require(engine.performance().instances == instancesBeforeSelection,
+                "Kit selection marker survived deselection");
+        require(runtime.selectHero(hero), "Hero reselection failed");
         runtime.startWave();
         tick(engine, runtime);
         auto& enemies = *runtime.navigation().enemies();
@@ -160,7 +219,7 @@ int main(int argc, char**) {
         const auto actor = enemies.enemies().back().id;
         const auto instance = *enemies.find(actor)->instance;
         tick(engine, runtime, 5);
-        control(engine, runtime, id, "Game Status", "Pause");
+        pause(engine, runtime, id);
         require(runtime.paused() && !engine.cameraNavigationEnabled(), "Pause did not suspend gameplay/camera");
         const auto position = enemies.find(actor)->position;
         const auto elapsed = runtime.completionSeconds();
@@ -177,6 +236,7 @@ int main(int argc, char**) {
         control(engine, runtime, id, "Pause Menu", "Resume");
         require(!runtime.paused() && engine.cameraNavigationEnabled() && runtime.completionSeconds() > elapsed,
                 "resume did not restore gameplay");
+        require(runtime.selectHero(hero), "Hero selection after pause failed");
         escape(engine, runtime, id);
         require(!runtime.paused() && !runtime.selectedHero() && !runtime.inspectedTower(),
                 "Escape did not clear selection before pausing");
@@ -198,9 +258,15 @@ int main(int argc, char**) {
         tick(engine, runtime, 5);
         runtime.attachProgress(unavailable);
         tick(engine, runtime, 2);
-        const auto* status = ImGui::FindWindowByName("Game Status");
-        require(status->ContentSize.y <= status->Size.y - 2 * ImGui::GetStyle().WindowPadding.y + 1,
-                "save failure warning was clipped in the status strip");
+        const auto* shop = ImGui::FindWindowByName("Build Towers");
+        require(std::abs(shop->Pos.x + shop->Size.x * 0.5F - ImGui::GetMainViewport()->GetCenter().x) < 1,
+                "Tower shop is not centered");
+        require(!ImGui::FindWindowByName("Hero Info") && !ImGui::FindWindowByName("Game Status"),
+                "Removed hero/status information remained in the HUD");
+        for (const auto* name : {"Round", "Objective Health", "Wave Controls"}) {
+            require((ImGui::FindWindowByName(name)->Flags & ImGuiWindowFlags_NoBackground) != 0,
+                    "Top HUD regained a background panel");
+        }
         if (argc > 1) {
             SDL_RaiseWindow(window);
             for (int frame = 0; frame < 900; ++frame) {
@@ -208,7 +274,7 @@ int main(int argc, char**) {
                 SDL_Delay(16);
             }
         }
-        control(engine, runtime, id, "Game Status", "Pause");
+        pause(engine, runtime, id);
         control(engine, runtime, id, "Pause Menu", "Main Menu");
         require(!runtime.paused() && !engine.scene(), "returning to main menu retained pause/world state");
         if (argc <= 1) {

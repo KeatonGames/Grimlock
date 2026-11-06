@@ -81,7 +81,13 @@ public:
                                                      double* remaining = nullptr) const;
     [[nodiscard]] glm::dvec3 move(glm::dvec3 position, glm::dvec2 displacement) const;
     [[nodiscard]] bool visible(glm::dvec3 start, glm::dvec3 destination) const;
-    [[nodiscard]] std::vector<glm::vec3> corners(glm::dvec3 position, const NavigationPath& path) const;
+    [[nodiscard]] std::vector<glm::vec3> corners(glm::dvec3 position,
+                                                 const NavigationPath& path,
+                                                 bool surfaceCrossings = false) const;
+    // Read-only visual trace using the same steering and surface constraints as movement.
+    [[nodiscard]] std::vector<glm::dvec3> movementRoute(glm::dvec3 position,
+                                                        const NavigationPath& path,
+                                                        std::optional<glm::dvec3> waypoint = {}) const;
 
 private:
     [[nodiscard]] bool visibleFrom(const NavigationPoint& from, glm::dvec3 destination) const;

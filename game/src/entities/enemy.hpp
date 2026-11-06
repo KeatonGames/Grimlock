@@ -78,6 +78,7 @@ struct EnemyRuntimeComponent : HealthComponent {
     double retryInterval = 1, stuckTimeout = 2;
     double remainingDistance = 0;
     bool active = true, alive = true, animationMoving = false;
+    std::optional<std::size_t> locomotionClip;
     bool despawnOnArrival = true;
     NavigationPath path;
     std::optional<glm::dvec2> requestedDestination;

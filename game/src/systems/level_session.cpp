@@ -13,16 +13,17 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
     auto& enemies = *navigation.enemies();
     std::vector<EnemyTypeId> types;
     std::vector<SpawnRoute> routes;
-    for (const auto& wave : definition.waves) {
-        for (const auto& group : wave.groups) {
+    for (auto& wave : definition.waves) {
+        for (auto& group : wave.groups) {
             EnemyTypeId type = 0;
-            while (type < enemies.typeCount() && enemies.definition(type).name != group.enemy) {
+            while (type < enemies.typeCount() && !enemies.definition(type).matchesName(group.enemy)) {
                 ++type;
             }
             if (type == enemies.typeCount() || !enemies.definition(type).despawnOnArrival) {
                 throw std::invalid_argument("Wave requires an available enemy with despawn_on_arrival enabled: " +
                                             group.enemy);
             }
+            group.enemy = enemies.definition(type).name;
             const auto& mesh = navigation.surface(engine, type);
             const auto area = definition.spawns[group.spawn].area;
             const glm::dvec3 goal{definition.objectivePosition.x,

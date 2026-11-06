@@ -662,7 +662,7 @@ std::span<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(c
             const DrawConstants constants{transform,
                                           glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F},
                                           glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
-                                          glm::vec4{normal[2], 0.0F},
+                                          glm::vec4{normal[2], draw.dissolve},
                                           draw.baseColor};
             const auto nodeData = deformation_->appendNode(pose.joints[node.node], pose.weights[node.node]);
             for (const auto mesh : node.meshes) {

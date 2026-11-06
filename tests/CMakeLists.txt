@@ -179,6 +179,16 @@ add_test(NAME Economy.Cpu COMMAND EconomyChecks "${PROJECT_SOURCE_DIR}/game/asse
 add_executable(PlacementChecks placement.cpp)
 target_link_libraries(PlacementChecks PRIVATE GameLogic)
 add_test(NAME Towers.BuildZones COMMAND PlacementChecks "${PROJECT_SOURCE_DIR}/game/assets" "${CMAKE_CURRENT_BINARY_DIR}/build-zones.json")
+add_executable(UniqueBuildZoneChecks unique_build_zones.cpp)
+target_link_libraries(UniqueBuildZoneChecks PRIVATE GameLogic)
+set_target_properties(UniqueBuildZoneChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(UniqueBuildZoneChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET UniqueBuildZoneChecks POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:UniqueBuildZoneChecks> VERBATIM)
+endif()
+add_test(NAME Towers.UniqueZones COMMAND UniqueBuildZoneChecks)
+set_tests_properties(Towers.UniqueZones PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
 add_executable(WaveChecks wave.cpp)
 target_link_libraries(WaveChecks PRIVATE GameLogic)
 add_test(NAME Levels.Waves COMMAND WaveChecks "${PROJECT_SOURCE_DIR}/game/assets/levels/first_watch.json")
@@ -347,3 +357,13 @@ target_include_directories(AssetLibraryChecks PRIVATE "${PROJECT_SOURCE_DIR}/eng
 target_link_libraries(AssetLibraryChecks PRIVATE Engine nlohmann_json::nlohmann_json)
 add_test(NAME Assets.Library COMMAND AssetLibraryChecks "${PROJECT_SOURCE_DIR}/game/assets"
     "${PROJECT_SOURCE_DIR}/docs/asset_migration.json")
+
+add_executable(GoblinRuntimeChecks goblin_runtime.cpp)
+target_link_libraries(GoblinRuntimeChecks PRIVATE GameLogic)
+set_target_properties(GoblinRuntimeChecks PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(GoblinRuntimeChecks GrimlockShaders GrimlockAssets)
+if(WIN32)
+    add_custom_command(TARGET GoblinRuntimeChecks POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3::SDL3> $<TARGET_FILE_DIR:GoblinRuntimeChecks> VERBATIM)
+endif()
+add_test(NAME Goblin.Runtime COMMAND GoblinRuntimeChecks)

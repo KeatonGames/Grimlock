@@ -199,6 +199,7 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, s
         ecs::Entity entity = 0;
         try {
             engine_.scene()->setRole(object, "grimlock.hero");
+            engine_.scene()->setSelectionHighlight(object, false);
             engine_.scene()->setModel(object, config.model);
             engine_.prepareScene(*engine_.scene());
             auto& resources = *types_.at(type);

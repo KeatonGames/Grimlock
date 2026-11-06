@@ -12,7 +12,7 @@ enum class HeroAbility {
 // Combat decisions own no render resources. All damage goes through EnemySystem.
 class HeroCombatSystem final {
 public:
-    void update(HeroSystem& heroes, EnemySystem& enemies, double delta, bool battle);
+    void update(HeroSystem& heroes, EnemySystem& enemies, double delta, bool battle, bool allowManualMovement = false);
     [[nodiscard]] bool attack(HeroSystem& heroes, const EnemySystem& enemies, HeroId hero, EnemyId target);
     [[nodiscard]] bool activate(HeroSystem& heroes, HeroId hero, HeroAbility ability, bool battle);
     [[nodiscard]] static std::optional<EnemyId> pick(Engine& engine, const EnemySystem& enemies, const Ray& ray);

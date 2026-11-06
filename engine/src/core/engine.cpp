@@ -330,7 +330,7 @@ struct Engine::Impl {
 
         for (const auto& [id, object] : activeScene->objects_) {
             if (object.instance_ && object.visible_) {
-                sceneDraws.at(draw++).selected = selected == id;
+                sceneDraws.at(draw++).selected = selected == id && object.selectionHighlight;
             }
         }
     }
@@ -709,6 +709,13 @@ glm::mat4 Engine::transform(InstanceId instance) const {
 
 void Engine::setTint(InstanceId instance, const glm::vec4& color) {
     impl_->draws[impl_->instanceIndex(instance)].baseColor = color;
+}
+
+void Engine::setDissolve(InstanceId instance, float amount) {
+    if (!std::isfinite(amount) || amount < 0 || amount > 1) {
+        throw std::invalid_argument("Dissolve amount must be finite and between zero and one.");
+    }
+    impl_->draws[impl_->instanceIndex(instance)].dissolve = amount;
 }
 
 void Engine::setMaterialOverride(InstanceId instance, std::optional<std::size_t> material) {
