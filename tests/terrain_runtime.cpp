@@ -105,6 +105,24 @@ void footprints(Engine& engine) {
     geometry.synchronize(engine);
     require(geometry.supportError(tower).empty(), "disabled obstacle retained placement references");
     std::filesystem::remove(file);
+
+    const auto diagonal = engine.assetRoot() / "models/terrain_diagonal_fixture.obj";
+    {
+        std::ofstream output{diagonal};
+        output << "v -1 0 -1\nv -1 0 1\nv 1 0 -1\nv 1 0 1\nf 4 1 2\nf 1 4 3\n";
+        require(static_cast<bool>(output), "could not write diagonal support fixture");
+    }
+    auto square = std::make_unique<Scene>("Diagonal foundation fixture");
+    const auto floor = square->createObject("Two coplanar triangles");
+    square->setModel(floor, "models/terrain_diagonal_fixture.obj");
+    square->setRole(floor, "grimlock.terrain");
+    engine.setScene(std::move(square));
+    geometry.synchronize(engine);
+    require(geometry.supportError(tower).empty(), "clipping repeated diagonal corners rejected a flat foundation");
+    tower.position.x = 0.8;
+    require(!geometry.supportError(tower).empty(), "diagonal repair concealed a foundation overhang");
+    engine.unloadScene();
+    std::filesystem::remove(diagonal);
 }
 
 void terrain(Engine& engine) {

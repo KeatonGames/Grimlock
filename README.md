@@ -9,6 +9,8 @@ and development tools. Game does not link Editor or GameDebug.
 
 ## Features
 
+- **Level 01 - Forest Defense:** a handcrafted Kenney woodland with two elevations,
+  strategic build areas, five fixed waves and an Iron Stag finale; see [the level guide](docs/forest_defense.md).
 - Vulkan 1.3+ Dynamic Rendering and Synchronization2, with window resizing and deterministic cleanup.
 - OBJ and glTF/GLB loading, textured PBR materials, punctual lights, image-based lighting and HDR tone mapping.
 - Shared model resources with independent skeletal, node and morph animation playback per instance.
@@ -85,6 +87,10 @@ cmake --build --preset debug --parallel 4
 
 # Scene editor
 .\out\build\debug\Debug\GrimlockEditor.exe
+
+# Open the handcrafted forest directly
+.\out\build\debug\Debug\Grimlock.exe assets/levels/forest_defense.json
+.\out\build\debug\Debug\GrimlockEditor.exe --level assets/levels/forest_defense.json
 ```
 
 For Release:

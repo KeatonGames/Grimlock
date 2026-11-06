@@ -55,6 +55,11 @@ void subtractSupport(std::vector<Polygon>& unsupported, std::span<const glm::dve
     for (auto piece : unsupported) {
         for (std::size_t i = 0; i < cover.size() && !piece.empty(); ++i) {
             const auto edge = cover[(i + 1) % cover.size()] - cover[i];
+            // Footprint clipping can repeat a corner on a triangle diagonal.
+            // A zero-length edge has no outside half-plane to subtract.
+            if (glm::dot(edge, edge) < 1e-20) {
+                continue;
+            }
             auto outside = clipEdge(piece, cover[i], edge, -sign);
             if (std::abs(signedArea(outside)) > 1e-10) {
                 remaining.push_back(std::move(outside));

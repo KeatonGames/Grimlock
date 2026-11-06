@@ -84,6 +84,7 @@ private:
     std::filesystem::path pendingPath_;
     std::string filePath_, error_, dialogError_;
     std::size_t modelIndex_ = 0;
+    ImGuiTextFilter modelFilter_;
 
     std::optional<ObjectId> rotationObject_;
     std::optional<ObjectId> hierarchySelection_;

@@ -1,0 +1,38 @@
+{
+  "id": "68369f21-3bfd-4d83-a5c2-c09c52922401",
+  "version": 1,
+  "name": "Level 01 - Forest Defense",
+  "description": "Hold the winding woodland trail, command the rocky lookout, and defend the forest obelisk above a broad grassy ramp. Five handcrafted waves culminate in the Iron Stag.",
+  "scene": "scenes/forest_defense.json",
+  "starting_gold": 120,
+  "hero_spawns": [[0, 0, 0]],
+  "objective": {"position": [4, 12], "height": 2, "health": 10, "damage_per_arrival": 1},
+  "spawns": [
+    {"name": "Woodland entrance", "minimum": [-10.8, -4.3], "maximum": [-9.2, -3.7], "height": 0},
+    {"name": "Iron Stag entrance", "minimum": [-10, -4], "maximum": [-10, -4], "height": 0}
+  ],
+  "waves": [
+    {"name": "Scouts on the trail", "gold_reward": 30, "groups": [
+      {"enemy": "Chicken", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4}
+    ]},
+    {"name": "Beneath the roots", "gold_reward": 40, "groups": [
+      {"enemy": "Chicken", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Black Rat", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3}
+    ]},
+    {"name": "The woodland raiders", "gold_reward": 50, "groups": [
+      {"enemy": "Grunt", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Dog", "count": 4, "spawn": "Woodland entrance", "start": 6, "batch_size": 2, "interval": 3},
+      {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 13, "batch_size": 1, "interval": 5}
+    ]},
+    {"name": "Hold the ascent", "gold_reward": 70, "groups": [
+      {"enemy": "Grunt", "count": 6, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Hunter", "count": 4, "spawn": "Woodland entrance", "start": 5, "batch_size": 2, "interval": 4},
+      {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 12, "batch_size": 1, "interval": 5}
+    ]},
+    {"name": "The Iron Stag", "gold_reward": 0, "groups": [
+      {"enemy": "Grunt", "count": 8, "spawn": "Woodland entrance", "start": 0, "batch_size": 2, "interval": 4},
+      {"enemy": "Siege", "count": 2, "spawn": "Woodland entrance", "start": 9, "batch_size": 1, "interval": 5},
+      {"enemy": "Iron Stag", "count": 1, "spawn": "Iron Stag entrance", "start": 19, "batch_size": 1, "interval": 1}
+    ]}
+  ]
+}

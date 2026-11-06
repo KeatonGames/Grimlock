@@ -1,5 +1,10 @@
 # Sample models
 
+The supplied [Kenney Nature Kit](kenney_nature/README.md) contains 329 original CC0
+GLBs. [Forest Defense](../../../docs/forest_defense.md) is the complete handcrafted
+level built from these modular assets; models are shared through the existing
+scene resource cache.
+
 `hill_terrain.glb` is the handcrafted lower meadow, ramp, hill platform and isolated
 overlook used by Hill Watch and Cover Watch. `cover_rock.obj` adds Cover Watch's
 solid mountain ridge. Scene roles classify the terrain and combat blockers; see

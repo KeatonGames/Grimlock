@@ -114,6 +114,18 @@ void checkAssembly(const std::filesystem::path& output, const Json& document) {
     require(allRoots.roots == std::vector<std::size_t>{0, 3} && allRoots.maximum == glm::vec3{101, 3, 0} &&
                 allRoots.warnings.find("No scenes; selected all root nodes") != std::string::npos,
             "root-node fallback changed");
+
+    auto wrapped = document;
+    wrapped["nodes"][0]["translation"] = {0, 0, 0};
+    wrapped["nodes"][0]["children"] = {1};
+    wrapped["scenes"] = Json::array({{{"nodes", {1}}}});
+    wrapped["scene"] = 0;
+    const auto repaired = loadFixture(output, wrapped);
+    require(repaired.roots == std::vector<std::size_t>{1} && !repaired.nodes[1].parent &&
+                repaired.nodes[0].children.empty() && repaired.minimum == glm::vec3{1, 0, 0} &&
+                repaired.maximum == glm::vec3{2, 1, 0} &&
+                repaired.warnings.find("unused identity wrapper") != std::string::npos,
+            "unused identity export wrapper changed selected geometry or transform");
 }
 
 Json withSkin(Json document) {
@@ -172,6 +184,16 @@ void checkValidation(const std::filesystem::path& output, const Json& document) 
     bad = document;
     bad["nodes"][3]["children"] = {1};
     rejects(output, bad, "Invalid child or multiple node parents");
+
+    bad = document;
+    bad["scenes"] = Json::array({{{"nodes", {1}}}});
+    bad["scene"] = 0;
+    rejects(output, bad, "Invalid or repeated scene root");
+
+    bad["nodes"][0]["translation"] = {0, 0, 0};
+    bad["nodes"][0]["children"] = {1};
+    bad["nodes"][0]["mesh"] = 0;
+    rejects(output, bad, "Invalid or repeated scene root");
 
     bad = document;
     bad["nodes"][1]["weights"] = {0.5, 0.5};

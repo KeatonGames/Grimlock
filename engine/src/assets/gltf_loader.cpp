@@ -784,6 +784,32 @@ void selectModelRoots(const fastgltf::Asset& asset, ModelData& model) {
         const auto& roots = asset.scenes[scene].nodeIndices;
         model.roots.assign(roots.begin(), roots.end());
 
+        for (const auto root : model.roots) {
+            if (root >= model.nodes.size() || !model.nodes[root].parent) {
+                continue;
+            }
+            const auto parent = *model.nodes[root].parent;
+            auto& wrapper = model.nodes[parent];
+            const auto& source = asset.nodes[parent];
+            const bool referenced = std::any_of(asset.scenes.begin(), asset.scenes.end(), [&](const auto& entry) {
+                return std::find(entry.nodeIndices.begin(), entry.nodeIndices.end(), parent) != entry.nodeIndices.end();
+            });
+            const bool animated = std::any_of(asset.animations.begin(), asset.animations.end(), [&](const auto& clip) {
+                return std::any_of(clip.channels.begin(), clip.channels.end(), [&](const auto& channel) {
+                    return channel.nodeIndex == parent;
+                });
+            });
+            // Some static exporters retain an unused identity wrapper above the
+            // declared scene root. Discard only that harmless link, not real hierarchy.
+            if (!wrapper.parent && wrapper.children.size() == 1 && wrapper.localTransform == glm::mat4{1} &&
+                !source.meshIndex && !source.skinIndex && !source.lightIndex && !referenced && !animated) {
+                wrapper.children.clear();
+                model.nodes[root].parent.reset();
+                model.warnings +=
+                    "Ignored unused identity wrapper above selected scene root '" + model.nodes[root].name + "'.\n";
+            }
+        }
+
         if (!asset.defaultScene) {
             model.warnings += "No default scene; selected the first scene.\n";
         }

@@ -565,11 +565,25 @@ void Editor::hierarchy() {
         }
 
         ImGui::TextDisabled("Model asset");
+        modelFilter_.Draw("Filter models", 280);
+        if (!models.empty() && !modelFilter_.PassFilter(text(models[modelIndex_]).c_str())) {
+            const auto first = std::find_if(models.begin(), models.end(), [&](const auto& model) {
+                return modelFilter_.PassFilter(text(model).c_str());
+            });
+            if (first != models.end()) {
+                modelIndex_ = static_cast<std::size_t>(first - models.begin());
+            }
+        }
+        const bool available = !models.empty() && modelFilter_.PassFilter(text(models[modelIndex_]).c_str());
         ImGui::SetNextItemWidth(280);
 
-        if (ImGui::BeginCombo("##model", models.empty() ? "No models" : text(models[modelIndex_]).c_str())) {
+        if (ImGui::BeginCombo("##model", available ? text(models[modelIndex_]).c_str() : "No matching models")) {
             for (std::size_t i = 0; i < models.size(); ++i) {
                 const auto label = text(models[i]);
+
+                if (!modelFilter_.PassFilter(label.c_str())) {
+                    continue;
+                }
 
                 if (ImGui::Selectable(label.c_str(), modelIndex_ == i)) {
                     modelIndex_ = i;
@@ -579,7 +593,7 @@ void Editor::hierarchy() {
             ImGui::EndCombo();
         }
 
-        ImGui::BeginDisabled(models.empty());
+        ImGui::BeginDisabled(!available);
 
         if (ImGui::Button("Add to Scene")) {
             attempt([&] {
