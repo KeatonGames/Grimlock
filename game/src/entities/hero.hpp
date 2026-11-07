@@ -20,6 +20,7 @@ struct CleaveDefinition {
 };
 
 struct HeroCombatDefinition {
+    DamageType damageType = DamageType::physical;
     HeroAttack attack = HeroAttack::melee;
     double projectileSpeed = 12, projectileRadius = 0.06;
     float damage = 25;

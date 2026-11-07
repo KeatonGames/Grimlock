@@ -139,7 +139,7 @@ int main() {
         Engine engine{EngineConfig{.windowTitle = "Game runtime checks"}};
         engine.setPerformanceEnabled(true);
         const auto assetRoot = engine.assetRoot();
-        auto definition = loadLevelDefinition(assetRoot / "levels/first_watch.json");
+        auto definition = loadLevelDefinition(assetRoot / "test_fixtures/levels/first_watch.json");
         definition.id = createLevelId();
         auto scene = Scene::load(assetRoot / definition.scene);
         scene->setName("Editor-authored runtime fixture");
@@ -160,7 +160,7 @@ int main() {
         definition.waves[0].groups[0].batchSize = 1;
         definition.waves[0].groups[0].interval = 0.1;
         definition.waves[0].groups[0].start = 20;
-        const auto levelPath = assetRoot / "levels/game-runtime-edited.json";
+        const auto levelPath = assetRoot / "test_fixtures/levels/game-runtime-edited.json";
         saveLevelDefinition(levelPath, definition);
         const auto sceneBefore = contents(assetRoot / definition.scene), levelBefore = contents(levelPath);
         LevelRuntime runtime;
@@ -445,7 +445,8 @@ int main() {
             runtime.level().economy().gold() == 200 && runtime.level().waves()->health() == 30 &&
                 runtime.navigation().towers().towers().empty() && runtime.navigation().enemies()->enemies().empty() &&
                 runtime.navigation().enemies()->deathEffectCount() == 0 &&
-                runtime.level().combat()->shotsFired() == 0 && runtime.navigation().navigation().contains({-3.3, 0, 0}),
+                runtime.navigation().enemies()->coinEffectCount() == 0 && runtime.level().combat()->shotsFired() == 0 &&
+                runtime.navigation().navigation().contains({-3.3, 0, 0}),
             "game restart retained runtime state");
         require(runtime.heroes()->heroes().size() == 3 && !runtime.selectedHero() &&
                     runtime.heroes()->heroes().front().health == 100 &&

@@ -12,6 +12,7 @@ struct ProjectileDefinition {
     double splashRadius = 0;
     std::filesystem::path model;
     float visualScale = 0;
+    DamageType damageType = DamageType::physical;
 };
 
 struct ProjectileComponent {
@@ -26,6 +27,7 @@ struct ProjectileComponent {
     DefensiveTargetKind sourceKind = DefensiveTargetKind::tower;
     double splashRadius = 0;
     float visualScale = 0;
+    DamageType damageType = DamageType::physical;
 };
 
 using Projectile = ProjectileComponent;

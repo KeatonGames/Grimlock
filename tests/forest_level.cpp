@@ -192,6 +192,7 @@ void play(Engine& engine, bool defended) {
     }
     HeroCombatSystem abilities;
     bool bossSeen = false, bossDefeated = false, bossBarSeen = false;
+    bool skeletonSeen = false, ghostSeen = false;
     std::optional<EnemyId> boss;
     while (session.waves()->phase() == LevelPhase::preparation) {
         const auto wave = session.waves()->wave();
@@ -226,6 +227,8 @@ void play(Engine& engine, bool defended) {
             }
             for (const auto& enemy : navigation.enemies()->enemies()) {
                 require(enemy.navigation->contains(enemy.position), "Forest enemy escaped navigation");
+                skeletonSeen = skeletonSeen || navigation.enemies()->definition(enemy.type).name == "Skeleton";
+                ghostSeen = ghostSeen || navigation.enemies()->definition(enemy.type).name == "Ghost";
                 if (navigation.enemies()->definition(enemy.type).boss) {
                     bossSeen = true;
                     boss = enemy.id;
@@ -260,6 +263,7 @@ void play(Engine& engine, bool defended) {
     require(session.waves()->phase() == (defended ? LevelPhase::victory : LevelPhase::defeat),
             "Forest does not distinguish defended and undefended strategies");
     if (defended) {
+        require(skeletonSeen && ghostSeen, "Forest waves did not exercise both new undead enemies");
         require(session.waves()->wave() == 5 && bossSeen && bossDefeated && bossBarSeen,
                 "Final forest boss or its health bar was not exercised");
         require(navigation.enemies()->metrics().defeated + navigation.enemies()->metrics().arrived == 51,

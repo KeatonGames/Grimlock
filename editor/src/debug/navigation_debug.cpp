@@ -407,7 +407,7 @@ void NavigationDebug::levelMenu(Engine& engine) {
     if (ImGui::BeginMenu("Level")) {
         if (ImGui::Button("Load First Watch")) {
             try {
-                requestLevelLoad(engine, engine.assetRoot() / "levels/first_watch.json");
+                requestLevelLoad(engine, engine.assetRoot() / "test_fixtures/levels/first_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
@@ -415,7 +415,7 @@ void NavigationDebug::levelMenu(Engine& engine) {
         }
         if (ImGui::Button("Load Hill Watch")) {
             try {
-                requestLevelLoad(engine, engine.assetRoot() / "levels/hill_watch.json");
+                requestLevelLoad(engine, engine.assetRoot() / "test_fixtures/levels/hill_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
@@ -423,7 +423,7 @@ void NavigationDebug::levelMenu(Engine& engine) {
         }
         if (ImGui::Button("Load Cover Watch")) {
             try {
-                requestLevelLoad(engine, engine.assetRoot() / "levels/cover_watch.json");
+                requestLevelLoad(engine, engine.assetRoot() / "test_fixtures/levels/cover_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
@@ -431,7 +431,7 @@ void NavigationDebug::levelMenu(Engine& engine) {
         }
         if (ImGui::Button("Load Rival Watch")) {
             try {
-                requestLevelLoad(engine, engine.assetRoot() / "levels/rival_watch.json");
+                requestLevelLoad(engine, engine.assetRoot() / "test_fixtures/levels/rival_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
@@ -439,7 +439,7 @@ void NavigationDebug::levelMenu(Engine& engine) {
         }
         if (ImGui::Button("Load Boss Watch")) {
             try {
-                requestLevelLoad(engine, engine.assetRoot() / "levels/boss_watch.json");
+                requestLevelLoad(engine, engine.assetRoot() / "test_fixtures/levels/boss_watch.json");
                 error_.clear();
             } catch (const std::exception& error) {
                 error_ = error.what();
@@ -482,7 +482,7 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
     ImGui::InputScalarN("Objective X/Z", ImGuiDataType_Double, &definition.objectivePosition.x, 2);
     ImGui::InputDouble("Objective Height", &definition.objectiveHeight, 0.1, 1, "%.3f");
     ImGui::InputScalar("Objective Health", ImGuiDataType_U64, &definition.objectiveHealth);
-    ImGui::InputScalar("Arrival Damage", ImGuiDataType_U64, &definition.damagePerArrival);
+    ImGui::InputScalar("Objective Hit Damage", ImGuiDataType_U64, &definition.damagePerArrival);
     for (std::size_t i = 0; i < definition.spawns.size(); ++i) {
         ImGui::PushID(static_cast<int>(i));
         if (ImGui::TreeNode("Spawn", "%s", definition.spawns[i].name.c_str())) {

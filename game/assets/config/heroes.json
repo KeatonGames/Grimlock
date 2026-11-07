@@ -21,7 +21,7 @@
     "idle_animation": "Idle_A", "walk_animation": "Walking_A", "run_animation": "Running_A",
     "hit_animation": "Hit_A", "death_animation": "Death_A",
     "combat": {
-      "attack": "ranged_area", "damage": 20, "range": 4.5, "attack_interval": 1.1, "impact_time": 0.4,
+      "attack": "ranged_area", "damage_type": "magic", "damage": 20, "range": 4.5, "attack_interval": 1.1, "impact_time": 0.4,
       "acquisition_range": 6, "pursuit_range": 8, "projectile_speed": 10, "projectile_radius": 0.09,
       "splash_radius": 1.5, "projectile_tint": [0.45, 0.6, 1, 1],
       "attack_animation": "Ranged_Magic_Shoot", "special_abilities": false,

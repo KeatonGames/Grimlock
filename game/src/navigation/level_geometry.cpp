@@ -83,7 +83,7 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
                 continue;
             }
             const bool terrain = object.role == "grimlock.terrain";
-            const bool obstacle = object.role == "grimlock.obstacle";
+            const bool obstacle = object.role == "grimlock.obstacle" || object.role == "grimlock.objective";
             if (terrain || obstacle || (legacyProps && object.role.empty())) {
                 scratch_.push_back({id, *object.model, scene->worldTransform(id), object.role});
                 imported = imported || terrain;
@@ -138,7 +138,7 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
             }
             geometry.addTriangle(world[0], world[1], world[2], object.role == "grimlock.terrain");
         }
-        if (object.role == "grimlock.obstacle" && !found->second.empty()) {
+        if ((object.role == "grimlock.obstacle" || object.role == "grimlock.objective") && !found->second.empty()) {
             // Obstacle volumes are conservative; their shells must not leave navigable interiors.
             geometry.solidBoxes.push_back({minimum, maximum});
         }

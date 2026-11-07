@@ -58,7 +58,7 @@ void save(const std::filesystem::path& path, const nlohmann::json& document) {
 }
 
 void configuration(const std::filesystem::path& assets, const std::filesystem::path& fixture) {
-    const auto level = loadLevelDefinition(assets / "levels/first_watch.json");
+    const auto level = loadLevelDefinition(assets / "test_fixtures/levels/first_watch.json");
     const auto towers = loadTowerDefinitions(assets);
     require(towers[0].levels.size() == 3 && towers[1].levels.size() == 3, "expected three authored tower levels");
     for (std::size_t level = 1; level <= 3; ++level) {
@@ -78,7 +78,7 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     std::ofstream{fixture / "towers/structures/primitives/cube.glb"};
     const auto levelPath = fixture / "level.json";
     const auto towerPath = fixture / "config/towers.json";
-    auto levelJson = read(assets / "levels/first_watch.json");
+    auto levelJson = read(assets / "test_fixtures/levels/first_watch.json");
     auto towerJson = read(assets / "config/towers.json");
     levelJson.erase("starting_gold");
     for (auto& wave : levelJson["waves"]) {

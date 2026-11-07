@@ -70,11 +70,13 @@ void control(Engine& engine, LevelRuntime& runtime, SDL_WindowID window, const c
     move(window, {1, 1});
     tick(engine, runtime);
     for (float y = panel->InnerClipRect.Min.y + 3; y < panel->InnerClipRect.Max.y; y += 3) {
-        move(window, {x, y});
-        tick(engine, runtime, 1);
-        if (ImGui::GetHoveredID() == id) {
-            click(engine, runtime, window, {x, y});
-            return;
+        for (float scanX = x; scanX < panel->InnerClipRect.Max.x; scanX += 120) {
+            move(window, {scanX, y});
+            tick(engine, runtime, 1);
+            if (ImGui::GetHoveredID() == id) {
+                click(engine, runtime, window, {scanX, y});
+                return;
+            }
         }
     }
     throw std::runtime_error(std::string{"UI control missing: "} + label);
@@ -115,8 +117,8 @@ bool overlaps(const ImGuiWindow& a, const ImGuiWindow& b) {
 
 void layout() {
     const auto* v = ImGui::GetMainViewport();
-    const char* names[]{"Round", "Objective Health", "Wave Controls", "Build Towers", "Boss Health"};
-    for (int i = 0; i < 5; ++i) {
+    const char* names[]{"Round", "Objective Health", "Wave Controls", "Build Towers", "Boss Health", "Coins"};
+    for (int i = 0; i < 6; ++i) {
         const auto* panel = ImGui::FindWindowByName(names[i]);
         require(panel && panel->Active, "responsive panel missing");
         require(panel->Pos.x >= v->Pos.x && panel->Pos.y >= v->Pos.y &&
@@ -136,7 +138,7 @@ int main(int argc, char**) {
         engine.setPerformanceEnabled(true);
         PlayerProgress unavailable;
         LevelRuntime runtime;
-        runtime.load(engine, "assets/levels/first_watch.json");
+        runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
         GameHud hud{engine, runtime};
         tick(engine, runtime, 4);
         int count = 0;
@@ -165,7 +167,7 @@ int main(int argc, char**) {
                 return (a >= -1e-5F && b >= -1e-5F && c >= -1e-5F) || (a <= 1e-5F && b <= 1e-5F && c <= 1e-5F);
             });
         };
-        require(covered({0.435F, 0}) && covered({-0.435F, 0}) && covered({0, 0.435F}) && covered({0, -0.435F}) &&
+        require(covered({0.48F, 0}) && covered({-0.48F, 0}) && covered({0, 0.48F}) && covered({0, -0.48F}) &&
                     !covered({0, 0}),
                 "Construction frame is not a complete square with an open center");
         const auto availableZoneInstances = engine.performance().instances;
@@ -182,6 +184,18 @@ int main(int argc, char**) {
                 "Destroying a tower did not restore its build-zone frame");
         runtime.restart(engine);
         tick(engine, runtime);
+        auto* waveControls = ImGui::FindWindowByName("Gameplay Settings");
+        require(waveControls && waveControls->Active, "Gameplay settings panel missing");
+        click(engine,
+              runtime,
+              id,
+              {waveControls->Pos.x + waveControls->Size.x - 18, waveControls->Pos.y + waveControls->Size.y - 18});
+        require(runtime.paused(), "Gear button did not pause gameplay");
+        control(engine, runtime, id, "Pause Menu", "Settings");
+        require(ImGui::FindWindowByName("Settings")->Active, "Gear menu did not provide settings access");
+        control(engine, runtime, id, "Settings", "Back");
+        control(engine, runtime, id, "Pause Menu", "Resume");
+        require(!runtime.paused(), "Gear menu did not resume gameplay");
         runtime.beginPlacement("basic");
         escape(engine, runtime, id);
         require(!runtime.paused() && !runtime.placing(), "Escape did not cancel tower placement");
@@ -286,6 +300,15 @@ int main(int argc, char**) {
             const auto* v = ImGui::GetMainViewport();
             require(selection->Pos.y >= v->Pos.y && selection->Pos.y + selection->Size.y <= v->Pos.y + v->Size.y + 1,
                     "small-window level selection exceeded viewport");
+            const ImGuiWindow* cards = nullptr;
+            for (const auto* child : ImGui::GetCurrentContext()->Windows) {
+                if (child->Active && child->ParentWindow == selection) {
+                    cards = child;
+                    break;
+                }
+            }
+            require(cards && cards->ScrollMax.y < 1 && cards->ScrollMax.x < 1,
+                    "Single level card did not fit the small-window content area");
             control(engine, runtime, id, "Level Selection", "Main Menu");
         } else {
             for (int frame = 0; frame < 600; ++frame) {

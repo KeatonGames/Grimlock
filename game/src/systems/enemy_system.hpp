@@ -29,12 +29,17 @@ public:
     [[nodiscard]] bool remove(EnemyId id) noexcept;
     void clear() noexcept;
     void update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta);
-    [[nodiscard]] bool applyDamage(EnemyId id, float damage, DefensiveTarget attacker = {});
+    [[nodiscard]] bool applyDamage(EnemyId id,
+                                   float damage,
+                                   DefensiveTarget attacker = {},
+                                   DamageType damageType = DamageType::physical);
+    [[nodiscard]] bool canDamage(const Enemy& enemy, DamageType type) const noexcept;
     void updateEffects(double delta);
 
     [[nodiscard]] std::size_t deathEffectCount() const noexcept {
         return deaths_.size();
     }
+
     [[nodiscard]] std::size_t coinEffectCount() const noexcept {
         return coins_.size();
     }
@@ -119,6 +124,7 @@ private:
         bool finishAnimation = false;
         double dissolveTime = 0;
     };
+
     struct CoinEffect {
         InstanceId instance;
         glm::dvec3 origin;

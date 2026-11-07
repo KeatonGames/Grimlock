@@ -50,6 +50,29 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
     lastWaveReward_.reset();
     types_ = std::move(types);
     scene_ = engine.scene();
+    objectiveObject_ = 0;
+    MeleeBody objective{{waves_->definition().objectivePosition.x,
+                         waves_->definition().objectiveHeight,
+                         waves_->definition().objectivePosition.y},
+                        0};
+    for (const auto& [id, object] : scene_->objects()) {
+        if (object.role != "grimlock.objective" || !object.model || !scene_->enabledInHierarchy(id)) {
+            continue;
+        }
+        if (objectiveObject_) {
+            throw std::invalid_argument("A level must have only one defense objective model.");
+        }
+        objectiveObject_ = id;
+        const auto bounds = engine.modelInfo(engine.loadModel(engine.assetRoot() / *object.model));
+        const auto world = scene_->worldTransform(id);
+        const auto center = glm::dvec3{world * glm::vec4{(bounds.minimum + bounds.maximum) * 0.5F, 1}};
+        const auto extent = (bounds.maximum - bounds.minimum) * 0.5F;
+        objective.position = {center.x, (world * glm::vec4{0, bounds.minimum.y, 0, 1}).y, center.z};
+        objective.halfExtent = {extent.x * glm::length(glm::vec3{world[0]}),
+                                extent.z * glm::length(glm::vec3{world[2]})};
+        objective.yaw = std::atan2(world[2].x, world[2].z);
+    }
+    enemyCombat_.defendObjective(objective, objectiveObject_);
     arrivals_ = 0;
     navigation.setPlacementEnabled(true);
 }
@@ -64,6 +87,8 @@ void LevelSession::stop(NavigationSession& navigation) {
     lastWaveReward_.reset();
     types_.clear();
     scene_ = nullptr;
+    objectiveObject_ = 0;
+    enemyCombat_ = {};
     navigation.setSpawnRoutes({});
     navigation.setPlacementEnabled(true);
 }
@@ -145,7 +170,7 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
     waves_->update(
         delta,
         navigation.enemies()->enemies().size(),
-        newArrivals,
+        newArrivals + enemyCombat_.objectiveHits(),
         [&](const WaveGroup& group, std::size_t count) {
             const auto index = static_cast<std::size_t>(&group - groups.data());
             return navigation.spawnAt(engine, types_[offset + index], definition.spawns[group.spawn].area, count);
@@ -157,6 +182,12 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
     }
     navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
     if (waves_->phase() != LevelPhase::battle) {
+        if (waves_->phase() == LevelPhase::defeat && objectiveObject_ && engine.scene()->contains(objectiveObject_)) {
+            auto broken = engine.scene()->object(objectiveObject_).local;
+            broken.scale.y *= 0.25;
+            engine.scene()->setTransform(objectiveObject_, broken);
+            engine.scene()->setTint(objectiveObject_, {0.35F, 0.32F, 0.3F, 1});
+        }
         enemyCombat_.stop(*navigation.enemies());
         combat_->clearProjectiles();
     }

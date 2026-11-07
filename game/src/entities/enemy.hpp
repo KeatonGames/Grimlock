@@ -58,6 +58,15 @@ enum class EnemyState {
 [[nodiscard]] const char* enemyStateName(EnemyState state) noexcept;
 
 struct EnemyRuntimeComponent : HealthComponent {
+    enum class Life {
+        living,
+        dying,
+        bones
+    };
+    Life life = Life::living;
+    double lifeRemaining = 0, visualTime = 0;
+    bool intangible = false;
+    double hoverOffset = 0;
     EnemyCombatState combat;
     EnemyId id = 0;
     std::uint64_t spawnOrder = 0; // Deterministic gameplay ordering is independent of recycled ECS handle bits.

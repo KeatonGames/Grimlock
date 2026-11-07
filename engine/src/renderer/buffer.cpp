@@ -80,6 +80,13 @@ void Buffer::write(const void* data, const VkDeviceSize bytes) {
     std::memcpy(mapped_, data, static_cast<std::size_t>(bytes));
 }
 
+void Buffer::read(void* data, const VkDeviceSize bytes) const {
+    if (!mapped_ || !data || bytes > size_) {
+        throw std::invalid_argument("Invalid read from a mapped GPU buffer.");
+    }
+    std::memcpy(data, mapped_, static_cast<std::size_t>(bytes));
+}
+
 void Buffer::destroy() noexcept {
     if (device_ != VK_NULL_HANDLE) {
         if (mapped_ != nullptr) {

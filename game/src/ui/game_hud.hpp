@@ -15,7 +15,8 @@ public:
     GameHud(Engine& engine,
             LevelRuntime& runtime,
             bool startInMenu = false,
-            const std::filesystem::path& initialLevel = {});
+            const std::filesystem::path& initialLevel = {},
+            const std::filesystem::path& optionsFile = {});
     ~GameHud() override;
     OverlayInput frame() override;
     void finishFrame(const Camera& camera) override;
@@ -30,6 +31,13 @@ public:
 
 private:
     void configureUi() override;
+    void releaseUi() noexcept override;
+    void targetChanged(const OverlayTarget& target) override;
+    void initializeMenu();
+    ImTextureRef menuImage(const std::filesystem::path& path);
+    void menuBackground(bool darkened);
+    void saveOptions();
+    void applyOptions();
     void transitions();
     void menu();
     void refreshLevels();
@@ -38,6 +46,8 @@ private:
     void status();
     void bossHealth();
     void construction();
+    void coins();
+    void coinIcon(ImVec2 center, float size);
     void towerInfo();
     void result();
     void placementOverlay(const Camera& camera);
@@ -102,6 +112,15 @@ private:
     std::string notification_;
     float notificationRemaining_ = 0;
     bool modalFrame_ = false;
+    std::vector<std::array<glm::vec3, 3>> coinTriangles_;
+    glm::vec3 coinCenter_{0};
+    float coinHeight_ = 1;
+    std::map<std::filesystem::path, std::unique_ptr<ImTextureData>> menuImages_;
+    ImFont* menuFont_ = nullptr;
+    std::filesystem::path optionsPath_;
+    int resolution_ = 1;
+    bool fullscreen_ = false, vsync_ = true;
+    std::string optionsError_;
 };
 
 } // namespace grimlock::game

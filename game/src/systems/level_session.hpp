@@ -58,6 +58,7 @@ private:
     const Scene* scene_ = nullptr;
     std::vector<EnemyTypeId> types_;
     std::uint64_t arrivals_ = 0;
+    ObjectId objectiveObject_ = 0;
     EconomySystem economy_;
     std::optional<std::uint64_t> lastWaveReward_;
     bool performanceEnabled_ = false;

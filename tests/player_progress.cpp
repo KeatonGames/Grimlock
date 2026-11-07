@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         require(nextSession.find(other)->attempts == 1 && !nextSession.find(other)->completed,
                 "abandoned attempt was not durable");
 
-        auto level = loadLevelDefinition(std::filesystem::path{argv[1]} / "levels/first_watch.json");
+        auto level = loadLevelDefinition(std::filesystem::path{argv[1]} / "test_fixtures/levels/first_watch.json");
         level.id = id;
         const auto original = folder / "original.json", renamed = folder / "renamed.json";
         saveLevelDefinition(original, level);

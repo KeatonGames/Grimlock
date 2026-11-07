@@ -357,7 +357,7 @@ void unreachableDefender(Engine& engine) {
 
 void archetypeWaves(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/rival_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/rival_watch.json");
     require(runtime.level().waves()->definition().waves.size() == 4, "archetype scenario needs four authored waves");
     bool elevated = false, grunt = false, siege = false, hunter = false;
     for (int wave = 0; wave < 4; ++wave) {

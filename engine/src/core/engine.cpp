@@ -907,6 +907,28 @@ void Engine::configureCameraNavigation(const OrbitCameraConfig& config) {
     impl_->navigationSynchronized = true;
 }
 
+FrameCapture Engine::captureFrame() {
+    impl_->renderer.requestCapture();
+    for (int attempt = 0; attempt < 4; ++attempt) {
+        if (!update()) {
+            throw std::runtime_error("Window closed during frame capture.");
+        }
+        auto capture = impl_->renderer.takeCapture();
+        if (!capture.rgba.empty()) {
+            return capture;
+        }
+    }
+    throw std::runtime_error("Frame capture requires a drawable window.");
+}
+
+void Engine::setVsync(bool enabled) {
+    impl_->renderer.setVsync(enabled);
+}
+
+bool Engine::vsyncEnabled() const noexcept {
+    return impl_->renderer.vsyncEnabled();
+}
+
 bool Engine::update(const std::function<void(double)>& gameUpdate) {
     return impl_->update(gameUpdate);
 }

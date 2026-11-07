@@ -8,6 +8,15 @@ namespace grimlock::game {
 
 class EnemyCombatSystem final {
 public:
+    void defendObjective(MeleeBody body, ObjectId object = 0) {
+        objective_ = body;
+        objectiveObject_ = object;
+    }
+
+    [[nodiscard]] std::uint64_t objectiveHits() const noexcept {
+        return objectiveHits_;
+    }
+
     void prepare(EnemySystem& enemies,
                  const TowerSystem& towers,
                  HeroSystem* heroes,
@@ -19,6 +28,9 @@ public:
 
 private:
     const CombatGeometry* geometry_ = nullptr;
+    std::optional<MeleeBody> objective_;
+    ObjectId objectiveObject_ = 0;
+    std::uint64_t objectiveHits_ = 0;
     bool clearStrike(const Enemy& enemy, const MeleeBody& body, ObjectId target = 0) const;
 
     struct Target {

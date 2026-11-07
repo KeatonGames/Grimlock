@@ -3,8 +3,132 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <string_view>
 
 namespace grimlock::game::presentation {
+namespace {
+bool menuSrgbTarget = true;
+}
+
+void menuColorSpace(bool srgbTarget) {
+    menuSrgbTarget = srgbTarget;
+}
+
+ImVec4 menuColor(ImVec4 color) {
+    if (menuSrgbTarget) {
+        const auto linear = [](float value) {
+            return value <= 0.04045F ? value / 12.92F : std::pow((value + 0.055F) / 1.055F, 2.4F);
+        };
+        color.x = linear(color.x);
+        color.y = linear(color.y);
+        color.z = linear(color.z);
+    }
+    return color;
+}
+
+ImU32 menuInk(ImVec4 color) {
+    return ImGui::GetColorU32(menuColor(color));
+}
+
+MenuTheme::MenuTheme() {
+    const std::pair<ImGuiCol, ImVec4> colors[]{{ImGuiCol_Text, ivory},
+                                               {ImGuiCol_TextDisabled, secondaryText},
+                                               {ImGuiCol_WindowBg, panel},
+                                               {ImGuiCol_ChildBg, {0, 0, 0, 0}},
+                                               {ImGuiCol_Border, stone},
+                                               {ImGuiCol_FrameBg, forest},
+                                               {ImGuiCol_FrameBgHovered, secondary},
+                                               {ImGuiCol_FrameBgActive, secondary},
+                                               {ImGuiCol_Button, secondary},
+                                               {ImGuiCol_ButtonHovered, sage},
+                                               {ImGuiCol_ButtonActive, hoverGreen},
+                                               {ImGuiCol_Header, secondary},
+                                               {ImGuiCol_HeaderHovered, sage},
+                                               {ImGuiCol_HeaderActive, hoverGreen},
+                                               {ImGuiCol_CheckMark, menuGold},
+                                               {ImGuiCol_SliderGrab, sage},
+                                               {ImGuiCol_SliderGrabActive, hoverGreen},
+                                               {ImGuiCol_Separator, stone},
+                                               {ImGuiCol_NavCursor, menuGold},
+                                               {ImGuiCol_CheckboxSelectedBg, secondary},
+                                               {ImGuiCol_PopupBg, panel},
+                                               {ImGuiCol_ScrollbarBg, forest},
+                                               {ImGuiCol_ScrollbarGrab, stone},
+                                               {ImGuiCol_ScrollbarGrabHovered, sage},
+                                               {ImGuiCol_ScrollbarGrabActive, hoverGreen},
+                                               {ImGuiCol_TextSelectedBg, secondary}};
+    for (const auto& [slot, color] : colors) {
+        ImGui::PushStyleColor(slot, menuColor(color));
+        ++colorCount_;
+    }
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4);
+}
+
+MenuTheme::~MenuTheme() {
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(colorCount_);
+}
+
+void menuHeading(const char* title, const char* subtitle) {
+    ImGui::PushFont(nullptr, 30);
+    ImGui::TextColored(menuColor(ivory), "%s", title);
+    ImGui::PopFont();
+    if (subtitle) {
+        ImGui::TextDisabled("%s", subtitle);
+    }
+}
+
+void menuShade(float opacity) {
+    const auto* viewport = ImGui::GetMainViewport();
+    auto color = forest;
+    color.w = opacity;
+    ImGui::GetBackgroundDrawList()->AddRectFilled(
+        viewport->Pos,
+        {viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y},
+        menuInk(color));
+}
+
+bool menuAction(const char* label, ImVec2 size, bool primary, bool dangerous) {
+    const std::string_view caption{label};
+    const auto separator = caption.find("###");
+    const char* identity = separator == std::string_view::npos ? label : label + separator + 3;
+    const auto visible = caption.substr(0, separator);
+    const auto id = ImGui::GetID(identity);
+    auto* storage = ImGui::GetStateStorage();
+    const float hover = storage->GetFloat(id ^ 0x48A0U);
+    const auto destination = dangerous ? danger : sage;
+    ImVec4 fill;
+    for (int i = 0; i < 4; ++i) {
+        (&fill.x)[i] = (&panel.x)[i] + ((&destination.x)[i] - (&panel.x)[i]) * hover;
+    }
+    ImGui::PushStyleColor(ImGuiCol_Button, menuColor(fill));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, menuColor(fill));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, menuColor(dangerous ? danger : hoverGreen));
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0, 0, 0, 0});
+    const bool pressed = ImGui::Button(identity, size);
+    ImGui::PopStyleColor(4);
+    const bool active = ImGui::IsItemHovered() || ImGui::IsItemFocused();
+    storage->SetFloat(id ^ 0x48A0U,
+                      hover + ((active ? 1.0F : 0.0F) - hover) * (1 - std::exp(-12 * ImGui::GetIO().DeltaTime)));
+    auto border = menuGold;
+    border.w = (primary ? 0.85F : 0.38F) + hover * 0.15F;
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
+    const auto textSize = ImGui::CalcTextSize(visible.data(), visible.data() + visible.size());
+    const float pressedOffset = ImGui::IsItemActive() ? 1.0F : 0.0F;
+    draw->AddText({(a.x + b.x - textSize.x) * 0.5F, (a.y + b.y - textSize.y) * 0.5F + pressedOffset},
+                  menuInk(hover > 0.55F && !dangerous ? forest : ivory),
+                  visible.data(),
+                  visible.data() + visible.size());
+    draw->AddRect(a, b, menuInk(border), 4.0F);
+    if (primary || active) {
+        const float y = (a.y + b.y) * 0.5F;
+        draw->AddTriangleFilled({a.x + 14, y - 4}, {a.x + 14, y + 4}, {a.x + 20, y}, menuInk(menuGold));
+    }
+    return pressed;
+}
+
 void configure() {
     ImGui::StyleColorsDark();
     auto& s = ImGui::GetStyle();

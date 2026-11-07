@@ -31,7 +31,7 @@ the root. Each predefined wave adds its own fixed nonnegative integer
 ```
 
 This fragment illustrates the economy fields; real waves still need their explicit
-enemy groups. See `assets/levels/first_watch.json` for a complete level.
+enemy groups. See `assets/test_fixtures/levels/first_watch.json` for a complete level.
 
 Each entry in `assets/config/towers.json` adds `construction_cost`, for example:
 

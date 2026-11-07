@@ -182,7 +182,7 @@ void heroesAndTowers(Engine& engine) {
 
 void selection(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/first_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
     const auto initialHeroes = runtime.heroes()->heroes().size();
     const auto initialTowers = runtime.navigation().towers().towers().size();
     const auto hero = runtime.heroes()->heroes().front().id;
@@ -203,8 +203,9 @@ void selection(Engine& engine) {
                 runtime.navigation().towers().towers().size() == initialTowers,
             "restart retained selections or runtime actors");
     runtime.unload(engine);
-    for (const auto* path :
-         {"assets/levels/first_watch.json", "assets/levels/hill_watch.json", "assets/levels/first_watch.json"}) {
+    for (const auto* path : {"assets/test_fixtures/levels/first_watch.json",
+                             "assets/test_fixtures/levels/hill_watch.json",
+                             "assets/test_fixtures/levels/first_watch.json"}) {
         runtime.load(engine, path);
         require(runtime.heroes()->heroes().size() == runtime.heroes()->typeCount() &&
                     runtime.navigation().enemies()->registry().size() == 0 && !runtime.selectedHero() &&

@@ -3,7 +3,7 @@
 Run the handcrafted test level from the repository root after building:
 
 ```powershell
-out/build/debug/Debug/Grimlock.exe assets/levels/hill_watch.json
+out/build/debug/Debug/Grimlock.exe assets/test_fixtures/levels/hill_watch.json
 ```
 
 In Editor, choose **Navigation > Level > Load Hill Watch**. The scene has no

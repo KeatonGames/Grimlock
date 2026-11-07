@@ -16,7 +16,7 @@ void require(bool condition, const char* message) {
 
 void checkZones(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/first_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
     auto& navigation = runtime.navigation();
     auto zone = navigation.placement().zones().front();
     zone.constructionOffset = {0.15, 0, 0.2};
@@ -68,7 +68,7 @@ void checkZones(Engine& engine) {
     runtime.restart(engine);
     require(navigation.placement().zones().front().occupants.empty() && navigation.towers().towers().empty(),
             "restart retained occupancy");
-    runtime.load(engine, "assets/levels/hill_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/hill_watch.json");
     require(std::all_of(navigation.placement().zones().begin(),
                         navigation.placement().zones().end(),
                         [](const BuildZone& item) {

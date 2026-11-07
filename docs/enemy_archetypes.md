@@ -81,7 +81,59 @@ show **Goblin**. New Editor wave authoring writes the canonical name. This chang
 neither the level JSON schema nor wave counts, timing, rewards or progression rules.
 No duplicate Grunt enemy implementation or additional playable enemy type is added.
 
-## Validation
+## Phase 47: Skeleton and Ghost
+
+Both appear by name in the Editor's existing handcrafted wave enemy catalog.
+Archetype IDs keep their order. New statistics and policies live in
+`config/enemy_archetypes.json`. Level 01, Forest Defense, introduces Skeletons in
+wave two and Ghosts in wave three, then mixes them into later waves; see
+[the encounter table](forest_defense.md#handcrafted-waves-and-economy).
+
+Skeleton has 40 health versus Goblin's 60 and reuses first-detected melee targeting.
+Its node-transform Kenney model contains `idle`, `walk`, `sprint`,
+`attack-melee-right`, and `die`; it has no resurrection clip. Lethal damage plays
+`die` without interruption, then flattens the completed collapsed skeleton pose
+into stationary, destructible bones (there is no separate bone-pile prop in the
+asset library). Bones have 5 health and a world health bar visible immediately,
+including at full bone-pile health (when world health bars are enabled).
+They revive after three seconds with full normal health. `bone_health` and
+`resurrection_time` configure these values. The same ECS entity and render instance
+are reused, while dying skeletons are untargetable and bones cannot move or attack.
+They count toward the wave throughout; only permanent bone destruction increments
+defeats and emits a visual coin. Repeated resurrection does not award anything.
+
+Ghost has 30 health, looping `idle`/`walk`, and one-shot `die`. Its visual model
+hovers above its grounded navigation anchor (`hover_height`/`hover_amplitude`).
+The `intangible` policy uses a separate Recast profile built from terrain triangles,
+excluding authored obstacles and tower blockers. Terrain slopes, elevations,
+clearance, islands and voids still constrain paths; Ghosts do not fly or receive
+crowd/hero collision impulses. They skip defensive targeting and use the existing
+objective combat and wave accounting. During level play they stay at the objective
+and repeatedly attack it instead of disappearing; standalone navigation previews
+retain arrival removal. All campaign enemies share this objective siege behavior,
+with damage per completed hit configured by the existing level setting.
+
+`DamageType::physical` is the default for existing attacks. The Mage's configured
+`damage_type: magic` travels through direct damage, projectiles and splash.
+`magic_only` rejects physical damage at the enemy boundary and filters immune
+targets from Knight/Ranger and current tower acquisition. Magic also damages all
+normal enemies. No magic tower or additional ability is introduced.
+
+`Undead.Runtime` checks repeated and concurrent resurrection, timing, retained
+handles, bone targeting/destruction, wave retention, physical immunity, Mage basic
+attack/splash, tower target filtering, terrain-only routing and objective arrival.
+Debug Game and Editor build successfully. The complete 47-check CTest run passes;
+logs are in `out/phase47_tests.log`. Focused checks after the final resurrection
+navigation changes are recorded in `out/phase47_final_tests.log`. No extended manual
+visual playthrough was performed.
+
+## Previous validation
+
+Enemy kills emit one render-only dungeon coin from the body. It rises and rotates
+for 1.25 seconds, shrinking away at the end. Corpses finish their death animation
+before a 0.65-second dissolve removes them. These effects have no collision or
+targeting, clear on level reset, and do not award gold: existing wave rewards stay
+unchanged.
 
 `Goblin.Runtime` covers the imported meshes/rig, idle/walk/run/attack/death states,
 damage flash, no per-frame attack restart, ignored tactical scores, visibility,

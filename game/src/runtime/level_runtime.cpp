@@ -10,6 +10,10 @@
 namespace grimlock::game {
 
 std::filesystem::path assetRootForLevel(const std::filesystem::path& level) {
+    if (level.is_absolute() && level.parent_path().filename() == "levels" &&
+        level.parent_path().parent_path().filename() == "test_fixtures") {
+        return level.parent_path().parent_path().parent_path();
+    }
     return level.is_absolute() && level.parent_path().filename() == "levels" ? level.parent_path().parent_path()
                                                                              : std::filesystem::path{"assets"};
 }

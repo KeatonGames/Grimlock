@@ -8,6 +8,11 @@
 
 namespace grimlock::game {
 
+enum class DamageType {
+    physical,
+    magic
+};
+
 struct EnemyCombatDefinition {
     float damage = 8;
     double range = 0.35, interval = 1, impactTime = 0.25;
@@ -49,6 +54,11 @@ struct EnemyDefinition {
     EnemyCombatDefinition combat;
     bool showHealthBar = false;
     bool boss = false;
+    bool intangible = false;
+    bool magicOnly = false;
+    double hoverHeight = 0, hoverAmplitude = 0;
+    float boneHealth = 0; // Zero disables resurrection.
+    double resurrectionTime = 3;
 };
 
 void validateEnemyDefinition(const EnemyDefinition& definition);

@@ -16,7 +16,7 @@ and shared scene picking/highlighting infrastructure.
 
 `Editor` produces **GrimlockEditor**. It retains the existing docked editor and
 navigation, build-zone, tower, animal and preview controls. Its tower tools remain
-free authoring operations. `GrimlockEditor --level assets/levels/first_watch.json`
+free authoring operations. `GrimlockEditor --level assets/test_fixtures/levels/first_watch.json`
 opens the same scene and configuration used by Game. A positional scene JSON still
 opens just that scene. The former `Grimlock --editor` and standalone model-viewer
 entry points are replaced by this separate authoring application; use its existing
@@ -66,8 +66,8 @@ inside an `assets/levels` directory selects that directory's parent as the asset
 root in both launchers. This allows direct play of source edits without restaging:
 
 ```powershell
-.\out\build\release\Release\GrimlockEditor.exe --level "$PWD/game/assets/levels/first_watch.json"
-.\out\build\release\Release\Grimlock.exe "$PWD/game/assets/levels/first_watch.json"
+.\out\build\release\Release\GrimlockEditor.exe --level "$PWD/game/assets/test_fixtures/levels/first_watch.json"
+.\out\build\release\Release\Grimlock.exe "$PWD/game/assets/test_fixtures/levels/first_watch.json"
 ```
 
 ## Build and checks

@@ -75,6 +75,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
         projectiles_.back().sourceKind = attacker.kind;
         projectiles_.back().splashRadius = definition.splashRadius;
         projectiles_.back().visualScale = definition.visualScale;
+        projectiles_.back().damageType = definition.damageType;
         engine_.setTransform(*instance, projectileTransform(projectiles_.back()));
     } catch (...) {
         if (instance) {
@@ -139,7 +140,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
             bool hit = false;
             // Collect stable IDs before lethal damage compacts enemy storage.
             for (const auto victim : victims_) {
-                hit = enemies.applyDamage(victim, projectile.damage, attacker) || hit;
+                hit = enemies.applyDamage(victim, projectile.damage, attacker, projectile.damageType) || hit;
             }
             if (hit) {
                 ++impacts_;

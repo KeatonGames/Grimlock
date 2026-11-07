@@ -62,7 +62,7 @@ checks or Editor UI dependencies.
 Run Game with the new level:
 
 ```powershell
-.\out\build\release\Release\Grimlock.exe assets/levels/boss_watch.json
+.\out\build\release\Release\Grimlock.exe assets/test_fixtures/levels/boss_watch.json
 ```
 
 In Editor, choose **Navigation > Level > Load Boss Watch**. Its wave definition

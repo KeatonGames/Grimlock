@@ -113,7 +113,7 @@ void combat(Engine& engine) {
 
 void hudAndWaves(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/boss_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/boss_watch.json");
     GameHud hud{engine, runtime};
     const auto render = [&] {
         require(engine.update(), "boss HUD render failed");
@@ -174,12 +174,26 @@ void hudAndWaves(Engine& engine) {
         runtime.startWave();
         for (int frame = 0; frame < 1800 && runtime.level().waves()->phase() == LevelPhase::battle; ++frame) {
             runtime.update(engine, 0.1);
+            std::vector<EnemyId> dispatched;
             for (const auto& enemy : runtime.navigation().enemies()->enemies()) {
                 if (runtime.navigation().enemies()->definition(enemy.type).boss) {
                     sawBoss = true;
                     elevated = elevated || enemy.position.y > 1.5;
                     require(enemy.navigation->contains(enemy.position), "boss clipped elevated terrain");
                 }
+                const auto& definition = runtime.level().waves()->definition();
+                const glm::dvec3 objective{definition.objectivePosition.x,
+                                           definition.objectiveHeight,
+                                           definition.objectivePosition.y};
+                if (glm::length(enemy.position - objective) < 2) {
+                    dispatched.push_back(enemy.id);
+                }
+            }
+            // Reaching the objective now starts a siege; resolve this traversal fixture with explicit kills.
+            for (const auto id : dispatched) {
+                const auto* enemy = runtime.navigation().enemies()->find(id);
+                require(enemy && runtime.navigation().enemies()->applyDamage(id, enemy->health),
+                        "Elevated encounter defender failed to dispatch an attacker");
             }
         }
         if (runtime.level().waves()->phase() != (wave ? LevelPhase::victory : LevelPhase::preparation)) {

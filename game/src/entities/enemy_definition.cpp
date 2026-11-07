@@ -35,6 +35,12 @@ void readCombat(const nlohmann::json& source, EnemyCombatDefinition& combat) {
 } // namespace
 
 void validateEnemyDefinition(const EnemyDefinition& d) {
+    if (!std::isfinite(d.boneHealth) || d.boneHealth < 0 || !std::isfinite(d.resurrectionTime) ||
+        d.resurrectionTime <= 0 || !std::isfinite(d.hoverHeight) || d.hoverHeight < 0 ||
+        !std::isfinite(d.hoverAmplitude) || d.hoverAmplitude < 0 || d.hoverAmplitude > d.hoverHeight ||
+        (d.intangible && d.boneHealth > 0)) {
+        throw std::invalid_argument("Invalid resurrection or ghost presentation configuration.");
+    }
     const auto& c = d.combat;
     if (!std::isfinite(c.damage) || c.damage <= 0 || !std::isfinite(c.range) || c.range <= 0 ||
         !std::isfinite(c.interval) || c.interval < 1.0 / 60 || !std::isfinite(c.impactTime) || c.impactTime < 0 ||
@@ -164,6 +170,12 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
             d.forwardYaw = entry.value("forward_yaw", d.forwardYaw);
             d.boss = entry.value("boss", false);
             d.showHealthBar = true;
+            d.intangible = entry.value("intangible", false);
+            d.magicOnly = entry.value("magic_only", false);
+            d.hoverHeight = entry.value("hover_height", 0.0);
+            d.hoverAmplitude = entry.value("hover_amplitude", 0.0);
+            d.boneHealth = entry.value("bone_health", 0.0F);
+            d.resurrectionTime = entry.value("resurrection_time", 3.0);
             const auto attackAnimation = d.combat.attackAnimation;
             d.combat = {};
             d.combat.attackAnimation = attackAnimation;

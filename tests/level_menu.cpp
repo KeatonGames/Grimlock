@@ -7,6 +7,8 @@
 #include <imgui_internal.h>
 #include <iostream>
 #include <stdexcept>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 using namespace grimlock;
 using namespace grimlock::game;
@@ -25,6 +27,26 @@ void tick(Engine& engine, LevelRuntime& runtime, int count = 2) {
         }),
                 "menu window closed");
     }
+}
+
+void capture(Engine& engine, const std::filesystem::path& file) {
+    const auto frame = engine.captureFrame();
+    require(stbi_write_png(file.string().c_str(), frame.width, frame.height, 4, frame.rgba.data(), frame.width * 4) !=
+                0,
+            "Menu screenshot capture failed");
+}
+
+void key(Engine& engine, LevelRuntime& runtime, SDL_WindowID window, SDL_Keycode code, SDL_Scancode scan) {
+    SDL_Event event{};
+    event.type = SDL_EVENT_KEY_DOWN;
+    event.key.windowID = window;
+    event.key.key = code;
+    event.key.scancode = scan;
+    require(SDL_PushEvent(&event), SDL_GetError());
+    tick(engine, runtime, 1);
+    event.type = SDL_EVENT_KEY_UP;
+    require(SDL_PushEvent(&event), SDL_GetError());
+    tick(engine, runtime, 2);
 }
 
 void mouse(SDL_WindowID window, Uint32 type, glm::vec2 point) {
@@ -72,7 +94,12 @@ void control(Engine& engine,
             require(SDL_PushEvent(&event), SDL_GetError());
             tick(engine, runtime, 1);
         }
-        control(engine, runtime, window, "Pause Menu", label);
+        if (std::string_view{label} == "Choose Level") {
+            control(engine, runtime, window, "Pause Menu", "Main Menu");
+            control(engine, runtime, window, "Main Menu", "Choose Level");
+        } else {
+            control(engine, runtime, window, "Pause Menu", label);
+        }
         return;
     }
     auto* panel = ImGui::FindWindowByName(panelName);
@@ -91,16 +118,18 @@ void control(Engine& engine,
     const auto id = ImHashStr(label, 0, seed);
     mouse(window, SDL_EVENT_MOUSE_MOTION, {1, 1});
     tick(engine, runtime);
-    for (float y = panel->InnerClipRect.Min.y + 3; y < panel->InnerClipRect.Max.y; y += 3) {
+    for (float y = panel->InnerClipRect.Min.y + 3; y < panel->InnerClipRect.Max.y; y += scope.empty() ? 3 : 10) {
         const bool secondColumn = std::string_view{label} == "Refresh";
         const float x = std::string_view{label} == "Pause" ? panel->InnerClipRect.Max.x - 35
                                                            : panel->DC.CursorStartPos.x + (secondColumn ? 200 : 50);
-        const glm::vec2 point{x, y};
-        mouse(window, SDL_EVENT_MOUSE_MOTION, point);
-        tick(engine, runtime, 1);
-        if (ImGui::GetHoveredID() == id) {
-            click(engine, runtime, window, point);
-            return;
+        for (float scanX = x; scanX < panel->InnerClipRect.Max.x; scanX += 120) {
+            const glm::vec2 point{scanX, y};
+            mouse(window, SDL_EVENT_MOUSE_MOTION, point);
+            tick(engine, runtime, 1);
+            if (ImGui::GetHoveredID() == id) {
+                click(engine, runtime, window, point);
+                return;
+            }
         }
     }
     throw std::runtime_error(std::string{"Missing menu control: "} + label);
@@ -118,15 +147,22 @@ int main() {
         const auto root = engine.assetRoot();
         const auto folder = root / "levels/menu_checks";
         std::filesystem::remove_all(folder);
+        const auto shipped = discoverLevels(root);
+        const auto levelOneBefore = contents(root / "levels/forest_defense.json");
+        require(shipped.levels.size() == 1 && shipped.levels.front().path.filename() == "forest_defense.json",
+                "Game must ship exactly Level 1");
+        require(std::filesystem::is_regular_file(root / "ui/menu_background.png") &&
+                    std::filesystem::is_regular_file(root / "previews/forest_defense.png"),
+                "Menu captures missing");
         std::filesystem::create_directories(folder);
         const auto a = folder / "a.json", b = folder / "b.json", bad = folder / "bad.json";
-        auto first = loadLevelDefinition(root / "levels/first_watch.json");
+        auto first = loadLevelDefinition(root / "test_fixtures/levels/first_watch.json");
         first.name = "A menu fixture";
         first.id = createLevelId();
         first.description = "Handcrafted menu description";
         first.startingGold = 123;
         saveLevelDefinition(a, first);
-        auto second = loadLevelDefinition(root / "levels/boss_watch.json");
+        auto second = loadLevelDefinition(root / "test_fixtures/levels/boss_watch.json");
         second.name = "B menu fixture";
         second.id = createLevelId();
         second.startingGold = 99;
@@ -162,7 +198,9 @@ int main() {
         std::filesystem::remove(progressPath);
         PlayerProgress progress{progressPath};
         runtime.attachProgress(progress);
-        GameHud hud{engine, runtime, true};
+        const auto optionsPath = root.parent_path() / "menu-options-check.json";
+        std::filesystem::remove(optionsPath);
+        GameHud hud{engine, runtime, true, {}, optionsPath};
         tick(engine, runtime, 3);
         require(!engine.scene() && !runtime.level().waves() && !runtime.navigation().enemies(),
                 "menu created gameplay state");
@@ -171,7 +209,35 @@ int main() {
         require(windows && count == 1, "menu window missing");
         const auto window = SDL_GetWindowID(windows[0]);
         SDL_free(windows);
+        control(engine, runtime, window, "Main Menu", "START GAME");
+        require(runtime.level().waves() && runtime.level().waves()->definition().name == "Level 01 - Forest Defense",
+                "Start Game did not launch Level 1 directly");
+        control(engine, runtime, window, "Game Status", "Choose Level");
+        control(engine, runtime, window, "Level Selection", "Main Menu");
+        control(engine, runtime, window, "Main Menu", "Settings");
+        capture(engine, root.parent_path() / "phase48_options.png");
+        control(engine, runtime, window, "Settings", "Display mode");
+        key(engine, runtime, window, SDLK_END, SDL_SCANCODE_END);
+        key(engine, runtime, window, SDLK_RETURN, SDL_SCANCODE_RETURN);
+        control(engine, runtime, window, "Settings", "APPLY");
+        require(SDL_GetWindowFlags(SDL_GetWindowFromID(window)) & SDL_WINDOW_FULLSCREEN,
+                "Fullscreen setting was not applied");
+        control(engine, runtime, window, "Settings", "Display mode");
+        key(engine, runtime, window, SDLK_HOME, SDL_SCANCODE_HOME);
+        key(engine, runtime, window, SDLK_RETURN, SDL_SCANCODE_RETURN);
+        control(engine, runtime, window, "Settings", "APPLY");
+        require(!(SDL_GetWindowFlags(SDL_GetWindowFromID(window)) & SDL_WINDOW_FULLSCREEN),
+                "Windowed mode did not restore");
+        control(engine, runtime, window, "Settings", "VSync");
+        control(engine, runtime, window, "Settings", "APPLY");
+        require(!engine.vsyncEnabled() && std::filesystem::is_regular_file(optionsPath),
+                "VSync/options were not applied and saved");
+        control(engine, runtime, window, "Settings", "VSync");
+        control(engine, runtime, window, "Settings", "APPLY");
+        require(engine.vsyncEnabled(), "VSync did not restore");
+        control(engine, runtime, window, "Settings", "Back");
         control(engine, runtime, window, "Main Menu", "Choose Level");
+        capture(engine, root.parent_path() / "phase48_levels.png");
         control(engine, runtime, window, "Level Selection", first.name.c_str(), a);
         const auto authored = contents(a);
         control(engine, runtime, window, "Level Selection", "Play");
@@ -267,11 +333,28 @@ int main() {
         require(ImGui::FindWindowByName("Main Menu")->Active, "return to main menu failed");
         control(engine, runtime, window, "Main Menu", "Quit");
         require(hud.quitRequested(), "quit request failed");
+        require(contents(root / "levels/forest_defense.json") == levelOneBefore,
+                "Menus changed Level 1 gameplay metadata");
+        engine.detachOverlay();
+        engine.setVsync(false);
+        std::filesystem::remove_all(folder);
+        {
+            GameHud reopenedHud{engine, runtime, true, {}, optionsPath};
+            tick(engine, runtime, 2);
+            require(engine.vsyncEnabled(), "Saved display preferences did not reload");
+            control(engine, runtime, window, "Main Menu", "Choose Level");
+            for (int frame = 0; frame < 20; ++frame) {
+                tick(engine, runtime, 1);
+                SDL_Delay(10);
+            }
+            capture(engine, root.parent_path() / "phase48_levels.png");
+        }
         PlayerProgress reopened{progressPath};
         require(reopened.error().empty() && reopened.find(second.id)->completed &&
                     reopened.find(second.id)->victories == 1,
                 "gameplay progress did not survive reopening");
         std::filesystem::remove(progressPath);
+        std::filesystem::remove(optionsPath);
         std::filesystem::remove_all(folder);
         std::cout << "PASS discovery, descriptions, live edits, menus, complete loading, switching, restart and "
                      "failed-load cleanup.\n";

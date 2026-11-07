@@ -395,7 +395,7 @@ std::string TowerSystem::check(const Tower& tower,
         }
     }
     for (const auto& enemy : enemies) {
-        if (!enemy.active || !enemy.alive) {
+        if (!enemy.active || (!enemy.alive && enemy.life == Enemy::Life::living) || enemy.intangible) {
             continue;
         }
         const auto nearest = glm::clamp(glm::dvec2{enemy.position.x, enemy.position.z},

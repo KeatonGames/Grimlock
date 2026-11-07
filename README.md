@@ -9,6 +9,9 @@ and development tools. Game does not link Editor or GameDebug.
 
 ## Features
 
+- Forest-themed Game menus with captured Nature Kit scenery, real level previews,
+  persistent display options and a single playable Forest Defense level; see [menus](docs/menus.md).
+
 - **Level 01 - Forest Defense:** a handcrafted Kenney woodland with two elevations,
   strategic build areas, five fixed waves and an Iron Stag finale; see [the level guide](docs/forest_defense.md).
 - Vulkan 1.3+ Dynamic Rendering and Synchronization2, with window resizing and deterministic cleanup.

@@ -48,6 +48,7 @@ bool HeroCombatSystem::attack(HeroSystem& heroes, const EnemySystem& enemies, He
     auto* hero = heroes.findMutable(id);
     const auto* enemy = enemies.find(target);
     if (!hero || !hero->controllable || hero->health <= 0 || !enemy || !enemy->alive || !enemy->active ||
+        !enemies.canDamage(*enemy, heroes.definition(*hero).combat.damageType) ||
         distance(hero->position, enemy->position) > heroes.definition(*hero).combat.pursuitRange) {
         return false;
     }
@@ -108,6 +109,7 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
                                             stats.projectileRadius,
                                             stats.projectileTint};
             projectile.model = stats.projectileModel;
+            projectile.damageType = stats.damageType;
             projectile.visualScale = stats.projectileScale;
             projectile.splashRadius = stats.attack == HeroAttack::rangedArea ? stats.splashRadius : 0;
             heroes.projectiles_.spawn(heroes.projectileOrigin(hero),
@@ -126,14 +128,14 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
             }
         }
         for (const auto id : victims_) {
-            (void)enemies.applyDamage(id, stats.damage, {DefensiveTargetKind::hero, hero.id});
+            (void)enemies.applyDamage(id, stats.damage, {DefensiveTargetKind::hero, hero.id}, stats.damageType);
         }
         return;
     }
     if (!hero.combat.abilitySwing) {
         const auto* enemy = hero.combat.target ? enemies.find(*hero.combat.target) : nullptr;
         if (enemy && inRange(heroes, hero, *enemy, stats.range)) {
-            (void)enemies.applyDamage(enemy->id, stats.damage, {DefensiveTargetKind::hero, hero.id});
+            (void)enemies.applyDamage(enemy->id, stats.damage, {DefensiveTargetKind::hero, hero.id}, stats.damageType);
         }
         return;
     }
@@ -150,7 +152,7 @@ void HeroCombatSystem::impact(HeroSystem& heroes, EnemySystem& enemies, Hero& he
     }
     // Lethal damage compacts enemy storage; never keep references across impacts.
     for (const auto id : victims_) {
-        (void)enemies.applyDamage(id, stats.cleave.damage, {DefensiveTargetKind::hero, hero.id});
+        (void)enemies.applyDamage(id, stats.cleave.damage, {DefensiveTargetKind::hero, hero.id}, stats.damageType);
     }
     hero.combat.feedbackRemaining = 0.3;
 }
@@ -206,7 +208,7 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         abandon(heroes, hero);
         return;
     }
-    if (state.target && (!enemy || !enemy->alive || !enemy->active)) {
+    if (state.target && (!enemy || !enemies.canDamage(*enemy, stats.damageType))) {
         abandon(heroes, hero);
         return;
     }
@@ -267,7 +269,8 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
     state.retryDelay = 0.4;
     candidates_.clear();
     enemies.visitNearby(hero.position, stats.acquisitionRange, [&](const Enemy& candidate) {
-        if (!candidate.alive || !candidate.active || !hostile(heroes.team(hero.id), enemies.team(candidate.id)) ||
+        if (!enemies.canDamage(candidate, stats.damageType) ||
+            !hostile(heroes.team(hero.id), enemies.team(candidate.id)) ||
             distance(hero.defensivePosition, candidate.position) > stats.pursuitRange ||
             (state.unreachableTarget == candidate.id && state.unreachableRetry > 0 &&
              state.failedRevision == heroes.navigation(hero.type).revision())) {

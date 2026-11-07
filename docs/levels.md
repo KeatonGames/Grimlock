@@ -1,5 +1,9 @@
 # Handcrafted levels and waves
 
+Game discovers only **Level 01 - Forest Defense** from `assets/levels/`.
+The older scenarios below are preserved under `assets/test_fixtures/levels/`
+for automated checks and existing Editor shortcuts, outside the playable catalog.
+
 Run `GrimlockEditor`, then choose **Navigation > Level > Load First Watch**.
 Loading uses the editor's normal scene-opening and unsaved-change confirmation.
 The **Level** panel shows objective health, wave name, pending and active counts,
@@ -26,7 +30,7 @@ See [the level guide](first_watch.md) for the five exact waves, balance and test
 
 ## Authoring
 
-`game/assets/levels/first_watch.json` contains gameplay configuration, separate
+`game/assets/test_fixtures/levels/first_watch.json` contains gameplay configuration, separate
 from `game/assets/scenes/first_watch.json`. The latter is a normal engine scene;
 the current sample uses existing cube terrain. Level/wave data never addresses
 grid cells: destinations, spawn rectangles and elevations use world coordinates.

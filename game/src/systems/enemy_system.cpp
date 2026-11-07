@@ -184,6 +184,9 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             const glm::dvec3 position = surface->position;
             bool occupied = false;
             spawnNeighbors_.visit(position, definition.radius + maximumRadius + padding, [&](std::size_t index) {
+                if (enemies_[index].intangible) {
+                    return;
+                }
                 if (position.y >= enemies_[index].position.y + enemies_[index].height ||
                     enemies_[index].position.y >= position.y + definition.height) {
                     return;
@@ -193,7 +196,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
                 const double distance = std::max(footprint, footprint + padding - 1e-5);
                 occupied = occupied || offset.x * offset.x + offset.z * offset.z < distance * distance;
             });
-            if (occupied) {
+            if (occupied && !definition.intangible) {
                 continue;
             }
             loadModel(type);
@@ -201,6 +204,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             Enemy enemy;
             enemy.spawnOrder = nextSpawnOrder_++;
             enemy.type = type;
+            enemy.intangible = definition.intangible;
             enemy.navigation = &navigation;
             enemy.despawnOnArrival = definition.despawnOnArrival;
             enemy.position = position;
@@ -253,12 +257,18 @@ void EnemySystem::updateModel(Enemy& enemy) {
     const auto& definition = animal.definition;
     const auto center = (animal.info.minimum + animal.info.maximum) * 0.5F;
     const float scale = definition.visualHeight / (animal.info.maximum.y - animal.info.minimum.y);
+    const float hover = static_cast<float>(
+        definition.hoverHeight + definition.hoverAmplitude * std::sin(enemy.visualTime * 3 + enemy.spawnOrder));
+    enemy.hoverOffset = hover;
     const auto matrix =
-        glm::translate(glm::mat4{1}, glm::vec3{enemy.position}) *
+        glm::translate(glm::mat4{1}, glm::vec3{enemy.position} + glm::vec3{0, hover, 0}) *
         glm::mat4_cast(glm::angleAxis(static_cast<float>(enemy.yaw + definition.forwardYaw), glm::vec3{0, 1, 0})) *
         glm::scale(glm::mat4{1}, glm::vec3{scale}) *
         glm::translate(glm::mat4{1}, glm::vec3{-center.x, -animal.info.minimum.y, -center.z});
     engine_.setTransform(*enemy.instance, matrix);
+    if (enemy.life != Enemy::Life::living) {
+        return;
+    }
     const bool moving = enemy.movement == MovementStatus::moving;
     if (!enemy.combat.swinging && animal.idleClip) {
         const auto selected =
@@ -293,19 +303,26 @@ void EnemySystem::update(const NavMesh& navigation, std::optional<glm::dvec2> de
     metrics_.crowd = movement_.metrics();
     for (std::size_t index = 0; index < enemies_.size();) {
         auto& enemy = enemies_[index];
-        if (!enemy.active || !enemy.alive) {
+        if ((!enemy.active || !enemy.alive) && enemy.life == Enemy::Life::living) {
             metrics_.arrived += enemy.movement == MovementStatus::arrived ? 1 : 0;
             removeAt(index);
             continue;
         }
-        updateModel(enemy);
+        if (enemy.life == Enemy::Life::living) {
+            updateModel(enemy);
+        }
         ++index;
     }
     metrics_.updateMilliseconds =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 }
 
-bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker) {
+bool EnemySystem::canDamage(const Enemy& enemy, DamageType type) const noexcept {
+    return enemy.type < types_.size() && enemy.active && enemy.alive && enemy.health > 0 &&
+           (!types_[enemy.type].definition.magicOnly || type == DamageType::magic);
+}
+
+bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker, DamageType damageType) {
     validateDamage(damage);
     auto* found = enemies_.get(id);
     if (!found || damage == 0) {
@@ -313,7 +330,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     }
     const auto index = static_cast<std::size_t>(found - enemies_.data());
     auto& enemy = *found;
-    if (!enemy.active || !enemy.alive) {
+    if (!canDamage(enemy, damageType)) {
         return false;
     }
     receiveDamage(enemy, damage);
@@ -324,6 +341,34 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     enemy.hitFlashRemaining = 0.12;
     engine_.setTint(*enemy.instance, {1, 0.35F, 0.3F, 1});
     if (enemy.health > 0) {
+        return true;
+    }
+
+    const auto& configuration = types_[enemy.type].definition;
+    if (configuration.boneHealth > 0 && enemy.life == Enemy::Life::living) {
+        const auto objective = enemy.combat.managed ? enemy.combat.objective : enemy.destination;
+        const auto height =
+            enemy.combat.managed ? std::optional<double>{enemy.combat.objectiveHeight} : enemy.destinationHeight;
+        enemy.combat = {};
+        EnemyAi::setDestination(enemy, objective);
+        enemy.destinationHeight = height;
+        enemy.velocity = enemy.desiredVelocity = {0, 0};
+        enemy.path.valid = false;
+        enemy.movement = MovementStatus::idle;
+        enemy.life = Enemy::Life::dying;
+        enemy.alive = false;
+        enemy.locomotionClip.reset();
+        auto& playback = engine_.animation(*enemy.instance);
+        enemy.lifeRemaining = 0.25;
+        if (const auto clip = types_[enemy.type].deathClip) {
+            playback.setSpeed(1);
+            playback.play(*clip, false);
+            const auto& animation = playback.model().animations[*clip];
+            enemy.lifeRemaining = std::max(0.25, static_cast<double>(animation.end - animation.start));
+        } else {
+            playback.pause();
+        }
+        engine_.setTint(*enemy.instance, glm::vec4{1});
         return true;
     }
 
@@ -347,7 +392,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     engine_.setTint(*enemy.instance, glm::vec4{1});
     auto& playback = engine_.animation(*enemy.instance);
     double duration = 0.25;
-    if (const auto clip = types_[enemy.type].deathClip) {
+    if (const auto clip = types_[enemy.type].deathClip; clip && enemy.life == Enemy::Life::living) {
         playback.setSpeed(1);
         playback.play(*clip, false);
         const auto& animation = playback.model().animations[*clip];
@@ -368,6 +413,32 @@ void EnemySystem::updateEffects(double delta) {
         throw std::invalid_argument("Enemy effects delta must be finite and nonnegative.");
     }
     registry_.each<Enemy, TeamComponent>([&](ecs::Entity, Enemy& enemy, const TeamComponent&) {
+        enemy.visualTime += delta;
+        if (enemy.life != Enemy::Life::living) {
+            enemy.lifeRemaining -= delta;
+            if (enemy.life == Enemy::Life::dying && enemy.lifeRemaining <= 0 &&
+                !engine_.animation(*enemy.instance).running()) {
+                enemy.life = Enemy::Life::bones;
+                enemy.alive = true;
+                enemy.maximumHealth = enemy.health = definition(enemy.type).boneHealth;
+                enemy.lifeRemaining = definition(enemy.type).resurrectionTime;
+                engine_.animation(*enemy.instance).pause();
+                // The Kenney library has no separate bones prop. Flatten its completed death pose.
+                auto pile = engine_.transform(*enemy.instance);
+                const auto origin = glm::vec3{enemy.position};
+                pile = glm::translate(glm::mat4{1}, origin) * glm::scale(glm::mat4{1}, glm::vec3{1.1F, 0.25F, 1.1F}) *
+                       glm::translate(glm::mat4{1}, -origin) * pile;
+                engine_.setTransform(*enemy.instance, pile);
+            } else if (enemy.life == Enemy::Life::bones && enemy.lifeRemaining <= 0) {
+                enemy.life = Enemy::Life::living;
+                enemy.maximumHealth = enemy.health = definition(enemy.type).maximumHealth;
+                enemy.combat = {};
+                EnemyAi::setDestination(enemy, enemy.destination);
+                enemy.locomotionClip.reset();
+                enemy.animationMoving = false;
+                updateModel(enemy);
+            }
+        }
         if (enemy.hitFlashRemaining > 0) {
             enemy.hitFlashRemaining = std::max(0.0, enemy.hitFlashRemaining - delta);
             if (enemy.hitFlashRemaining == 0) {
@@ -396,17 +467,19 @@ void EnemySystem::updateEffects(double delta) {
         auto& coin = coins_[index];
         coin.age += delta;
         constexpr double duration = 1.25;
-        if (coin.age >= duration) {
+        const auto progress = coin.age / duration;
+        const double scale = 0.7 * std::min(1.0, (1 - progress) / 0.25);
+        // Retire subpixel coins before their shrinking transform becomes effectively singular.
+        if (scale < 0.01) {
             engine_.removeInstance(coin.instance);
             coin = coins_.back();
             coins_.pop_back();
             continue;
         }
-        const auto progress = coin.age / duration;
         Transform transform;
         transform.position = coin.origin + glm::dvec3{0, 1.4 * (1 - (1 - progress) * (1 - progress)), 0};
         transform.rotation = glm::angleAxis(coin.age * 9, glm::dvec3{0, 1, 0});
-        transform.scale = glm::dvec3{0.7 * std::min(1.0, (1 - progress) / 0.25)};
+        transform.scale = glm::dvec3{scale};
         engine_.setTransform(coin.instance, transform);
         ++index;
     }

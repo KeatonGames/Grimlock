@@ -32,7 +32,7 @@ a build can overwrite. Point Game at that same asset root:
 ```powershell
 $assets = Join-Path $PWD 'game/assets'
 # Editor's existing absolute-level support uses this level's asset tree.
-.\out\build\debug\Debug\GrimlockEditor.exe --level (Join-Path $assets 'levels/first_watch.json')
+.\out\build\debug\Debug\GrimlockEditor.exe --level (Join-Path $assets 'test_fixtures/levels/first_watch.json')
 # Game sees new/edited levels in that tree immediately; no rebuild is needed.
 .\out\build\debug\Debug\Grimlock.exe --assets $assets
 ```
@@ -40,7 +40,7 @@ $assets = Join-Path $PWD 'game/assets'
 `--assets` accepts an absolute path or an executable-relative folder. Packaged
 builds simply distribute the executable with its adjacent `assets` directory;
 there is no source-tree or Editor working-directory dependency. Existing explicit
-level launches still work, e.g. `Grimlock.exe assets/levels/boss_watch.json`. An
+level launches still work, e.g. `Grimlock.exe assets/test_fixtures/levels/boss_watch.json`. An
 absolute level directly inside an asset tree's `levels` folder selects that asset
 tree, as before. For nested/external explicit paths, supply `--assets` when needed.
 `--environment` remains available independently.

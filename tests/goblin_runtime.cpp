@@ -155,10 +155,19 @@ void behavior(Engine& engine) {
     require(enemies.applyDamage(walking, 100) && !enemies.find(walking) && enemies.deathEffectCount() == 1,
             "Dead Goblin remained in ECS targeting/navigation");
     require(motion.model().animations[motion.clip()].name == "die" && !motion.looping(), "Goblin death missing");
+    require(enemies.coinEffectCount() == 1 && !enemies.applyDamage(walking, 100),
+            "Death did not emit exactly one visual coin");
+    enemies.updateEffects(0.3);
+    require(enemies.coinEffectCount() == 1, "Coin disappeared before its rising animation");
     enemies.updateEffects(60);
+    require(enemies.coinEffectCount() == 0, "Visual coin did not expire");
     require(enemies.deathEffectCount() == 1, "Goblin death removed before animation playback completed");
     motion.update(1);
     enemies.updateEffects(0);
+    require(enemies.deathEffectCount() == 1, "Corpse skipped disintegration after death animation");
+    enemies.updateEffects(0.3);
+    require(enemies.deathEffectCount() == 1, "Corpse disintegration ended too early");
+    enemies.updateEffects(0.4);
     require(enemies.deathEffectCount() == 0 && enemies.metrics().defeated == 1,
             "Goblin corpse or defeat count incorrect");
     enemies.clear();
@@ -205,9 +214,24 @@ void terrainAndCrowds(Engine& engine) {
     require(engine.update(), "Goblin crowd render failed");
 }
 
+void coinExpiry(Engine& engine) {
+    auto scene = std::make_unique<Scene>("Coin expiry render regression");
+    scene->setNavigationGrid(GridConfiguration{8, 8, 1, {-4, 0, -4}});
+    engine.setScene(std::move(scene));
+    NavigationSession navigation;
+    navigation.synchronize(engine);
+    require(navigation.spawnAt(engine, 0, {{0, 0}, {0, 0}, 0}, 1) == 1, "Coin regression spawn failed");
+    auto& enemies = *navigation.enemies();
+    require(enemies.applyDamage(enemies.enemies().front().id, 1000), "Coin regression kill failed");
+    enemies.updateEffects(1.25 - 0.000001);
+    require(engine.update(), "Coin expiry produced an invalid render transform");
+    enemies.updateEffects(0.01);
+    require(enemies.coinEffectCount() == 0, "Expired coin retained a render instance");
+}
+
 void waves(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/rival_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/rival_watch.json");
     require(runtime.level().waves()->definition().waves.front().groups.front().enemy == "Goblin",
             "Legacy Grunt wave did not resolve to Goblin");
     runtime.startWave();
@@ -226,6 +250,7 @@ int main() {
         behavior(engine);
         terrainAndCrowds(engine);
         waves(engine);
+        coinExpiry(engine);
         std::cout
             << "PASS Goblin targeting, melee timing, clips, death lifecycle, crowds, elevation and legacy waves.\n";
         return 0;

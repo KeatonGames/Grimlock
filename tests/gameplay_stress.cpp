@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
             }
         }
         for (int pass = 0; pass < 3; ++pass) {
-            runtime.load(engine, "assets/levels/first_watch.json");
+            runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
             for (std::size_t type = 1; type < runtime.heroes()->typeCount(); ++type) {
                 const glm::dvec3 point{6, 0, type == 1 ? -2 : 2};
                 (void)runtime.heroes()->deploy(point, runtime.heroes()->heroes()[type].id);

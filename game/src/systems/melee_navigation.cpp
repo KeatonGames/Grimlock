@@ -102,7 +102,7 @@ bool approachMelee(const NavMesh& navigation,
         const auto point = navigation.project(desired, navigation.configuration().cellSize * 2);
         const bool occupied =
             point && std::any_of(blockers.begin(), blockers.end(), [&](const Enemy& enemy) {
-                return enemy.id != targetId && enemy.alive && enemy.active &&
+                return enemy.id != targetId && enemy.alive && enemy.active && !enemy.intangible &&
                        point->position.y < enemy.position.y + enemy.height &&
                        enemy.position.y < point->position.y + navigation.configuration().agentHeight &&
                        glm::length(horizontal(point->position - enemy.position)) < radius + enemy.radius;

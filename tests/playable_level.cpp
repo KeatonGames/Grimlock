@@ -29,7 +29,7 @@ struct Result {
 
 Result play(Engine& engine, Strategy strategy) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/first_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
     auto& session = runtime.level();
     auto& navigation = runtime.navigation();
     const auto build = [&](const char* type, glm::dvec2 position) {
@@ -178,7 +178,9 @@ int main() {
             const auto result = play(engine, strategy);
             std::cout << "Result " << static_cast<int>(strategy) << ": " << levelPhaseName(result.phase) << "; kills "
                       << result.defeated << "; arrivals " << result.arrived << '\n';
-            const bool poor = strategy == Strategy::empty || strategy == Strategy::neglect;
+            // A rear-only defense can no longer win by letting surviving enemies disappear at the objective.
+            const bool poor =
+                strategy == Strategy::empty || strategy == Strategy::neglect || strategy == Strategy::rear;
             require(result.phase == (poor ? LevelPhase::defeat : LevelPhase::victory),
                     "authored level no longer distinguishes successful and poor defensive plans");
             if (!poor) {

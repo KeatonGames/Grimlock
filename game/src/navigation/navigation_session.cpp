@@ -6,6 +6,23 @@
 #include <stdexcept>
 
 namespace grimlock::game {
+namespace {
+NavigationGeometry terrainOnly(const NavigationGeometry& source) {
+    NavigationGeometry result;
+    for (std::size_t i = 0; i < source.walkable.size(); ++i) {
+        if (!source.walkable[i]) {
+            continue;
+        }
+        std::array<glm::vec3, 3> triangle;
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            const auto index = static_cast<std::size_t>(source.triangles[i * 3 + corner]) * 3;
+            triangle[corner] = {source.vertices[index], source.vertices[index + 1], source.vertices[index + 2]};
+        }
+        result.addTriangle(triangle[0], triangle[1], triangle[2], true);
+    }
+    return result;
+}
+} // namespace
 
 void NavigationSession::synchronize(Engine& engine) {
     if (engine_ && engine_ != &engine) {
@@ -20,7 +37,8 @@ void NavigationSession::synchronize(Engine& engine) {
             (void)enemies_->addDefinition(definitions[type]);
             std::size_t matching = 0;
             while (matching < type && (definitions[matching].radius != definitions[type].radius ||
-                                       definitions[matching].height != definitions[type].height)) {
+                                       definitions[matching].height != definitions[type].height ||
+                                       definitions[matching].intangible != definitions[type].intangible)) {
                 ++matching;
             }
             if (matching < type) {
@@ -112,7 +130,11 @@ void NavigationSession::buildProfile(EnemyTypeId type) {
     const auto& definition = enemies_->definition(type);
     configuration.agentRadius = static_cast<float>(definition.radius);
     configuration.agentHeight = static_cast<float>(definition.height);
-    navigationFor(type).build(geometry_, configuration);
+    if (definition.intangible) {
+        navigationFor(type).build(terrainOnly(levelGeometry_.navigation()), configuration);
+    } else {
+        navigationFor(type).build(geometry_, configuration);
+    }
     ++navigationRevision_;
 }
 
@@ -229,7 +251,9 @@ void NavigationSession::preparePlacement(const Tower& tower) {
             candidate.error = "Configure a reachable spawn area and destination before placing towers.";
             return;
         }
-        if (!trial->build(candidate.geometry, current.configuration())) {
+        const bool intangible = enemies_->definition(type).intangible;
+        const auto ghostGeometry = intangible ? terrainOnly(levelGeometry_.navigation()) : NavigationGeometry{};
+        if (!trial->build(intangible ? ghostGeometry : candidate.geometry, current.configuration())) {
             if (selected) {
                 candidate.error = "Cannot build navigation around this tower: " + trial->status();
             }
@@ -266,7 +290,8 @@ bool NavigationSession::profileInUse(EnemyTypeId type) const {
     }
     const auto* surface = profile == 0 ? &navigation_ : profiles_[profile - 1].mesh.get();
     return std::any_of(enemies_->enemies().begin(), enemies_->enemies().end(), [&](const Enemy& enemy) {
-        return enemy.active && enemy.alive && (enemy.navigation ? enemy.navigation : &navigation_) == surface;
+        return enemy.active && (enemy.alive || enemy.life != Enemy::Life::living) &&
+               (enemy.navigation ? enemy.navigation : &navigation_) == surface;
     });
 }
 
@@ -285,7 +310,8 @@ std::string NavigationSession::checkEnemyRoutes(const PlacementCandidate& candid
             }
         }
         for (const auto& enemy : enemies_->enemies()) {
-            if (!enemy.active || !enemy.alive || (enemy.navigation ? enemy.navigation : &navigation_) != current) {
+            if (!enemy.active || (!enemy.alive && enemy.life == Enemy::Life::living) ||
+                (enemy.navigation ? enemy.navigation : &navigation_) != current) {
                 continue;
             }
             if (prepared.hadSpawnRoute && !prepared.hasSpawnRoute) {

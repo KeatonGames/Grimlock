@@ -2,6 +2,7 @@
 #include "assets/environment.hpp"
 #include "grimlock/assets/animation.hpp"
 #include "grimlock/camera.hpp"
+#include "grimlock/engine.hpp"
 #include "grimlock/render_overlay.hpp"
 #include "renderer/buffer.hpp"
 #include "renderer/deformation.hpp"
@@ -59,6 +60,13 @@ public:
     void requestSwapchainRecreation() noexcept;
     void attachOverlay(RenderOverlay& overlay);
     void detachOverlay() noexcept;
+    void requestCapture();
+    [[nodiscard]] FrameCapture takeCapture();
+    void setVsync(bool enabled);
+
+    [[nodiscard]] bool vsyncEnabled() const noexcept {
+        return vsync_;
+    }
 
     void setPerformanceEnabled(bool enabled) noexcept {
         performanceEnabled_ = enabled;
@@ -92,6 +100,9 @@ private:
     void destroy() noexcept;
 
     SDL_Window* window_ = nullptr;
+    bool vsync_ = true, capturePending_ = false, captureSupported_ = false;
+    std::optional<Buffer> captureBuffer_;
+    FrameCapture capture_;
     VulkanContext context_;
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
 

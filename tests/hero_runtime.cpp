@@ -418,7 +418,7 @@ void heroTypeChecks(Engine& engine) {
 
 void heroDeploymentChecks(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/first_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
     auto& heroes = *runtime.heroes();
     const auto gold = runtime.level().economy().gold();
     const auto& definition = runtime.level().waves()->definition();

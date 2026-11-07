@@ -18,8 +18,12 @@ constexpr ImGuiWindowFlags hudFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindo
                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
 }
 
-GameHud::GameHud(Engine& engine, LevelRuntime& runtime, bool startInMenu, const std::filesystem::path& initialLevel)
-    : engine_(engine), runtime_(runtime) {
+GameHud::GameHud(Engine& engine,
+                 LevelRuntime& runtime,
+                 bool startInMenu,
+                 const std::filesystem::path& initialLevel,
+                 const std::filesystem::path& optionsFile)
+    : engine_(engine), runtime_(runtime), optionsPath_(optionsFile) {
     if (startInMenu) {
         runtime_.unload(engine_);
         screen_ = Screen::mainMenu;
@@ -38,6 +42,7 @@ GameHud::~GameHud() {
 
 void GameHud::configureUi() {
     presentation::configure();
+    initializeMenu();
 }
 
 void GameHud::updateLayout() {
@@ -136,6 +141,7 @@ OverlayInput GameHud::frame() {
     status();
     if (waves) {
         construction();
+        coins();
     }
     towerInfo();
     bossHealth();
@@ -189,6 +195,9 @@ void GameHud::refreshLevels() {
             }
         }
     }
+    if (!selectedLevel_ && !catalog_.levels.empty()) {
+        selectedLevel_ = catalog_.levels.front().path;
+    }
 }
 
 void GameHud::progressNotice() {
@@ -226,178 +235,6 @@ void GameHud::transitions() {
             refreshLevels();
         }
     }
-}
-
-void GameHud::menu() {
-    auto* viewport = ImGui::GetMainViewport();
-    const float s = layout_.scale;
-    presentation::backdrop();
-    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x * 0.5F,
-                             viewport->Pos.y + viewport->Size.y * 0.5F + (1 - entrance_) * 12 * s},
-                            ImGuiCond_Always,
-                            {0.5F, 0.5F});
-    const bool selecting = screen_ == Screen::levels;
-    ImGui::SetNextWindowSize({std::max(200.0F, std::min((selecting ? 720.0F : 480.0F) * s, viewport->Size.x - 32 * s)),
-                              selecting ? std::max(220.0F, std::min(650 * s, viewport->Size.y - 32 * s)) : 340 * s});
-    if (ImGui::Begin(selecting ? "Level Selection" : "Main Menu",
-                     nullptr,
-                     hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::PushFont(nullptr, 32);
-        ImGui::TextColored(presentation::gold, "GRIMLOCK");
-        ImGui::PopFont();
-        ImGui::TextDisabled(selecting ? "CHOOSE YOUR BATTLEFIELD" : "PREPARE. DEFEND. SURVIVE.");
-        ImGui::Separator();
-        ImGui::BeginDisabled(settingsOpen_);
-        if (!selecting) {
-            if (presentation::action("Choose Level", {-1, 48 * s}, true)) {
-                requestedScreen_ = Screen::levels;
-            }
-            if (presentation::action("Settings", {-1, 42 * s})) {
-                settingsOpen_ = true;
-            }
-            if (presentation::action("Quit", {-1, 42 * s})) {
-                quit_ = true;
-            }
-        } else {
-            refreshRemaining_ -= ImGui::GetIO().DeltaTime;
-            if (refreshRemaining_ <= 0) {
-                refreshLevels();
-            }
-            const bool saveWarning = runtime_.progress() && !runtime_.progress()->error().empty();
-            const float footer = (110 + (!error_.empty() ? 28 : 0) + (saveWarning ? 28 : 0)) * s;
-            if (ImGui::BeginChild("Available Levels", {0, -footer})) {
-                if (catalog_.levels.empty()) {
-                    ImGui::TextWrapped(
-                        "No playable levels found. Save a level in the game's levels folder, then refresh.");
-                }
-                for (const auto& level : catalog_.levels) {
-                    ImGui::PushID(level.path.generic_string().c_str());
-                    const auto* progress = runtime_.progress();
-                    const bool last = progress && !level.id.empty() && progress->lastPlayed() == level.id;
-                    if (last) {
-                        ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.78F, 0.48F, 1});
-                    }
-                    if (ImGui::Selectable(level.name.c_str(), selectedLevel_ == level.path)) {
-                        selectedLevel_ = level.path;
-                        error_.clear();
-                    }
-                    if (last) {
-                        ImGui::PopStyleColor();
-                        ImGui::TextDisabled("Last played");
-                    }
-                    if (const auto* record = progress ? progress->find(level.id) : nullptr) {
-                        if (record->completed) {
-                            ImGui::TextDisabled("Completed | Best %.2f s", *record->bestSeconds);
-                        }
-                        ImGui::TextDisabled("Attempts %llu | Victories %llu",
-                                            static_cast<unsigned long long>(record->attempts),
-                                            static_cast<unsigned long long>(record->victories));
-                    }
-                    if (progress && level.id.empty()) {
-                        ImGui::TextDisabled("Save in Editor to enable progress tracking");
-                    }
-                    if (!level.description.empty()) {
-                        ImGui::TextWrapped("%s", level.description.c_str());
-                    }
-                    ImGui::Spacing();
-                    ImGui::PopID();
-                }
-            }
-            ImGui::EndChild();
-            if (!error_.empty()) {
-                ImGui::TextColored({1, 0.55F, 0.45F, 1}, "Unable to load this level. Hover for details.");
-                if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("%s", error_.c_str());
-                }
-            }
-            ImGui::BeginDisabled(!selectedLevel_);
-            if (presentation::action("Play", {160, 36}, true)) {
-                requestedLevel_ = selectedLevel_;
-            }
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (presentation::action("Refresh", {100, 36})) {
-                refreshLevels();
-            }
-            if (presentation::action("Main Menu")) {
-                requestedScreen_ = Screen::mainMenu;
-            }
-            if (!catalog_.errors.empty()) {
-                ImGui::SameLine();
-                ImGui::TextDisabled("%zu unavailable", catalog_.errors.size());
-                if (ImGui::IsItemHovered()) {
-                    ImGui::BeginTooltip();
-                    ImGui::PushTextWrapPos(460);
-                    for (const auto& error : catalog_.errors) {
-                        ImGui::TextWrapped("%s", error.c_str());
-                    }
-                    ImGui::PopTextWrapPos();
-                    ImGui::EndTooltip();
-                }
-            }
-        }
-        ImGui::EndDisabled();
-        progressNotice();
-    }
-    ImGui::End();
-}
-
-void GameHud::pauseMenu() {
-    presentation::backdrop(0.65F);
-    if (settingsOpen_) {
-        settings();
-        return;
-    }
-    auto* v = ImGui::GetMainViewport();
-    const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + v->Size.x * .5F, v->Pos.y + v->Size.y * .5F}, ImGuiCond_Always, {.5F, .5F});
-    ImGui::SetNextWindowSize({std::min(420 * s, v->Size.x - 2 * layout_.gap), 0});
-    if (ImGui::Begin("Pause Menu", nullptr, hudFlags)) {
-        presentation::heading("PAUSED", "Your defense will wait.");
-        ImGui::Separator();
-        if (presentation::action("Resume", {-1, 38 * s}, true)) {
-            runtime_.setPaused(false);
-        }
-        if (presentation::action("Settings", {-1, 34 * s})) {
-            settingsOpen_ = true;
-        }
-        if (presentation::action("Restart Level", {-1, 34 * s})) {
-            restart_ = true;
-        }
-        if (presentation::action("Choose Level", {-1, 34 * s})) {
-            requestedScreen_ = Screen::levels;
-        }
-        if (presentation::action("Main Menu", {-1, 34 * s})) {
-            requestedScreen_ = Screen::mainMenu;
-        }
-        if (presentation::action("Quit", {-1, 34 * s})) {
-            quit_ = true;
-        }
-    }
-    ImGui::End();
-}
-
-void GameHud::settings() {
-    auto* v = ImGui::GetMainViewport();
-    const float s = layout_.scale;
-    ImGui::SetNextWindowPos({v->Pos.x + v->Size.x * .5F, v->Pos.y + v->Size.y * .5F}, ImGuiCond_Always, {.5F, .5F});
-    ImGui::SetNextWindowSize({std::min(450 * s, v->Size.x - 2 * layout_.gap), 0});
-    if (ImGui::Begin("Settings", nullptr, hudFlags)) {
-        presentation::heading("SETTINGS", "Interface preferences for this session");
-        ImGui::Separator();
-        ImGui::SetNextItemWidth(-100 * s);
-        ImGui::SliderFloat("UI Scale", &uiScale_, 0.85F, 1.25F, "%.2fx");
-        ImGui::Checkbox("World health bars", &worldHealthBars_);
-        ImGui::TextDisabled("Boss health is always visible during an encounter.");
-        ImGui::Separator();
-        ImGui::TextWrapped(
-            "Click hero, then click ground to move\nRight drag: pan\nMiddle drag: orbit\nWheel: zoom\nEscape: "
-            "cancel placement/selection, then pause");
-        if (presentation::action("Back", {-1, 36 * s}) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            settingsOpen_ = false;
-        }
-    }
-    ImGui::End();
 }
 
 void GameHud::notifications() {
@@ -448,7 +285,34 @@ void GameHud::status() {
     const float scale = layout_.scale;
     const auto flags = hudFlags | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoFocusOnAppearing;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-    ImGui::SetNextWindowPos({viewport->Pos.x + layout_.gap, viewport->Pos.y + layout_.gap + 9 * scale});
+    const float healthWidth = std::min(320 * scale, viewport->Size.x * 0.28F);
+    ImGui::SetNextWindowPos({viewport->Pos.x + layout_.gap, viewport->Pos.y + layout_.gap});
+    if (ImGui::Begin("Gameplay Settings", nullptr, flags)) {
+        const float gearSize = 40 * scale;
+        if (ImGui::Button("##GameplaySettings", {gearSize, gearSize})) {
+            runtime_.setPaused(true);
+            cancelWorldInput_ = true;
+        }
+        const auto minimum = ImGui::GetItemRectMin();
+        const ImVec2 center{minimum.x + gearSize * 0.5F, minimum.y + gearSize * 0.5F};
+        auto* draw = ImGui::GetWindowDrawList();
+        const auto color = ImGui::GetColorU32(ImGuiCol_Text);
+        for (int point = 0; point < 32; ++point) {
+            const float angle = glm::two_pi<float>() * point / 32;
+            const float radius = (point % 4 == 0 || point % 4 == 3 ? 13 : 10) * scale;
+            draw->PathLineTo({center.x + std::cos(angle) * radius, center.y + std::sin(angle) * radius});
+        }
+        draw->PathStroke(color, ImDrawFlags_Closed, 1.8F * scale);
+        draw->AddCircle(center, 4 * scale, color, 16, 1.8F * scale);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Settings / Main Menu");
+        }
+    }
+    ImGui::End();
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x * 0.5F - healthWidth * 0.5F - layout_.gap,
+                             viewport->Pos.y + layout_.gap + 9 * scale},
+                            ImGuiCond_Always,
+                            {1, 0});
     if (ImGui::Begin("Round", nullptr, flags)) {
         ImGui::Text("Round %zu / %zu",
                     std::min(waves->wave() + 1, waves->definition().waves.size()),
@@ -466,7 +330,7 @@ void GameHud::status() {
                       static_cast<unsigned long long>(waves->health()),
                       static_cast<unsigned long long>(waves->definition().objectiveHealth));
         presentation::meter(static_cast<float>(waves->health()) / waves->definition().objectiveHealth,
-                            {std::min(320 * scale, viewport->Size.x * 0.38F), 24 * scale},
+                            {healthWidth, 24 * scale},
                             health);
     }
     ImGui::End();
@@ -547,6 +411,91 @@ void GameHud::bossHealth() {
     ImGui::PopStyleColor(3);
 }
 
+void GameHud::coinIcon(ImVec2 center, float size) {
+    if (coinTriangles_.empty()) {
+        const auto model = engine_.loadModel(engine_.assetRoot() / "environment/dungeon/coin.glb");
+        const auto bounds = engine_.modelInfo(model);
+        coinTriangles_ = engine_.modelTriangles(model);
+        coinCenter_ = (bounds.minimum + bounds.maximum) * 0.5F;
+        coinHeight_ = std::max(bounds.maximum.y - bounds.minimum.y, 0.001F);
+    }
+
+    struct Face {
+        std::array<ImVec2, 3> points;
+        float depth;
+        ImU32 color;
+    };
+
+    std::vector<Face> faces;
+    faces.reserve(coinTriangles_.size());
+    const auto rotation = glm::angleAxis(static_cast<float>(ImGui::GetTime()) * 0.7F, glm::vec3{0, 1, 0}) *
+                          glm::angleAxis(-0.18F, glm::vec3{1, 0, 0});
+    // Project the actual coin mesh into the HUD, independent of scene depth and camera movement.
+    for (const auto& triangle : coinTriangles_) {
+        std::array<glm::vec3, 3> points;
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            points[i] = rotation * ((triangle[i] - coinCenter_) / coinHeight_);
+        }
+        const auto normal = glm::cross(points[1] - points[0], points[2] - points[0]);
+        if (normal.z <= 0 || glm::dot(normal, normal) < 0.000001F) {
+            continue;
+        }
+        const float light =
+            0.38F + 0.62F * std::max(0.0F, glm::dot(glm::normalize(normal), glm::normalize(glm::vec3{-0.3F, 0.6F, 1})));
+        Face face{
+            {},
+            (points[0].z + points[1].z + points[2].z) / 3,
+            IM_COL32(static_cast<int>(255 * light), static_cast<int>(199 * light), static_cast<int>(52 * light), 255)};
+        for (std::size_t i = 0; i < points.size(); ++i) {
+            face.points[i] = {center.x + points[i].x * size, center.y - points[i].y * size};
+        }
+        faces.push_back(face);
+    }
+    std::sort(faces.begin(), faces.end(), [](const Face& a, const Face& b) {
+        return a.depth < b.depth;
+    });
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto flags = draw->Flags;
+    // Mesh triangles share edges. ImGui's per-shape AA fringe exposes those edges as cracks
+    // and overlaps neighboring faces; only independent UI shapes should use that fringe.
+    draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+    for (const auto& face : faces) {
+        draw->AddTriangleFilled(face.points[0], face.points[1], face.points[2], face.color);
+    }
+    draw->Flags = flags;
+}
+
+void GameHud::coins() {
+    const auto* viewport = ImGui::GetMainViewport();
+    const float scale = layout_.scale;
+    const float sideSpace = (viewport->Size.x - layout_.dockWidth) * 0.5F - layout_.gap * 2;
+    const float width = std::min(125 * scale, std::max(24.0F, sideSpace));
+    ImGui::SetNextWindowPos(
+        {viewport->Pos.x + viewport->Size.x - layout_.gap, viewport->Pos.y + viewport->Size.y - layout_.gap},
+        ImGuiCond_Always,
+        {1, 1});
+    ImGui::SetNextWindowSize({width, 78 * scale});
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {5 * scale, 5 * scale});
+    if (ImGui::Begin("Coins",
+                     nullptr,
+                     (hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize) | ImGuiWindowFlags_NoScrollbar)) {
+        const float available = ImGui::GetContentRegionAvail().x;
+        const float iconSize = std::min(40 * scale, available);
+        const auto cursor = ImGui::GetCursorScreenPos();
+        coinIcon({cursor.x + available * 0.5F, cursor.y + iconSize * 0.5F}, iconSize * 0.82F);
+        ImGui::Dummy({available, iconSize});
+        const auto text = std::to_string(runtime_.level().economy().gold());
+        const float factor = std::min(1.0F, available / std::max(ImGui::CalcTextSize(text.c_str()).x, 1.0F));
+        ImGui::PushFont(nullptr, ImGui::GetFontSize() * factor);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
+                             std::max(0.0F, (available - ImGui::CalcTextSize(text.c_str()).x) * 0.5F));
+        ImGui::TextColored(presentation::gold, "%s", text.c_str());
+        ImGui::PopFont();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 void GameHud::construction() {
     const auto* waves = runtime_.level().waves();
     const bool preparing = waves && waves->phase() == LevelPhase::preparation;
@@ -560,10 +509,6 @@ void GameHud::construction() {
     const auto flags = hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
     if (ImGui::Begin("Build Towers", nullptr, flags)) {
         ImGui::TextDisabled("TOWERS");
-        ImGui::SameLine();
-        ImGui::TextColored(presentation::gold,
-                           "Gold %llu",
-                           static_cast<unsigned long long>(runtime_.level().economy().gold()));
         const float cardWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5F;
         std::size_t index = 0;
         for (const auto& definition : runtime_.navigation().towers().definitions()) {
@@ -674,19 +619,21 @@ void GameHud::towerInfo() {
 }
 
 void GameHud::result() {
+    presentation::MenuTheme theme;
+    ImGui::PushFont(menuFont_, 20);
     const auto* waves = runtime_.level().waves();
     if (!resultCatalogReady_) {
         refreshLevels();
         resultCatalogReady_ = true;
     }
     auto* viewport = ImGui::GetMainViewport();
-    presentation::backdrop(0.72F);
+    presentation::menuShade(0.72F);
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + viewport->Size.y * 0.5F},
                             ImGuiCond_Always,
                             {0.5F, 0.5F});
     ImGui::SetNextWindowSize({std::min(500 * layout_.scale, viewport->Size.x - 2 * layout_.gap), 0});
     if (ImGui::Begin("Level Result", nullptr, hudFlags)) {
-        presentation::heading(waves->phase() == LevelPhase::victory ? "VICTORY" : "DEFEAT");
+        presentation::menuHeading(waves->phase() == LevelPhase::victory ? "VICTORY" : "DEFEAT", nullptr);
         ImGui::TextUnformatted(waves->phase() == LevelPhase::victory ? "Your objective survived every wave."
                                                                      : "Your defense objective has fallen.");
         ImGui::TextUnformatted(waves->definition().name.c_str());
@@ -697,7 +644,7 @@ void GameHud::result() {
         } else {
             ImGui::Text("Wave reached: %zu / %zu", waves->wave() + 1, waves->definition().waves.size());
         }
-        if (presentation::action("Retry", {-1, 38 * layout_.scale}, true)) {
+        if (presentation::menuAction("RETRY###Retry", {-1, 38 * layout_.scale}, true)) {
             restart_ = true;
         }
         if (waves->phase() == LevelPhase::victory) {
@@ -707,16 +654,17 @@ void GameHud::result() {
                                                            : level.path == runtime_.path();
                 });
             if (current != catalog_.levels.end() && std::next(current) != catalog_.levels.end()) {
-                if (presentation::action("Next Level", {-1, 38 * layout_.scale})) {
+                if (presentation::menuAction("NEXT LEVEL###Next Level", {-1, 38 * layout_.scale})) {
                     requestedLevel_ = std::next(current)->path;
                 }
             }
         }
-        if (presentation::action("Choose Level", {-1, 38 * layout_.scale})) {
+        if (presentation::menuAction("LEVELS###Choose Level", {-1, 38 * layout_.scale})) {
             requestedScreen_ = Screen::levels;
         }
     }
     ImGui::End();
+    ImGui::PopFont();
 }
 
 void GameHud::finishFrame(const Camera& camera) {
@@ -981,36 +929,37 @@ void GameHud::placementOverlay(const Camera& camera) {
         glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
-    const auto healthBar = [&](glm::dvec3 position, float health, float maximum, double flash) {
-        if (!worldHealthBars_ || health >= maximum) {
-            return;
-        }
-        const auto clip = matrix * glm::dvec4{position, 1};
-        if (clip.w <= 0 || clip.z < 0 || clip.z > clip.w) {
-            return;
-        }
-        const ImVec2 point{viewport->Pos.x + static_cast<float>((clip.x / clip.w + 1) * viewport->Size.x * 0.5),
-                           viewport->Pos.y + static_cast<float>((clip.y / clip.w + 1) * viewport->Size.y * 0.5)};
-        const float s = layout_.scale;
-        draw->AddRectFilled({point.x - 30 * s, point.y - 5 * s},
-                            {point.x + 30 * s, point.y + 5 * s},
-                            IM_COL32(8, 14, 18, 235),
-                            3 * s);
-        draw->AddRectFilled({point.x - 28 * s, point.y - 3 * s},
-                            {point.x - 28 * s + 56 * s * std::clamp(health / maximum, 0.0F, 1.0F), point.y + 3 * s},
-                            health / maximum < 0.3F ? IM_COL32(218, 100, 91, 255) : IM_COL32(102, 197, 164, 255),
-                            2 * s);
-        draw->AddRect({point.x - 30 * s, point.y - 5 * s},
-                      {point.x + 30 * s, point.y + 5 * s},
-                      IM_COL32(205, 185, 133, 130),
-                      3 * s);
-        if (flash > 0) {
-            draw->AddRect({point.x - 31 * s, point.y - 6 * s},
-                          {point.x + 31 * s, point.y + 6 * s},
-                          IM_COL32(255, 240, 210, static_cast<int>(std::clamp(flash / 0.12, 0.0, 1.0) * 190)),
+    const auto healthBar =
+        [&](glm::dvec3 position, float health, float maximum, double flash, bool alwaysVisible = false) {
+            if (!worldHealthBars_ || (!alwaysVisible && health >= maximum)) {
+                return;
+            }
+            const auto clip = matrix * glm::dvec4{position, 1};
+            if (clip.w <= 0 || clip.z < 0 || clip.z > clip.w) {
+                return;
+            }
+            const ImVec2 point{viewport->Pos.x + static_cast<float>((clip.x / clip.w + 1) * viewport->Size.x * 0.5),
+                               viewport->Pos.y + static_cast<float>((clip.y / clip.w + 1) * viewport->Size.y * 0.5)};
+            const float s = layout_.scale;
+            draw->AddRectFilled({point.x - 30 * s, point.y - 5 * s},
+                                {point.x + 30 * s, point.y + 5 * s},
+                                IM_COL32(8, 14, 18, 235),
+                                3 * s);
+            draw->AddRectFilled({point.x - 28 * s, point.y - 3 * s},
+                                {point.x - 28 * s + 56 * s * std::clamp(health / maximum, 0.0F, 1.0F), point.y + 3 * s},
+                                health / maximum < 0.3F ? IM_COL32(218, 100, 91, 255) : IM_COL32(102, 197, 164, 255),
+                                2 * s);
+            draw->AddRect({point.x - 30 * s, point.y - 5 * s},
+                          {point.x + 30 * s, point.y + 5 * s},
+                          IM_COL32(205, 185, 133, 130),
                           3 * s);
-        }
-    };
+            if (flash > 0) {
+                draw->AddRect({point.x - 31 * s, point.y - 6 * s},
+                              {point.x + 31 * s, point.y + 6 * s},
+                              IM_COL32(255, 240, 210, static_cast<int>(std::clamp(flash / 0.12, 0.0, 1.0) * 190)),
+                              3 * s);
+            }
+        };
     for (const auto& tower : runtime_.navigation().towers().towers()) {
         const auto& progress = runtime_.navigation().towers().progress(tower.object);
         healthBar(tower.position + glm::dvec3{0, tower.halfExtent.y + 0.12, 0},
@@ -1022,11 +971,15 @@ void GameHud::placementOverlay(const Camera& camera) {
     if (const auto* enemies = runtime_.navigation().enemies()) {
         for (const auto& enemy : enemies->enemies()) {
             const auto& definition = enemies->definition(enemy.type);
-            if (definition.showHealthBar || (selected && selected->combat.target == enemy.id)) {
-                healthBar(enemy.position + glm::dvec3{0, definition.visualHeight + 0.12, 0},
+            if (enemy.alive && (enemy.life == Enemy::Life::bones || definition.showHealthBar ||
+                                (selected && selected->combat.target == enemy.id))) {
+                const double barHeight =
+                    enemy.life == Enemy::Life::bones ? 0.3 : definition.visualHeight + definition.hoverHeight + 0.12;
+                healthBar(enemy.position + glm::dvec3{0, barHeight, 0},
                           enemy.health,
                           enemy.maximumHealth,
-                          enemy.hitFlashRemaining);
+                          enemy.hitFlashRemaining,
+                          enemy.life == Enemy::Life::bones);
             }
         }
     }

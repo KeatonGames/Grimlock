@@ -20,7 +20,8 @@ glm::dvec2 horizontal(glm::dvec3 value) {
 }
 
 bool verticalOverlap(const Enemy& first, const Enemy& second) {
-    return first.position.y < second.position.y + second.height && second.position.y < first.position.y + first.height;
+    return !first.intangible && !second.intangible && first.position.y < second.position.y + second.height &&
+           second.position.y < first.position.y + first.height;
 }
 
 const NavMesh& navigationFor(const Enemy& enemy, const NavMesh& fallback) {
@@ -157,7 +158,7 @@ void CrowdMovement::step(const NavMesh& navigation,
     for (std::size_t index = 0; index < enemies.size(); ++index) {
         auto& enemy = enemies[index];
         enemy.desiredVelocity = {0, 0};
-        if (!enemy.active || !enemy.alive) {
+        if (!enemy.active || !enemy.alive || enemy.life != Enemy::Life::living) {
             continue;
         }
         EnemyAi::prepare(enemy, navigationFor(enemy, navigation), delta, despawnOnArrival);
@@ -167,12 +168,12 @@ void CrowdMovement::step(const NavMesh& navigation,
     for (std::size_t order = 0; order < enemies.size(); ++order) {
         const auto index = static_cast<std::size_t>((order + order_) % enemies.size());
         auto& enemy = enemies[index];
-        if (!enemy.destination || !enemy.active || !enemy.alive || enemy.movement == MovementStatus::blocked ||
-            enemy.movement == MovementStatus::arrived) {
+        if (!enemy.destination || !enemy.active || !enemy.alive || enemy.life != Enemy::Life::living ||
+            enemy.movement == MovementStatus::blocked || enemy.movement == MovementStatus::arrived) {
             continue;
         }
         auto desired = enemy.desiredVelocity;
-        if (enemy.speed > 0) {
+        if (enemy.speed > 0 && !enemy.intangible) {
             desired += separation(index, enemies, maximumRadius) * enemy.speed * 1.4;
         }
         const double speed = glm::length(desired);
@@ -241,6 +242,9 @@ glm::dvec3 CrowdMovement::move(const NavMesh& navigation,
                                double maximumRadius) {
     const auto& enemy = enemies[index];
     const auto& surface = navigationFor(enemy, navigation);
+    if (enemy.intangible) {
+        return surface.move(enemy.position, displacement);
+    }
     auto position = enemy.position;
     const double skin = std::max(1e-8, enemy.radius * 1e-5);
     for (int contact = 0; contact < 4 && glm::dot(displacement, displacement) > 1e-22; ++contact) {
@@ -282,8 +286,8 @@ void CrowdMovement::resolveOverlaps(const NavMesh& navigation, std::span<Enemy> 
         for (std::size_t index = 0; index < enemies.size(); ++index) {
             auto& enemy = enemies[index];
             const auto& surface = navigationFor(enemy, navigation);
-            if (!enemy.active || !enemy.alive || !surface.contains(enemy.position) ||
-                enemy.radius > surface.configuration().agentRadius + 1e-6) {
+            if (!enemy.active || !enemy.alive || enemy.intangible || enemy.life != Enemy::Life::living ||
+                !surface.contains(enemy.position) || enemy.radius > surface.configuration().agentRadius + 1e-6) {
                 continue;
             }
             glm::dvec2 correction{0};

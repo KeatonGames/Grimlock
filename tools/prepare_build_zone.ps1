@@ -51,10 +51,12 @@ function Add-Quad([Vector3]$a, [Vector3]$b, [Vector3]$c, [Vector3]$d,
 # The continuous top surface replaces selection-b's open vertical ribbon.
 $outerBase = New-Ring 0.5 0.05 0
 $outerSide = New-Ring 0.5 0.05 0.025
-$outerTop = New-Ring 0.485 0.045 0.05
-$innerTop = New-Ring 0.385 0.02 0.05
-$innerSide = New-Ring 0.37 0.015 0.025
-$innerBase = New-Ring 0.37 0.015 0
+# The runtime frame is three metres wide. Keep its border about twelve centimetres
+# wide in world space, matching the smaller hero marker instead of scaling up its rim.
+$outerTop = New-Ring 0.495 0.045 0.05
+$innerTop = New-Ring 0.465 0.035 0.05
+$innerSide = New-Ring 0.46 0.03 0.025
+$innerBase = New-Ring 0.46 0.03 0
 for ($i = 0; $i -lt 8; ++$i) {
     $next = ($i + 1) % 8
     $outward = [Vector3]::Normalize($outerBase[$i] + $outerBase[$next])

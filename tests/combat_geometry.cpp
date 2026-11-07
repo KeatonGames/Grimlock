@@ -139,7 +139,7 @@ int main() {
         Engine engine{EngineConfig{.windowTitle = "Combat visibility checks", .width = 640, .height = 480}};
         runtimeChecks(engine);
         LevelRuntime runtime;
-        runtime.load(engine, "assets/levels/cover_watch.json");
+        runtime.load(engine, "assets/test_fixtures/levels/cover_watch.json");
         require(runtime.navigation().combatGeometry().revision() > 0 && runtime.heroes()->heroes().size() == 3,
                 "terrain combat scene did not load");
         require(!runtime.navigation().combatGeometry().visible({7.7, 3.3, 1.2}, {3, 0.8, 1.2}, 11),

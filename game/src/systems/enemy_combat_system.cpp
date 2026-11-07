@@ -76,7 +76,8 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         }
     }
     for (auto& enemy : enemies.enemies_) {
-        if (!enemy.active || !enemy.alive || !enemy.navigation) {
+        if (!enemy.active || !enemy.alive || !enemy.navigation || (enemy.intangible && !objective_) ||
+            enemy.life != Enemy::Life::living) {
             continue;
         }
         auto& state = enemy.combat;
@@ -92,10 +93,13 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         state.rejectDelay = std::max(0.0, state.rejectDelay - delta);
         state.threatRemaining = std::max(0.0, state.threatRemaining - delta);
         const auto& mesh = *enemy.navigation;
-        // The objective uses the authored arrival damage/removal rule after its melee windup.
         Target goal{{DefensiveTargetKind::objective, 0},
-                    {{state.objective->x, state.objectiveHeight, state.objective->y}, 0}};
+                    objective_.value_or(MeleeBody{{state.objective->x, state.objectiveHeight, state.objective->y}, 0}),
+                    objectiveObject_};
         const auto relevant = [&](const Target& candidate) {
+            if (enemy.intangible) {
+                return candidate.reference.kind == DefensiveTargetKind::objective;
+            }
             if (!stats.objectiveFirst || candidate.reference.kind == DefensiveTargetKind::objective) {
                 return true;
             }
@@ -171,7 +175,9 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                                              enemyOrder(enemy),
                                              {},
                                              0,
-                                             geometry_,
+                                             enemy.intangible || option.reference.kind == DefensiveTargetKind::objective
+                                                 ? nullptr
+                                                 : geometry_,
                                              enemy.height,
                                              option.object)) {
                     state.target = option.reference;
@@ -229,7 +235,8 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                            enemyOrder(enemy),
                            {},
                            0,
-                           geometry_,
+                           enemy.intangible || target->reference.kind == DefensiveTargetKind::objective ? nullptr
+                                                                                                        : geometry_,
                            enemy.height,
                            target->object)) {
             release(enemies, enemy, true);
@@ -253,6 +260,7 @@ void EnemyCombatSystem::resolve(Engine& engine,
                                 HeroSystem* heroes,
                                 double delta) {
     arrivals_.clear();
+    objectiveHits_ = 0;
     for (auto& enemy : enemies.enemies_) {
         auto& state = enemy.combat;
         state.cooldown = std::max(0.0, state.cooldown - delta);
@@ -280,7 +288,9 @@ void EnemyCombatSystem::resolve(Engine& engine,
                         targetObject = found->object;
                     }
                 } else if (state.target.kind == DefensiveTargetKind::objective && state.objective) {
-                    body = {{state.objective->x, state.objectiveHeight, state.objective->y}, 0};
+                    body = objective_.value_or(
+                        MeleeBody{{state.objective->x, state.objectiveHeight, state.objective->y}, 0});
+                    targetObject = objectiveObject_;
                     valid = true;
                 }
                 if (valid && meleeContact(*enemy.navigation, enemy.position, enemy.radius, body, stats.range) &&
@@ -293,7 +303,11 @@ void EnemyCombatSystem::resolve(Engine& engine,
                         (void)towers.applyDamage(engine, targetObject, stats.damage * stats.towerDamageModifier);
                         break;
                     case DefensiveTargetKind::objective:
-                        arrivals_.push_back(enemy.id);
+                        if (objective_) {
+                            ++objectiveHits_;
+                        } else {
+                            arrivals_.push_back(enemy.id);
+                        }
                         break;
                     default:
                         break;
@@ -324,7 +338,13 @@ void EnemyCombatSystem::stop(EnemySystem& enemies) {
 }
 
 bool EnemyCombatSystem::clearStrike(const Enemy& enemy, const MeleeBody& body, ObjectId target) const {
-    return !geometry_ || geometry_->visible(combatAim(enemy), body.position + glm::dvec3{0, 0.25, 0}, 0, target);
+    // Contact is validated against the objective footprint and its navigable perimeter.
+    // A trace to the building's center would hit the very wall being attacked.
+    if (target && target == objectiveObject_) {
+        return true;
+    }
+    return enemy.intangible || !geometry_ ||
+           geometry_->visible(combatAim(enemy), body.position + glm::dvec3{0, 0.25, 0}, 0, target);
 }
 
 } // namespace grimlock::game

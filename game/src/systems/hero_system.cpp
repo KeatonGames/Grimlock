@@ -382,7 +382,7 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
         const Enemy* neighbor = nullptr;
         double fraction = 1;
         for (const auto& enemy : enemies) {
-            if (!enemy.active || !enemy.alive ||
+            if (!enemy.active || !enemy.alive || enemy.intangible ||
                 (next.y >= enemy.position.y + enemy.height || enemy.position.y >= next.y + config.height)) {
                 continue;
             }
@@ -424,7 +424,7 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     };
     if (hero.avoidanceEnemy) {
         const auto found = std::find_if(enemies.begin(), enemies.end(), [&](const Enemy& enemy) {
-            return enemy.id == *hero.avoidanceEnemy && enemy.alive && enemy.active;
+            return enemy.id == *hero.avoidanceEnemy && enemy.alive && enemy.active && !enemy.intangible;
         });
         if (found != enemies.end() && glm::length(horizontal(hero.avoidancePoint - hero.position)) > 0.12 &&
             mesh.visible(hero.position, hero.avoidancePoint)) {
@@ -442,7 +442,7 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     const Enemy* obstacle = nullptr;
     double nearest = distance;
     for (const auto& enemy : enemies) {
-        if (!enemy.alive || !enemy.active ||
+        if (!enemy.alive || !enemy.active || enemy.intangible ||
             (hero.position.y >= enemy.position.y + enemy.height ||
              enemy.position.y >= hero.position.y + config.height)) {
             continue;

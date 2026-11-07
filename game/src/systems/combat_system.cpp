@@ -34,7 +34,8 @@ void CombatSystem::update(TowerSystem& towers, EnemySystem& enemies, double delt
             const auto base = tower.position - glm::dvec3{0, tower.halfExtent.y, 0};
             const auto valid = [&](const Enemy& enemy) {
                 const auto offset = enemy.position - base;
-                return enemy.active && enemy.alive && hostile(towers.team(tower.entity), enemies.team(enemy.id)) &&
+                return enemies.canDamage(enemy, DamageType::physical) &&
+                       hostile(towers.team(tower.entity), enemies.team(enemy.id)) &&
                        glm::dot(offset, offset) <= statistics.attackRange * statistics.attackRange &&
                        !geometry->trace(origin, combatAim(enemy), definition.projectileRadius, tower.object);
             };

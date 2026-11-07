@@ -2,12 +2,17 @@
 
 Game uses its own HUD and input routing without Editor dependencies.
 
+Main menu, level cards, persistent display options and Pause share the forest
+theme described in [Game menus](menus.md). The playable catalog contains only
+Forest Defense; former demos are Editor/test fixtures outside it.
+
 ## Main layout
 
 - Top left: round number.
 - Top center: objective health bar.
 - Top right: Start Wave, enabled during Preparation.
-- Bottom center: towers-only shop, with gold, prices and tower cards.
+- Bottom center: towers-only shop, with prices and tower cards.
+- Bottom right: coin model and current gold balance.
 
 The three top widgets have transparent backgrounds; the old status rectangle is
 removed. The shop has no hero roster, deployment controls, hero information or wave
@@ -32,6 +37,10 @@ animation clocks while allowing UI rendering. Result screens retain Retry, Next
 Level and level selection.
 
 ## Layout and validation
+
+Gold appears at the bottom right beside the tower shop, with a rotating projection
+of the actual dungeon coin mesh above the current balance. Enemy coin effects are
+visual feedback only; gold still comes from the existing wave rewards.
 
 The shop stays horizontally centered as the window and UI scale change. Top widgets
 remain anchored to their respective corners/center, without a full-width panel.

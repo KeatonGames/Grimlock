@@ -44,6 +44,11 @@ HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlo
     stats.projectileSpeed = combat.value("projectile_speed", stats.projectileSpeed);
     stats.projectileRadius = combat.value("projectile_radius", stats.projectileRadius);
     stats.damage = combat.value("damage", stats.damage);
+    const auto damageType = combat.value("damage_type", std::string{"physical"});
+    if (damageType != "physical" && damageType != "magic") {
+        throw std::invalid_argument("Unknown hero damage type: " + damageType);
+    }
+    stats.damageType = damageType == "magic" ? DamageType::magic : DamageType::physical;
     stats.range = combat.value("range", stats.range);
     stats.interval = combat.value("attack_interval", stats.interval);
     stats.impactTime = combat.value("impact_time", stats.impactTime);

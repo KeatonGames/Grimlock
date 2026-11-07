@@ -311,6 +311,19 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     submit.signalSemaphoreInfoCount = 1;
     submit.pSignalSemaphoreInfos = &signal;
     checkVk(vkQueueSubmit2(context_.graphicsQueue(), 1, &submit, inFlight_), "vkQueueSubmit2");
+    if (capturePending_) {
+        checkVk(vkWaitForFences(device, 1, &inFlight_, VK_TRUE, UINT64_MAX), "capture fence");
+        capture_ = {swapchainExtent_.width, swapchainExtent_.height, {}};
+        capture_.rgba.resize(static_cast<std::size_t>(capture_.width) * capture_.height * 4);
+        captureBuffer_->read(capture_.rgba.data(), capture_.rgba.size());
+        if (swapchainFormat_ == VK_FORMAT_B8G8R8A8_UNORM || swapchainFormat_ == VK_FORMAT_B8G8R8A8_SRGB) {
+            for (std::size_t i = 0; i < capture_.rgba.size(); i += 4) {
+                std::swap(capture_.rgba[i], capture_.rgba[i + 2]);
+            }
+        }
+        captureBuffer_.reset();
+        capturePending_ = false;
+    }
     timestampPending_ = performanceEnabled_ && timestamps_;
 
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
@@ -343,6 +356,35 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     }
 
     return true;
+}
+
+void VulkanRenderer::requestCapture() {
+    if (!captureSupported_ ||
+        (swapchainFormat_ != VK_FORMAT_B8G8R8A8_UNORM && swapchainFormat_ != VK_FORMAT_B8G8R8A8_SRGB &&
+         swapchainFormat_ != VK_FORMAT_R8G8B8A8_UNORM && swapchainFormat_ != VK_FORMAT_R8G8B8A8_SRGB)) {
+        throw std::runtime_error("This surface does not support RGBA frame capture.");
+    }
+    capture_ = {};
+    capturePending_ = true;
+}
+
+FrameCapture VulkanRenderer::takeCapture() {
+    return std::exchange(capture_, {});
+}
+
+void VulkanRenderer::setVsync(bool enabled) {
+    if (!enabled) {
+        const auto support = context_.swapchainSupport();
+        if (std::none_of(support.presentModes.begin(), support.presentModes.end(), [](auto mode) {
+                return mode == VK_PRESENT_MODE_MAILBOX_KHR || mode == VK_PRESENT_MODE_IMMEDIATE_KHR;
+            })) {
+            throw std::runtime_error("This display requires VSync.");
+        }
+    }
+    if (vsync_ != enabled) {
+        vsync_ = enabled;
+        framebufferResized_ = true;
+    }
 }
 
 void VulkanRenderer::requestSwapchainRecreation() noexcept {
@@ -562,6 +604,10 @@ bool VulkanRenderer::createSwapchain() {
     info.imageExtent = extent;
     info.imageArrayLayers = 1;
     info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    captureSupported_ = (support.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0;
+    if (captureSupported_) {
+        info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    }
     const std::array families{context_.graphicsFamily(), context_.presentFamily()};
 
     if (families[0] != families[1]) {
@@ -585,6 +631,15 @@ bool VulkanRenderer::createSwapchain() {
     }
 
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    if (!vsync_) {
+        for (const auto mode : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
+            if (std::find(support.presentModes.begin(), support.presentModes.end(), mode) !=
+                support.presentModes.end()) {
+                info.presentMode = mode;
+                break;
+            }
+        }
+    }
     info.clipped = VK_TRUE;
     checkVk(vkCreateSwapchainKHR(context_.device(), &info, nullptr, &swapchain_), "vkCreateSwapchainKHR");
     checkVk(vkGetSwapchainImagesKHR(context_.device(), swapchain_, &count, nullptr), "vkGetSwapchainImagesKHR");
@@ -981,10 +1036,43 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     present.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
     present.dstAccessMask = VK_ACCESS_2_NONE;
     present.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    present.newLayout = capturePending_ ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    if (capturePending_) {
+        captureBuffer_.emplace(context_,
+                               static_cast<VkDeviceSize>(swapchainExtent_.width) * swapchainExtent_.height * 4,
+                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        present.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        present.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+    }
     dependency.imageMemoryBarrierCount = 1;
     dependency.pImageMemoryBarriers = &present;
     vkCmdPipelineBarrier2(command, &dependency);
+    if (capturePending_) {
+        VkBufferImageCopy copy{};
+        copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        copy.imageExtent = {swapchainExtent_.width, swapchainExtent_.height, 1};
+        vkCmdCopyImageToBuffer(command,
+                               swapchainImages_[imageIndex],
+                               VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               captureBuffer_->handle(),
+                               1,
+                               &copy);
+        present.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        present.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        present.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        present.srcAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT;
+        present.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+        present.dstAccessMask = VK_ACCESS_2_NONE;
+        VkMemoryBarrier2 host{VK_STRUCTURE_TYPE_MEMORY_BARRIER_2};
+        host.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        host.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        host.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+        host.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+        dependency.memoryBarrierCount = 1;
+        dependency.pMemoryBarriers = &host;
+        vkCmdPipelineBarrier2(command, &dependency);
+    }
     if (performanceEnabled_ && timestamps_) {
         vkCmdWriteTimestamp2(command, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, timestamps_, 1);
     }
@@ -1130,6 +1218,7 @@ void VulkanRenderer::destroy() noexcept {
     brdfLut_.reset();
     lightBuffer_.reset();
     cameraBuffer_.reset();
+    captureBuffer_.reset();
 
     vkDestroyFence(device, inFlight_, nullptr);
     vkDestroySemaphore(device, imageAvailable_, nullptr);

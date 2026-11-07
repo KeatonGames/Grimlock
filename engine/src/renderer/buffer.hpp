@@ -22,6 +22,7 @@ public:
     }
 
     void write(const void* data, VkDeviceSize bytes);
+    void read(void* data, VkDeviceSize bytes) const;
 
 private:
     void destroy() noexcept;

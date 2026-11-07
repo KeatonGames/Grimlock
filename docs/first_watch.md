@@ -3,7 +3,7 @@
 Run `Grimlock.exe`, choose **Choose Level**, then select **First Watch** and press
 **Play**. In Editor, use **Navigation > Level > Load First Watch**.
 Gameplay controls are in the bottom dock; Pause contains restart and level selection.
-The level is `game/assets/levels/first_watch.json`; the hand-authored engine
+The level is `game/assets/test_fixtures/levels/first_watch.json`; the hand-authored engine
 scene is `game/assets/scenes/first_watch.json`. The technical `demo.json` is unchanged.
 
 ## The battlefield
@@ -77,7 +77,9 @@ It simulates player decisions, not a privileged build path or modified enemy hea
   Tested victory with solid cover enabled.
 - **Rear defense:** Small at (4, -2.5), Large at (4, 2.5), hero (4, 0), upgrading
   the Large Tower before the Small Tower when affordable, and replacing a lost
-  Small Tower during preparation. Tested victory with solid cover enabled.
+  Small Tower during preparation. The current rear-only fixture loses in the final
+  wave under sustained objective attacks: survivors stay and fight instead of
+  disappearing after one hit. Mixed and Small Tower plans still win.
 - **No construction:** the default hero alone loses in wave two.
 - **No development:** the mixed opening without upgrades, reinforcements or Cleave
   loses in wave four despite unspent gold.

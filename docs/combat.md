@@ -141,7 +141,7 @@ hero attacks. There are no height-based damage/range bonuses.
 
 ## Cover Watch and Editor debugging
 
-Run `Grimlock.exe assets/levels/cover_watch.json`, or choose
+Run `Grimlock.exe assets/test_fixtures/levels/cover_watch.json`, or choose
 **Navigation > Level > Load Cover Watch** in Editor. This handcrafted extension of
 Hill Watch adds a solid mountain ridge, an authored hilltop Large Tower, lower
 animal approaches and a hero defending the elevated area. The north-facing valley

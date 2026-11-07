@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 3, "expected asset and fixture directories");
         const auto definitions = loadAnimalDefinitions(argv[1]);
-        require(definitions.size() == 15 && definitions.front().model == "enemies/animals/chicken.glb" &&
+        require(definitions.size() == 17 && definitions.front().model == "enemies/animals/chicken.glb" &&
                     definitions.front().radius == 0.195 && definitions.front().visualHeight == 0.36F,
                 "animal catalog/default settings incorrect");
         bool varied = false;

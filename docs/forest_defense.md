@@ -25,7 +25,7 @@ code in Game, no procedural generation, and no navigation grid.
 An irregular woodland meadow leads from the western camp at (-10, 0, -4) through
 an S-shaped dirt trail and an open central clearing. A broad grassy ramp at
 (4, 6) rises from Y=0 to a watch hill at Y=2. The defense objective is at
-(4, 2, 12), in front of the forest obelisk. A separate ramp connects the clearing
+(4, 2, 12), in front of the mausoleum. A separate ramp connects the clearing
 to a rocky lookout at (-6.5, 1, 4.2).
 
 Five continuous build zones cover the western ambush meadow, central clearing,
@@ -37,7 +37,7 @@ footprint; ramps, cliff overhangs and path depressions remain invalid foundation
 The scene's terrain pieces supply their actual transformed triangles to the
 existing Recast/Detour system. Agent radius, height, slope, step, crowd movement,
 and dynamic tower-obstacle settings are unchanged. The broad hill ramp supports
-the Iron Stag's one-metre collision radius. Solid boundary rocks and the obelisk
+the Iron Stag's one-metre collision radius. Solid boundary rocks and the mausoleum
 are obstacles; vegetation, flowers, signs and camp props are decoration.
 Heroes can deploy freely on valid terrain using the current controls and limits.
 Camera bindings are unchanged; only this scene's initial view was composed.
@@ -48,7 +48,7 @@ The 107 authored objects reference 22 distinct original Nature Kit GLBs. The mai
 pieces are `ground_grass`, `ground_pathStraight`, `ground_pathBend`,
 `ground_pathEnd`, `cliff_block_rock`, `cliff_blockHalf_rock`, and
 `cliff_blockSlope_rock`. Repeated `tree_default`, `tree_oak`, `tree_pineTallA`,
-bushes, rocks and flowers frame the playable area. The camp, signs, obelisk,
+bushes, rocks and flowers frame the playable area. The camp, signs, mausoleum,
 columns and a small `platform_grass` detail identify the entrance and objective.
 Original mesh geometry, palette, material settings and GLBs are retained, under
 the supplied [CC0 license](../game/assets/environment/nature/kenney/LICENSE.txt).
@@ -74,21 +74,35 @@ continues to report them and omit zero-area triangles.
 
 ## Handcrafted waves and economy
 
-The player starts with **120 gold** and Knight, Ranger and Mage near the objective. The objective has **10 health**, with one point lost per arriving enemy.
+The player starts with **120 gold** and Knight, Ranger and Mage near the objective.
+The mausoleum uses the existing graveyard `crypt.glb` model and has **10 health**.
+Enemies remain at its perimeter and repeatedly attack, removing one health per
+completed hit at their normal attack cadence. Ghosts ignore defenders on the way
+but stop to attack the mausoleum too. Attackers remain targetable and keep the
+wave active until killed. At zero health the mausoleum collapses and the level
+ends in defeat; restarting restores its appearance and health. The Editor's
+Objective Hit Damage retains the `damage_per_arrival` JSON key for compatibility.
+The scene model uses the `grimlock.objective` role, available in the Editor's
+existing Level geometry selector. Keep the level's objective route point on the
+walkable approach outside the building; melee attacks use the model's footprint.
 
 | Wave | Exact composition | Fixed reward |
 | --- | --- | --- |
 | Scouts on the trail | 6 Goblins | 30 |
-| Beneath the roots | 10 Goblins | 40 |
-| The woodland raiders | 10 Goblins, 2 Siege | 50 |
-| Hold the ascent | 6 Goblins, 4 Hunters, 2 Siege | 70 |
-| The Iron Stag | 8 Goblins, 2 Siege, 1 Iron Stag | 0 |
+| Beneath the roots | 6 Goblins, 4 Skeletons | 40 |
+| The woodland raiders | 6 Goblins, 2 Skeletons, 2 Ghosts, 2 Siege | 50 |
+| Hold the ascent | 4 Goblins, 2 Skeletons, 2 Hunters, 2 Ghosts, 2 Siege | 70 |
+| The Iron Stag | 4 Goblins, 4 Skeletons, 2 Ghosts, 1 Iron Stag | 0 |
 
 All 51 enemies, batch sizes, intervals and group start times are explicit in the
 level JSON. The final boss starts 19 seconds into wave five. Tower/enemy/hero
 definitions and combat statistics are unchanged. Start each wave with the
 existing **Start Wave** button; preparation, rewards, victory, defeat, retry and
 level selection retain their normal lifecycle.
+
+Skeletons first appear in wave two; destroy their bones to stop resurrection.
+Ghosts start in wave three and require the Mage's magic attacks. The total remains
+51 enemies, with the same starting gold, rewards and final boss timing.
 
 One verified defense uses a Small Tower at (-8, 0, -2), Large Tower at (0, 0, 0),
 and Small Tower at (6.8, 2, 10.5). Reposition the Knight near (-6, 0, -2), move
@@ -99,6 +113,20 @@ without tower construction loses. These checks establish playable win/lose paths
 not that every placement combination is equally effective.
 
 ## Checks and limits
+
+The mausoleum update builds Game and Editor successfully. All 47 checks are
+verified across the full suite and focused reruns after updating arrival-based
+fixtures (`out/mausoleum_tests.log`, `out/mausoleum_final_tests.log`).
+`Undead.Runtime` explicitly checks Goblin, Skeleton and Ghost repeated attacks,
+surviving attackers at defeat, the broken building appearance and restart recovery.
+
+The death-coin expiry regression in `Goblin.Runtime` reproduces a renderer exit
+when a coin shrinks to an effectively singular transform just before 1.25 seconds.
+Coins now retire below 0.01 scale before entering that invalid range. The regression
+failed before the fix and passes afterward. The updated five-wave Forest playthrough
+also verifies Skeleton and Ghost spawning, unchanged rewards and all 51 arrivals or
+permanent defeats. Current build and test logs are `out/level1_fix_build.log`,
+`out/level1_fix_tests.log` and `out/level1_integration_tests.log`.
 
 `Level.Forest` imports all 329 GLBs, checks discovery, moves all hero types up the
 hill, walks the full route with the boss footprint, validates elevated Game tower

@@ -52,7 +52,8 @@ private:
 };
 
 [[nodiscard]] inline glm::dvec3 combatAim(const Enemy& enemy) {
-    return enemy.position + glm::dvec3{0, enemy.height * 0.5, 0};
+    return enemy.position +
+           glm::dvec3{0, enemy.life == Enemy::Life::bones ? 0.12 : enemy.height * 0.5 + enemy.hoverOffset, 0};
 }
 
 [[nodiscard]] inline glm::dvec3 firingOrigin(const Tower& tower) {

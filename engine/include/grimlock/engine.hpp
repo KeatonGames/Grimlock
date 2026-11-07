@@ -70,6 +70,11 @@ struct ModelInfo {
     std::vector<std::string> animationNames;
 };
 
+struct FrameCapture {
+    std::uint32_t width = 0, height = 0;
+    std::vector<std::uint8_t> rgba;
+};
+
 // Owns one window/device and its resources. Game policy (assets, placement,
 // normalization and default animation selection) stays outside this class.
 class Engine final {
@@ -78,6 +83,10 @@ public:
     ~Engine();
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
+    // Synchronous tooling capture of a newly rendered frame. Call between updates.
+    [[nodiscard]] FrameCapture captureFrame();
+    void setVsync(bool enabled);
+    [[nodiscard]] bool vsyncEnabled() const noexcept;
 
     // Relative paths resolve beside the executable; canonical paths reuse one resource.
     [[nodiscard]] ModelId loadModel(const std::filesystem::path& path);

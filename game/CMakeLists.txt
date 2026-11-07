@@ -31,8 +31,8 @@ target_include_directories(GameLogic PUBLIC src)
 target_link_libraries(GameLogic PUBLIC Engine PRIVATE RecastNavigation::Recast RecastNavigation::Detour nlohmann_json::nlohmann_json)
 set_target_properties(GameLogic PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(GameUi STATIC src/ui/game_hud.cpp src/ui/game_style.cpp)
-target_link_libraries(GameUi PUBLIC GameLogic ImGuiSupport PRIVATE SDL3::SDL3 Vulkan::Vulkan)
+add_library(GameUi STATIC src/ui/game_hud.cpp src/ui/game_style.cpp src/ui/game_menu.cpp)
+target_link_libraries(GameUi PUBLIC GameLogic ImGuiSupport PRIVATE SDL3::SDL3 Vulkan::Vulkan stb_image nlohmann_json::nlohmann_json)
 set_target_properties(GameUi PROPERTIES CXX_EXTENSIONS OFF)
 add_executable(Game src/main.cpp src/game.cpp)
 target_link_libraries(Game PRIVATE GameUi SDL3::SDL3)
@@ -50,6 +50,12 @@ add_custom_target(GrimlockAssets
     COMMENT "Staging game assets"
     VERBATIM)
 add_dependencies(Game GrimlockAssets GrimlockShaders)
+
+# Explicit authoring tool: captures real Vulkan frames; never runs at Game startup.
+add_executable(MenuCapture EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tools/capture_menu.cpp")
+target_link_libraries(MenuCapture PRIVATE GameUi stb_image SDL3::SDL3)
+set_target_properties(MenuCapture PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/$<CONFIG>" CXX_EXTENSIONS OFF)
+add_dependencies(MenuCapture GrimlockShaders)
 if(MSVC)
     target_compile_options(Game PRIVATE /W4 /permissive-)
     target_compile_options(GameLogic PRIVATE /W4 /permissive-)

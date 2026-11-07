@@ -277,7 +277,7 @@ void terrain(Engine& engine) {
 
 void serialization(Engine& engine) {
     LevelRuntime runtime;
-    runtime.load(engine, "assets/levels/hill_watch.json");
+    runtime.load(engine, "assets/test_fixtures/levels/hill_watch.json");
     const auto saved = engine.assetRoot().parent_path() / "hill-roundtrip.json";
     engine.saveScene(saved);
     const auto scene = engine.loadScene(saved);
