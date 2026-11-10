@@ -28,18 +28,20 @@ void require(bool value, const std::string& message) {
 
 void verifyAssets(const std::filesystem::path& root) {
     std::size_t count = 0;
-    for (const auto& file : std::filesystem::directory_iterator(root / "environment/nature/kenney")) {
+    for (const auto& file : std::filesystem::directory_iterator(root / "environment/platformer")) {
         if (file.path().extension() != ".glb") {
             continue;
         }
         const auto model = assets::loadModel(file.path());
-        require(!model.meshes.empty() && !model.materials.empty(), "Empty nature asset: " + file.path().string());
-        require(model.skins.empty() && model.animations.empty(), "Unexpected animated terrain asset");
+        require(!model.meshes.empty() && !model.materials.empty(), "Empty platformer asset: " + file.path().string());
+        if (file.path().filename().string().starts_with("block-grass")) {
+            require(model.skins.empty() && model.animations.empty(), "Unexpected animated terrain asset");
+        }
         (void)assets::modelNodeTransforms(model);
         ++count;
     }
-    require(count == 329, "Expected all 329 supplied Nature Kit GLBs");
-    std::cout << "PASS all " << count << " original Nature Kit assets imported.\n";
+    require(count == 147, "Expected all 147 Platformer Kit environment GLBs");
+    std::cout << "PASS all " << count << " Platformer Kit environment assets imported.\n";
 }
 
 void terrain(Engine& engine) {
@@ -47,6 +49,17 @@ void terrain(Engine& engine) {
     runtime.load(engine, "assets/levels/forest_defense.json");
     require(!engine.scene()->navigationGrid(), "Forest depends on a debug grid");
     require(runtime.level().waves()->definition().waves.size() == 5, "Forest requires five handcrafted waves");
+    const auto& waves = runtime.level().waves()->definition().waves;
+    for (std::size_t wave = 0; wave < 4; ++wave) {
+        for (const auto& group : waves[wave].groups) {
+            require(group.enemy == "Goblin", "Introductory waves contain a non-Goblin enemy");
+        }
+    }
+    const auto& finale = waves.back().groups;
+    require(finale.size() == 2 && finale[0].enemy == "Goblin Boss" && finale[0].count == 1 &&
+                finale[0].batchSize == 1 && finale[0].start == 0 && finale[1].enemy == "Goblin" &&
+                finale[1].count == 4 && finale[1].batchSize == 4 && finale[1].start == 0,
+            "Final swarm must contain exactly one Goblin boss and four Goblins together");
     const auto catalog = discoverLevels(engine.assetRoot());
     require(std::any_of(catalog.levels.begin(),
                         catalog.levels.end(),
@@ -55,34 +68,27 @@ void terrain(Engine& engine) {
                         }),
             "Forest is missing from Game discovery");
     auto& navigation = runtime.navigation();
-    require(navigation.placement().zones().size() == 5, "Forest construction zones missing");
+    require(navigation.placement().zones().size() == 4, "Forest construction zones missing");
     NavigationPath path;
-    require(navigation.navigation().findPath({-10, 0, -4}, {4, 2, 12}, path),
+    require(navigation.navigation().findPath({10, 0, -3.5}, {-8.5, 2, 10.8}, path),
             "Forest spawn cannot reach hill objective");
-    require(navigation.navigation().findPath({0, 0, 4}, {-6.5, 1, 4.2}, path), "Lookout ramp is disconnected");
-    require(!navigation.navigation().contains({0, 0, -4}), "Navigation crossed the missing meadow corner");
-    for (std::size_t type = 0; type < runtime.heroes()->typeCount(); ++type) {
-        auto& heroes = *runtime.heroes();
-        heroes.clear();
-        const auto id = heroes.deploy({0, 0, 0}, {}, type);
-        require(heroes.command(id, {4, 2, 12}), "Hero cannot reach elevated objective");
-        bool climbed = false;
-        for (int step = 0; step < 1500; ++step) {
-            heroes.update(1.0 / 60, true);
-            const auto* hero = heroes.find(id);
-            require(hero && heroes.navigation(type).contains(hero->position), "Hero escaped forest terrain");
-            climbed = climbed || (hero->position.y > 0.4 && hero->position.y < 1.7);
-        }
-        require(climbed && heroes.find(id)->state == HeroState::reached && heroes.find(id)->position.y > 1.9,
-                "Hero did not arrive on the watch hill");
-    }
-    runtime.heroes()->clear();
+    require(navigation.navigation().findPath({5.5, 0, -4.6}, {7, 1, 4.6}, path), "Lookout ramp is disconnected");
+    require(!navigation.navigation().contains({0, 0, 4}), "Navigation crossed the ravine beside the bridge");
+    require(runtime.heroes()->typeCount() == 0 && runtime.heroes()->heroes().empty(), "Level 1 made heroes available");
     EnemyTypeId bossType = 0;
-    while (bossType < navigation.enemies()->typeCount() && !navigation.enemies()->definition(bossType).boss) {
+    while (bossType < navigation.enemies()->typeCount() &&
+           navigation.enemies()->definition(bossType).name != "Goblin Boss") {
         ++bossType;
     }
     require(bossType < navigation.enemies()->typeCount(), "Forest boss definition missing");
-    require(navigation.spawnAt(engine, bossType, {{-10, -4}, {-10, -4}, 0}, 1) == 1,
+    const auto& bossDefinition = navigation.enemies()->definition(bossType);
+    require(bossDefinition.boss && bossDefinition.model == "enemies/orcs/character-orc.glb" &&
+                bossDefinition.maximumHealth == 900 && bossDefinition.visualHeight == 1.5,
+            "Goblin boss did not use the animated Goblin model and boss statistics");
+    require(navigation.surface(engine, bossType).contains({0, 0, 0}) &&
+                !navigation.surface(engine, bossType).contains({0, 0, 4}),
+            "Bridge deck does not support the boss independently of the ravine");
+    require(navigation.spawnAt(engine, bossType, {{10, -3.5}, {10, -3.5}, 0}, 1) == 1,
             "Forest boss clearance spawn failed");
     bool bossClimbed = false;
     for (int step = 0; step < 2400 && !navigation.enemies()->enemies().empty(); ++step) {
@@ -96,7 +102,7 @@ void terrain(Engine& engine) {
             "Forest boss could not traverse the full ascent");
     navigation.reset(engine);
     runtime.beginPlacement("wide");
-    const Ray hill{{6.8, 12, 10.5}, {0, -1, 0}, 0, 30};
+    const Ray hill{{-5.8, 12, 10.8}, {0, -1, 0}, 0, 30};
     runtime.updatePlacement(engine, hill, false);
     require(runtime.preview() && runtime.placementError().empty(), "Hill placement: " + runtime.placementError());
     require(std::abs(runtime.preview()->position.y - runtime.preview()->halfExtent.y - 2) < 1e-5,
@@ -118,7 +124,7 @@ void terrain(Engine& engine) {
     require(engine.performance().models == referenced.size(),
             "Repeated forest instances duplicated GPU model resources");
     navigation.synchronize(engine);
-    require(navigation.spawnAt(engine, 0, {{4.8, 7.5}, {4.8, 7.5}, 1.5}, 1) == 1,
+    require(navigation.spawnAt(engine, 0, {{-6.5, 8}, {-6.5, 8}, 1.75}, 1) == 1,
             "Forest ramp combat target could not spawn");
     navigation.enemies()->setSpeed(0, 0);
     CombatSystem combat{engine};
@@ -138,9 +144,9 @@ void terrain(Engine& engine) {
     editor::SceneDocument document{engine};
     document.open(engine.assetRoot() / "scenes/forest_defense.json");
     document.refreshModels();
-    const auto expected = std::filesystem::path{"environment/nature/kenney/tree_default.glb"};
+    const auto expected = std::filesystem::path{"environment/platformer/tree-pine.glb"};
     require(std::find(document.models().begin(), document.models().end(), expected) != document.models().end(),
-            "Editor did not discover nested Nature Kit assets");
+            "Editor did not discover nested Platformer Kit assets");
     ObjectId tree = 0;
     for (const auto& [id, object] : engine.scene()->objects()) {
         if (object.model == expected) {
@@ -170,8 +176,8 @@ void play(Engine& engine, bool defended) {
     auto& session = runtime.level();
     auto& navigation = runtime.navigation();
     auto& heroes = *runtime.heroes();
-    const auto assassin = heroes.heroes().front().id;
-    ObjectId west = 0, center = 0;
+
+    ObjectId lastStand = 0, center = 0;
     const auto build = [&](const char* type, glm::dvec3 ground) {
         auto tower = navigation.towers().definition(type).instance();
         tower.position = ground + glm::dvec3{0, tower.halfExtent.y, 0};
@@ -183,21 +189,17 @@ void play(Engine& engine, bool defended) {
         return session.buildTower(engine, navigation, tower);
     };
     if (defended) {
-        (void)heroes.deploy({-6, 0, -2}, assassin);
-        (void)heroes.deploy({2, 0, 0}, heroes.heroes()[1].id);
-        (void)heroes.deploy({-4, 0, 0}, heroes.heroes()[2].id);
-        west = build("basic", {-8, 0, -2});
-        center = build("wide", {0, 0, 0});
-        (void)build("basic", {6.8, 2, 10.5});
+        (void)build("basic", {5.5, 0, -4.6});
+        center = build("wide", {-7.5, 0, -2.4});
+        lastStand = build("basic", {-5.8, 2, 10.8});
     }
-    HeroCombatSystem abilities;
+
     bool bossSeen = false, bossDefeated = false, bossBarSeen = false;
-    bool skeletonSeen = false, ghostSeen = false;
     std::optional<EnemyId> boss;
     while (session.waves()->phase() == LevelPhase::preparation) {
         const auto wave = session.waves()->wave();
         if (defended && wave > 0) {
-            const auto tower = wave == 1 || wave == 3 ? west : center;
+            const auto tower = wave == 1 || wave == 3 ? lastStand : center;
             if (navigation.towers().contains(tower) && session.upgradeError(navigation, tower).empty()) {
                 session.upgradeTower(engine, navigation, tower);
             }
@@ -206,19 +208,6 @@ void play(Engine& engine, bool defended) {
         runtime.startWave();
         double time = 0;
         while (session.waves()->phase() == LevelPhase::battle && time < 180) {
-            if (defended) {
-                const auto* hero = heroes.find(assassin);
-                if (hero && hero->health > 0) {
-                    std::size_t near = 0;
-                    for (const auto& enemy : navigation.enemies()->enemies()) {
-                        near += glm::length(enemy.position - hero->position) <
-                                heroes.definition(*hero).combat.cleave.radius;
-                    }
-                    if (near >= 2) {
-                        (void)abilities.activate(heroes, assassin, HeroAbility::cleave, true);
-                    }
-                }
-            }
             const auto arrivals = navigation.enemies()->metrics().arrived;
             const bool trackingBoss = boss && navigation.enemies()->find(*boss);
             runtime.update(engine, 1.0 / 30);
@@ -227,9 +216,11 @@ void play(Engine& engine, bool defended) {
             }
             for (const auto& enemy : navigation.enemies()->enemies()) {
                 require(enemy.navigation->contains(enemy.position), "Forest enemy escaped navigation");
-                skeletonSeen = skeletonSeen || navigation.enemies()->definition(enemy.type).name == "Skeleton";
-                ghostSeen = ghostSeen || navigation.enemies()->definition(enemy.type).name == "Ghost";
+                const auto& name = navigation.enemies()->definition(enemy.type).name;
+                require(name == "Goblin" || name == "Goblin Boss", "Level 1 spawned another enemy archetype");
+
                 if (navigation.enemies()->definition(enemy.type).boss) {
+                    require(wave == 4 && name == "Goblin Boss", "Wrong boss or boss spawned before wave five");
                     bossSeen = true;
                     boss = enemy.id;
                 }
@@ -250,7 +241,9 @@ void play(Engine& engine, bool defended) {
         if (session.waves()->phase() == LevelPhase::battle) {
             for (const auto& enemy : navigation.enemies()->enemies()) {
                 std::cout << "Stalled " << enemy.id << " at " << enemy.position.x << ',' << enemy.position.y << ','
-                          << enemy.position.z << " target " << static_cast<int>(enemy.combat.target.kind) << '\n';
+                          << enemy.position.z << " target " << static_cast<int>(enemy.combat.target.kind) << " type "
+                          << navigation.enemies()->definition(enemy.type).name << " life "
+                          << static_cast<int>(enemy.life) << " health " << enemy.health << '\n';
             }
         }
         require(session.waves()->phase() != LevelPhase::battle, "Forest wave failed to finish");
@@ -263,10 +256,9 @@ void play(Engine& engine, bool defended) {
     require(session.waves()->phase() == (defended ? LevelPhase::victory : LevelPhase::defeat),
             "Forest does not distinguish defended and undefended strategies");
     if (defended) {
-        require(skeletonSeen && ghostSeen, "Forest waves did not exercise both new undead enemies");
         require(session.waves()->wave() == 5 && bossSeen && bossDefeated && bossBarSeen,
                 "Final forest boss or its health bar was not exercised");
-        require(navigation.enemies()->metrics().defeated + navigation.enemies()->metrics().arrived == 51,
+        require(navigation.enemies()->metrics().defeated + navigation.enemies()->metrics().arrived == 45,
                 "Forest skipped scheduled enemies");
     }
     const auto levelId = session.waves()->definition().id;
@@ -277,7 +269,7 @@ void play(Engine& engine, bool defended) {
             "Forest results did not persist through the shared progression system");
     runtime.restart(engine);
     require(session.waves()->phase() == LevelPhase::preparation && session.economy().gold() == 120 &&
-                navigation.towers().towers().empty() && runtime.heroes()->heroes().size() == 3,
+                navigation.towers().towers().empty() && runtime.heroes()->heroes().empty(),
             "Forest restart retained runtime state");
     runtime.unload(engine);
     require(engine.update() && engine.performance().instances == 0, "Forest unload retained render instances");

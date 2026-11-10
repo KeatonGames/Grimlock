@@ -29,31 +29,30 @@ void composition(Engine& engine) {
     auto scene = std::make_unique<Scene>("Menu scenery - not a playable level");
     const auto add = [&](const char* model, glm::dvec3 position, glm::dvec3 scale = {2, 2, 2}, double yaw = 0) {
         const auto object = scene->createObject(model);
-        scene->setModel(object, std::filesystem::path{"environment/nature/kenney"} / model);
+        scene->setModel(object, std::filesystem::path{"environment/platformer"} / model);
         Transform transform;
         transform.position = position;
         transform.scale = scale;
         transform.rotation = glm::angleAxis(yaw, glm::dvec3{0, 1, 0});
         scene->setTransform(object, transform);
         const std::string_view name{model};
-        if (name.starts_with("ground_grass") || name.starts_with("tree_") || name.starts_with("plant_")) {
+        if (name.starts_with("tree") || name.starts_with("plant")) {
             scene->setTint(object, {0.78F, 1, 0.58F, 1});
         }
     };
-    // Broad quiet foreground on the left; the winding path, grove and camp frame the right.
+    // Broad quiet foreground on the left; the winding path, grove and supplies frame the right.
     for (int z = -20; z <= 24; z += 2) {
         for (int x = -24; x <= 24; x += 2) {
             const bool hill = x >= 4 && z >= 4;
-            const double y = hill ? 1.1 : 0.1;
-            add("cliff_blockHalf_rock.glb", {x, y - 1.12, z});
+            const double y = hill ? 1 : 0;
+            add("block-grass-low.glb", {x, y - 1, z}, {2.5, 2, 2.5});
             const bool path = (z <= -2 && x == 2) || (z == 0 && x >= 2 && x <= 6) || (x == 6 && z >= 2);
-            add(path ? "ground_pathStraight.glb" : "ground_grass.glb",
-                {x, y, z},
-                {2, 2, 2},
-                z == 0 ? glm::radians(90.0) : 0);
+            if (path) {
+                add("stones.glb", {x, y + 0.01, z}, {2, 2, 2}, z == 0 ? glm::radians(90.0) : 0);
+            }
         }
     }
-    add("cliff_blockSlope_rock.glb", {6, 0.1, 2});
+    add("block-grass-large-slope.glb", {6, -0.45, 2}, {1, 1.87, 1}, glm::radians(180.0));
     for (const auto p : {glm::dvec3{0, 0, -4},
                          {-2, 0, 1},
                          {0, 0, 5},
@@ -66,24 +65,24 @@ void composition(Engine& engine) {
                          {-8, 0, 0},
                          {-10, 0, 6},
                          {-12, 0, 4}}) {
-        add("tree_default.glb", p, {2.6, 2.6, 2.6});
-        add("plant_bushLarge.glb", p + glm::dvec3{1.2, 0, -0.6}, {1.6, 1.6, 1.6});
+        add("tree.glb", p, {2.6, 2.6, 2.6});
+        add("plant.glb", p + glm::dvec3{1.2, 0, -0.6}, {1.6, 1.6, 1.6});
     }
     for (int z = -6; z <= -2; z += 2) {
-        add("fence_simple.glb", {4, 0.1, z});
+        add("fence-low-straight.glb", {4, 0.1, z});
     }
-    add("tent_smallOpen.glb", {8, 1.15, 7}, {2.4, 2.4, 2.4}, glm::radians(180.0));
-    add("campfire_stones.glb", {6, 1.1, 8}, {1.4, 1.4, 1.4});
-    add("rock_largeA.glb", {1, 0, 6}, {2.2, 2.2, 2.2});
+    add("chest.glb", {8, 1.15, 7}, {2.4, 2.4, 2.4}, glm::radians(180.0));
+    add("barrel.glb", {6, 1.1, 8}, {1.4, 1.4, 1.4});
+    add("rocks.glb", {1, 0, 6}, {2.2, 2.2, 2.2});
     for (int z = 10; z <= 24; z += 4) {
         for (int x = -20; x <= 24; x += 4) {
             const double y = x >= 4 ? 1 : 0;
             const double jitter = std::sin(x * 13.1 + z * 7.3);
             const double scale = 2.2 + std::abs(jitter) * 1.1;
-            add((x + z) % 8 == 0 ? "tree_pineRoundF.glb" : "tree_default_dark.glb",
+            add((x + z) % 8 == 0 ? "tree-pine.glb" : "tree.glb",
                 {x + jitter, y, z + std::cos(x * 4.7 + z) * 0.8},
                 {scale, scale, scale});
-            add("plant_bushLarge.glb", {x + 1, y, z - 1});
+            add("plant.glb", {x + 1, y, z - 1});
         }
     }
     Camera camera;
@@ -106,7 +105,15 @@ int main(int argc, char** argv) {
         Engine engine{
             EngineConfig{.windowTitle = "Grimlock menu capture", .width = 1600, .height = 900, .assetRoot = argv[1]}};
         engine.setCameraNavigationEnabled(false);
-        if (argc == 3) {
+        if (argc == 5 && std::string_view{argv[2]} == "--scene") {
+            engine.setScene(engine.loadScene(argv[3]));
+            save(engine, argv[4]);
+        } else if (argc == 5 && std::string_view{argv[2]} == "--level") {
+            game::LevelRuntime runtime;
+            runtime.load(engine, argv[3]);
+            game::GameHud hud{engine, runtime};
+            save(engine, argv[4]);
+        } else if (argc == 3) {
             game::LevelRuntime runtime;
             game::GameHud hud{engine, runtime, true};
             save(engine, argv[2]);
@@ -114,11 +121,6 @@ int main(int argc, char** argv) {
             composition(engine);
             save(engine, engine.assetRoot() / "ui/menu_background.png");
             engine.setScene(engine.loadScene(engine.assetRoot() / "scenes/forest_defense.json"));
-            auto camera = engine.scene()->resolvedCamera();
-            camera.position = {14, 18, -15};
-            camera.target = {-1, 0.5F, 4};
-            camera.verticalFovDegrees = 48;
-            engine.scene()->setResolvedCamera(camera);
             save(engine, engine.assetRoot() / "previews/forest_defense.png");
         }
         return 0;

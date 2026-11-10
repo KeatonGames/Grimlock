@@ -30,6 +30,15 @@ See [the level guide](first_watch.md) for the five exact waves, balance and test
 
 ## Authoring
 
+Use **Navigation > Level > Level Definition > Available Heroes** to enable any
+combination of Knight, Ranger and Mage. The JSON `available_heroes` array stores
+their IDs: `[]` gives no heroes, `["ranger"]` gives one, `["knight", "mage"]`
+gives two, and `["knight", "ranger", "mage"]` gives all three. Only enabled
+heroes spawn near the objective, and only their character models are loaded.
+Restarting or switching levels applies that level's roster. Duplicate and unknown
+IDs are rejected. Omitting the field preserves the legacy three-hero behavior.
+The shipped Level 1 explicitly uses `"available_heroes": []`.
+
 `game/assets/test_fixtures/levels/first_watch.json` contains gameplay configuration, separate
 from `game/assets/scenes/first_watch.json`. The latter is a normal engine scene;
 the current sample uses existing cube terrain. Level/wave data never addresses

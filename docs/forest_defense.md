@@ -1,159 +1,129 @@
 # Level 01 - Forest Defense
 
-Choose **Level 01 - Forest Defense** in Game's existing level selection menu, or run:
+Level 1 follows the supplied overview reference: an entrance meadow on the left,
+a wooden bridge in the center, a raised garden behind the entrance, and a broad
+ramp leading to the walled mausoleum on the right. The level retains its UUID,
+five waves, starting gold, rewards and objective combat rules. Level 1 has no
+available heroes and is designed for tower-only play.
+
+Choose **Level 01 - Forest Defense** in Game, or open its level file in Editor:
 
 ```powershell
-.\out\build\release\Release\Grimlock.exe assets/levels/forest_defense.json
-.\out\build\release\Release\GrimlockEditor.exe --level assets/levels/forest_defense.json
+$levelOne = (Resolve-Path game/assets/levels/forest_defense.json).Path
+.\out\build\debug\Debug\Grimlock.exe $levelOne
+.\out\build\debug\Debug\GrimlockEditor.exe --level $levelOne
 ```
 
-For permanent authoring in the source asset tree, pass the absolute source level
-instead of editing the build's staged copy:
+The [level definition](../game/assets/levels/forest_defense.json) and
+[scene](../game/assets/scenes/forest_defense.json) remain ordinary editable JSON.
+The scene is handcrafted; there is no runtime terrain generation or navigation grid.
 
-```powershell
-$forestLevel = (Resolve-Path game/assets/levels/forest_defense.json).Path
-.\out\build\release\Release\GrimlockEditor.exe --level $forestLevel
-```
+## Layout
 
-The level uses the shared [level JSON](../game/assets/levels/forest_defense.json)
-and [editable scene](../game/assets/scenes/forest_defense.json). Its stable UUID
-associates results with the existing progression system. There is no level-specific
-code in Game, no procedural generation, and no navigation grid.
+Coordinates below are world X/Y/Z. The authored camera places the entrance at
+screen left and the mausoleum at screen right.
 
-## Layout and navigation
+| Feature | Position | Notes |
+| --- | --- | --- |
+| Enemy entrance | (10, 0, -3.5) | Stone arch, red light, entrance banner |
+| Entrance construction point | (5.5, 0, -4.6) | Beside crates and a barrel |
+| Raised garden construction point | (7, 1, 4.6) | Short grass ramp, fences and pines |
+| Timber bridge | (-1, 0, 0) | Real ravine below; approximately 3.7 metres of usable width |
+| Eastern construction point | (-7.5, 0, -2.4) | Lower meadow before the main ascent |
+| Main ascent | (-7, 0 to 2, 6) | Broad grassy ramp |
+| Terrace construction point | (-5.8, 2, 10.8) | Covers the final approach to the mausoleum |
+| Objective route point | (-8.5, 2, 10.8) | Walkable approach outside the building |
+| Mausoleum | (-8.5, 2.12, 14.2) | Modular crypt, pitched roof, glowing door and low steps |
 
-An irregular woodland meadow leads from the western camp at (-10, 0, -4) through
-an S-shaped dirt trail and an open central clearing. A broad grassy ramp at
-(4, 6) rises from Y=0 to a watch hill at Y=2. The defense objective is at
-(4, 2, 12), in front of the mausoleum. A separate ramp connects the clearing
-to a rocky lookout at (-6.5, 1, 4.2).
+Each of the four construction points accepts one tower using the existing shop.
+Occupied frames disappear and return when their towers are destroyed. Their
+current size and border thickness are preserved. `available_heroes` is empty for
+Level 1; future levels can enable any combination of Knight, Ranger and Mage.
 
-Five continuous build zones cover the western ambush meadow, central clearing,
-rocky lookout and both hill battlements. These are ordinary editable build-zone
-objects, not snapped tower slots. For an elevated placement, try a Small or Large
-Tower near (6.8, 2, 10.5). Upright towers still require flat support over their whole
-footprint; ramps, cliff overhangs and path depressions remain invalid foundations.
+The courtyard has low stone walls, banners and two lit braziers. Pines, low timber
+fences, rock groups, plants and flowers frame the islands while leaving tower
+footprints and routes clear. A purple scenic backdrop matches the reference's
+presentation and is excluded from navigation and terrain picking.
 
-The scene's terrain pieces supply their actual transformed triangles to the
-existing Recast/Detour system. Agent radius, height, slope, step, crowd movement,
-and dynamic tower-obstacle settings are unchanged. The broad hill ramp supports
-the Iron Stag's one-metre collision radius. Solid boundary rocks and the mausoleum
-are obstacles; vegetation, flowers, signs and camp props are decoration.
-Heroes can deploy freely on valid terrain using the current controls and limits.
-Camera bindings are unchanged; only this scene's initial view was composed.
+## Geometry and assets
 
-## Assets and editing
+The terrain uses the Kenney Platformer Kit's `block-grass-large` and
+`block-grass-large-slope` GLBs. Overlapping island sections keep rounded grass
+edges connected. Ramp ends overlap the adjoining flat ground. The existing
+Recast/Detour radius, slope, step and crowd settings remain unchanged.
 
-The 107 authored objects reference 22 distinct original Nature Kit GLBs. The main
-pieces are `ground_grass`, `ground_pathStraight`, `ground_pathBend`,
-`ground_pathEnd`, `cliff_block_rock`, `cliff_blockHalf_rock`, and
-`cliff_blockSlope_rock`. Repeated `tree_default`, `tree_oak`, `tree_pineTallA`,
-bushes, rocks and flowers frame the playable area. The camp, signs, mausoleum,
-columns and a small `platform_grass` detail identify the entrance and objective.
-Original mesh geometry, palette, material settings and GLBs are retained, under
-the supplied [CC0 license](../game/assets/environment/nature/kenney/LICENSE.txt).
+The bridge's visible solid timber base provides the walkable geometry; the kit's
+planks, edge beams, caps and support legs provide detail. This prevents the source
+plank gaps from disconnecting navigation for large enemies. The ground beneath
+and beside the bridge remains a real gap rather than an invisible terrain plane.
 
-The Editor discovers all 329 kit models in its existing **Add Model** picker.
-Use **Filter models** with `kenney_nature/tree`, `cliff`, `ground` or `rock`.
-Filtering to an empty result disables insertion rather than placing a hidden
-previous selection. Translation, rotation, scale, selection, grouping, duplication,
-role assignment and scene/level saving use the existing tools.
+The mausoleum uses the existing Graveyard Kit's `crypt-large` and matching roof.
+Its roof and arched doorway are children of the objective, so they follow its
+collapse and reset. The building's foot remains close enough to the terrace for
+existing melee contact checks. Enemies stop at its perimeter and repeatedly attack;
+they do not disappear on arrival. At zero health the level ends in defeat.
 
-Ground modules are two metres across. The scene compensates the kit's -0.05
-exported Y offset: ordinary ground uses Y=0.1 at scale 2; the hill's full cliff
-blocks use the same transform and reach Y=2. Do not normalize individual terrain
-pieces independently after placement, or adjacent edges will no longer align.
+Three project-authored, self-contained GLBs provide the warm doorway, red portal
+and brazier flame shapes. They are scenery with no gameplay or animation system
+changes. Regenerate them with `tools/prepare_level_one_details.ps1`.
 
-The supplied files have a nonconforming exporter wrapper: an unused identity
-`tmpParent` still lists the declared scene root as a child. The importer now
-detaches only unused, empty, nonanimated identity wrappers that are not roots in
-any scene. Other parent/root conflicts retain strict validation. This is a narrow
-compatibility repair; [glTF requires scene roots to be parentless](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#scenes).
-No source GLB is rewritten. Existing handling of degenerate source triangles
-continues to report them and omit zero-area triangles.
+`tools/author_level_one.ps1` reproduces the authored scene and its spawn/objective
+coordinates while retaining the level's existing wave data. Running it overwrites
+scene edits, so normal authoring should use Editor. No generation tool runs when
+the game starts. All scene models remain discoverable in Editor's model picker.
 
-## Handcrafted waves and economy
+The old Kenney Nature Kit remains removed. All 153 supplied Platformer Kit GLBs
+are retained with embedded textures: 147 environment/prop models, five future
+characters, and one bomb projectile. Their [CC0 license](../game/assets/licenses/kenney_platformer_LICENSE.txt)
+is preserved. Unused library models are not loaded at game startup.
 
-The player starts with **120 gold** and Knight, Ranger and Mage near the objective.
-The mausoleum uses the existing graveyard `crypt.glb` model and has **10 health**.
-Enemies remain at its perimeter and repeatedly attack, removing one health per
-completed hit at their normal attack cadence. Ghosts ignore defenders on the way
-but stop to attack the mausoleum too. Attackers remain targetable and keep the
-wave active until killed. At zero health the mausoleum collapses and the level
-ends in defeat; restarting restores its appearance and health. The Editor's
-Objective Hit Damage retains the `damage_per_arrival` JSON key for compatibility.
-The scene model uses the `grimlock.objective` role, available in the Editor's
-existing Level geometry selector. Keep the level's objective route point on the
-walkable approach outside the building; melee attacks use the model's footprint.
+## Waves and economy
 
-| Wave | Exact composition | Fixed reward |
+The player starts with **120 gold** and the mausoleum has **10 health**.
+
+| Wave | Composition | Fixed reward |
 | --- | --- | --- |
 | Scouts on the trail | 6 Goblins | 30 |
-| Beneath the roots | 6 Goblins, 4 Skeletons | 40 |
-| The woodland raiders | 6 Goblins, 2 Skeletons, 2 Ghosts, 2 Siege | 50 |
-| Hold the ascent | 4 Goblins, 2 Skeletons, 2 Hunters, 2 Ghosts, 2 Siege | 70 |
-| The Iron Stag | 4 Goblins, 4 Skeletons, 2 Ghosts, 1 Iron Stag | 0 |
+| Beneath the roots | 10 Goblins | 40 |
+| The woodland raiders | 12 Goblins | 50 |
+| Hold the ascent | 12 Goblins | 70 |
+| The Goblin Boss | 1 Goblin Boss and 4 Goblins together | 0 |
 
-All 51 enemies, batch sizes, intervals and group start times are explicit in the
-level JSON. The final boss starts 19 seconds into wave five. Tower/enemy/hero
-definitions and combat statistics are unchanged. Start each wave with the
-existing **Start Wave** button; preparation, rewards, victory, defeat, retry and
-level selection retain their normal lifecycle.
+The first four waves use only regular Goblins, retaining their existing group
+timing. The final wave contains exactly five enemies: the Goblin Boss and four
+Goblins, all scheduled at wave start as one swarm. The level totals 45 enemies.
+Other enemy definitions remain available to later levels. Coin effects remain
+visual; only the existing wave rewards add gold.
 
-Skeletons first appear in wave two; destroy their bones to stop resurrection.
-Ghosts start in wave three and require the Mage's magic attacks. The total remains
-51 enemies, with the same starting gold, rewards and final boss timing.
+A verified tower-only plan starts with a Small Tower in the entrance meadow,
+a Large Tower in the eastern meadow, and a Small Tower on the terrace. Upgrade
+the terrace tower after waves one and three, and the eastern tower after waves
+two and four. The terrace point covers the final approach without hero support.
 
-One verified defense uses a Small Tower at (-8, 0, -2), Large Tower at (0, 0, 0),
-and Small Tower at (6.8, 2, 10.5). Reposition the Knight near (-6, 0, -2), move
-Ranger near (2, 0, 0) and Mage near (-4, 0, 0), and improve surviving towers
-between waves. Mage uses its basic splash attack against clustered attackers. This plan completes all
-five waves and kills the boss with the objective intact; leaving the initial hero
-without tower construction loses. These checks establish playable win/lose paths,
-not that every placement combination is equally effective.
+## Validation and captures
 
-## Checks and limits
-
-The mausoleum update builds Game and Editor successfully. All 47 checks are
-verified across the full suite and focused reruns after updating arrival-based
-fixtures (`out/mausoleum_tests.log`, `out/mausoleum_final_tests.log`).
-`Undead.Runtime` explicitly checks Goblin, Skeleton and Ghost repeated attacks,
-surviving attackers at defeat, the broken building appearance and restart recovery.
-
-The death-coin expiry regression in `Goblin.Runtime` reproduces a renderer exit
-when a coin shrinks to an effectively singular transform just before 1.25 seconds.
-Coins now retire below 0.01 scale before entering that invalid range. The regression
-failed before the fix and passes afterward. The updated five-wave Forest playthrough
-also verifies Skeleton and Ghost spawning, unchanged rewards and all 51 arrivals or
-permanent defeats. Current build and test logs are `out/level1_fix_build.log`,
-`out/level1_fix_tests.log` and `out/level1_integration_tests.log`.
-
-`Level.Forest` imports all 329 GLBs, checks discovery, moves all hero types up the
-hill, walks the full route with the boss footprint, validates elevated Game tower
-placement/cost, downhill projectile hits, and resource sharing, round-trips scene
-data, and exercises Editor discovery/duplication/transform/save commands when
-Editor is enabled. It plays the
-defended and undefended strategies, verifies exact rewards, boss death/health-bar
-activation, isolated persistent results, restart and standalone-instance cleanup.
-The two-triangle foundation case also has a focused regression in `Terrain.Runtime`.
+`Level.Forest` validates all Platformer environment assets, four construction
+points, both ascents, bridge clearance for the boss, the real ravine,
+the absence of heroes, elevated tower placement and cost, downhill projectile hits, and
+scene/Editor round-tripping. It also plays defended and undefended strategies
+through all five waves and checks rewards, Goblin-only spawning, the exact final swarm, boss health bars,
+restart and resource cleanup. `Undead.Runtime` checks repeated mausoleum attacks,
+defeat, building collapse and restart for all enemy archetypes. Objective pursuit
+is never rejected because the building's center lies beyond a defender pursuit
+limit; those limits still apply when chasing heroes and towers.
 
 ```powershell
-ctest --test-dir out/build/release -C Release -R '^Level.Forest$' --output-on-failure
+ctest --test-dir out/build/debug -C Debug -R '^(Level.Forest|Undead.Runtime)$' --output-on-failure
 ```
 
-Verified on Windows on 2026-11-05: Game and Editor build with both CMake presets.
-All **43/43 Release checks** passed (165.84 seconds), and all **43/43 Debug checks**
-passed (374.80 seconds). Both suites ran with `VK_LAYER_KHRONOS_validation` and
-synchronization validation enabled; their logs contained no validation errors.
-Modified C++ files pass `clang-format --dry-run --Werror --style=file`, and
-`git diff --check` is clean. Game and Editor were also launched and visually
-reviewed with this level.
+The level-selection preview is a real renderer capture from the authored camera.
+For a fresh gameplay capture, build the optional capture tool and run:
 
-Original character assets retain their existing animation availability; this phase
-does not add clips. Broad navigation rebuilds remain synchronous. Decorative
-vegetation intentionally has no collision. Automated playthroughs and short repeated
-loads do not establish long-session leak freedom or exhaustive gameplay balance.
-Progression checks use isolated saves in the build output. The direct Game capture
-showed **Save unavailable** for the normal profile; saving to the normal user-data
-directory was not verified. No user save-file repairs or resets were performed.
-Game and Editor captures and verification logs are under ignored `out/phase41`.
+```powershell
+cmake --build --preset debug --target MenuCapture --parallel 4
+.\out\build\debug\Debug\MenuCapture.exe "$PWD\game\assets" --level "$PWD\game\assets\levels\forest_defense.json" "$PWD\out\level_one_game.png"
+```
+
+Current build, test and capture logs use `out/reference_layout_*` and
+`out/level_one_*`. Validation checks the authored level and existing mechanics;
+it does not establish exhaustive gameplay balance or long-session leak freedom.

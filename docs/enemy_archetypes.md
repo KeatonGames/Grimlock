@@ -8,6 +8,7 @@ available through `config/animals.json`.
 | Type | Model | Health | Speed | Damage | Cooldown | Reach | Detection / pursuit |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | Goblin | character-orc.glb | 60 | 1.6 | 5 | 0.9 s | 0.35 | 2.6 / 4 |
+| Goblin Boss | character-orc.glb | 900 | 1.1 | 18 | 1.2 s | 0.45 | 2.6 / 4 |
 | Siege | Deer | 300 | 0.95 | 14 | 1.2 s | 0.40 | 4.5 / 6 |
 | Hunter | Dog | 80 | 2.2 | 9 | 0.7 s | 0.35 | 4 / 5.5 |
 
@@ -15,6 +16,12 @@ The Iron Stag boss and all other definitions remain available. Siege retains its
 preference for towers and 2x tower damage; Hunter retains its preference for heroes
 and 1.5x hero damage. Default priority-based targeting and optional objective-first
 settings remain supported for those definitions and future use.
+
+Level 1 uses only Goblins. Its fifth wave is one Goblin Boss and four regular
+Goblins in a single swarm. The boss reuses the Goblin's embedded animation clips,
+simple melee AI and model at 1.5 metres visual height (regular Goblin: 0.9 metres),
+with an independent 0.4-metre collision radius and the existing boss health bar.
+It has no special abilities or additional attack types.
 
 ## Goblin asset and animations
 

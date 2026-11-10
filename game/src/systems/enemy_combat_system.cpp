@@ -115,8 +115,10 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             return obstructing || (engaging && gap <= stats.aggressionRange);
         };
         const Target* target = state.target.kind == DefensiveTargetKind::objective ? &goal : find(state.target);
-        const bool pursuitExceeded = target && (distance(state.origin, target->body.position) > stats.pursuitRange ||
-                                                distance(state.origin, enemy.position) > stats.pursuitRange);
+        // The main objective remains the destination; its large footprint must not exhaust defender pursuit.
+        const bool pursuitExceeded = target && target->reference.kind != DefensiveTargetKind::objective &&
+                                     (distance(state.origin, target->body.position) > stats.pursuitRange ||
+                                      distance(state.origin, enemy.position) > stats.pursuitRange);
         if (state.target.kind != DefensiveTargetKind::none &&
             (!target || !hostile(team, target->team) || !relevant(*target) || pursuitExceeded)) {
             release(enemies, enemy, true);

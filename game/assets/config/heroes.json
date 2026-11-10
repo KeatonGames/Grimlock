@@ -10,8 +10,8 @@
       "acquisition_range": 6, "pursuit_range": 8, "projectile_speed": 12, "projectile_radius": 0.06,
       "attack_animation": "Ranged_Bow_Draw", "release_animation": "Ranged_Bow_Release",
       "aiming_animation": "Ranged_Bow_Aiming_Idle", "special_abilities": false,
-      "projectile_model": "towers/projectiles/kaykit/arrow_bow.glb",
-      "projectile_scale": 0.32, "projectile_tint": [1, 1, 1, 1],
+      "projectile_model": "towers/projectiles/arrow_white.glb",
+      "projectile_scale": 0.5, "projectile_tint": [1, 1, 1, 1],
       "projectile_socket": "handslot.l", "projectile_offset": [0, 0, 0.1]
     }
   },

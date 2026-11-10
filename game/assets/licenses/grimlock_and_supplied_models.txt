@@ -1,6 +1,8 @@
 Grimlock's original cube, hierarchy and pbr-comparison geometric assets are
 public domain under CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/.
 The cube was converted from OBJ to GLB preserving the existing runtime geometry.
+The generated door_glow_warm, portal_glow_red and brazier_flame scenery meshes
+are also original Grimlock geometric assets under the same CC0 dedication.
 
 Assassin, witch, blackrat, dogcat, bunny and bunny2 are user-supplied assets.
 Their source licenses were not established in the original model README; the

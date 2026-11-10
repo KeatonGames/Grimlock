@@ -41,6 +41,7 @@ struct LevelDefinition {
     double objectiveHeight = 0;
     std::string description;
     std::string id;
+    std::vector<std::string> availableHeroes{"knight", "ranger", "mage"};
 };
 
 [[nodiscard]] std::string createLevelId();

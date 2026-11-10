@@ -101,6 +101,15 @@ int main(int argc, char** argv) {
             validateLevelDefinition(definition);
         });
         definition = loadLevelDefinition(argv[1]);
+        definition.availableHeroes = {"knight", "knight"};
+        rejects([&] {
+            validateLevelDefinition(definition);
+        });
+        definition.availableHeroes = {"unknown"};
+        rejects([&] {
+            validateLevelDefinition(definition);
+        });
+        definition = loadLevelDefinition(argv[1]);
         definition.spawns[1].name = definition.spawns[0].name;
         rejects([&] {
             validateLevelDefinition(definition);

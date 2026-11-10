@@ -11,7 +11,8 @@ namespace grimlock::game {
 // Owns runtime hero objects and a radius-aware Recast profile. Engine must outlive this system.
 class HeroSystem final {
 public:
-    explicit HeroSystem(Engine& engine);
+    // No filter retains the full editor catalog; an empty roster loads no hero models.
+    explicit HeroSystem(Engine& engine, std::optional<std::span<const std::string>> availableHeroes = std::nullopt);
     ~HeroSystem();
     HeroSystem(const HeroSystem&) = delete;
     HeroSystem& operator=(const HeroSystem&) = delete;

@@ -28,6 +28,7 @@ struct ProjectileComponent {
     double splashRadius = 0;
     float visualScale = 0;
     DamageType damageType = DamageType::physical;
+    bool whiteArrowTrail = false;
 };
 
 using Projectile = ProjectileComponent;

@@ -215,7 +215,7 @@ void checkAnimalSelection(Engine& engine, game::NavigationDebug& debug, SDL_Wind
     auto& session = debug.session();
     auto& system = *session.enemies();
     session.reset(engine);
-    require(system.typeCount() == 17 && system.definition().name == "Chicken", "animal catalog/default missing");
+    require(system.typeCount() == 18 && system.definition().name == "Chicken", "animal catalog/default missing");
     require(session.spawn(engine, 2) == 2, "compact chicken spawn failed");
     const auto chicken = system.enemies()[0];
     const auto chickenRevision = chicken.navigation->revision();

@@ -73,6 +73,22 @@ void checkProjectiles(Engine& engine, EnemySystem& enemies, const NavMesh& mesh,
     projectiles.update(enemies, 5);
     require(projectiles.projectiles().empty() && enemies.find(replacement)->health == 100,
             "stale projectile hit a replacement enemy");
+    ProjectileDefinition whiteArrow;
+    whiteArrow.model = "towers/projectiles/arrow_white.glb";
+    whiteArrow.visualScale = 0.5F;
+    whiteArrow.tint = {1, 1, 1, 1};
+    projectiles.spawn({0, 1, 0}, replacement, whiteArrow);
+    require(projectiles.projectiles().front().whiteArrowTrail, "White arrow did not enable its trail");
+    for (int frame = 0; frame < 60; ++frame) {
+        projectiles.update(enemies, 0.01);
+        require(engine.update(), "White arrow or tapering trail failed to render");
+    }
+    require(projectiles.projectiles().empty() && enemies.find(replacement)->health == 99,
+            "White arrow changed hit damage or did not finish its flight");
+    projectiles.spawn({0, 1, 0}, replacement, whiteArrow);
+    projectiles.update(enemies, 0.01);
+    projectiles.clear();
+    require(engine.update() && projectiles.projectiles().empty(), "Arrow trail cleanup failed");
     bool rejected = false;
     try {
         (void)enemies.applyDamage(replacement, std::numeric_limits<float>::quiet_NaN());

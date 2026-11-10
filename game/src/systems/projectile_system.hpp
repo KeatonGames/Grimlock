@@ -50,6 +50,14 @@ public:
     }
 
 private:
+    struct ArrowTrail {
+        InstanceId instance;
+        glm::mat4 transform;
+        double age = 0;
+    };
+
+    void updateTrails(double delta);
+    void addArrowTrail(glm::dvec3 from, glm::dvec3 to);
     void removeAt(std::size_t index) noexcept;
     Engine& engine_;
     std::optional<ModelId> model_;
@@ -59,6 +67,7 @@ private:
     std::uint64_t impacts_ = 0;
     CombatGeometry geometry_;
     std::vector<EnemyId> victims_;
+    std::vector<ArrowTrail> arrowTrails_;
 };
 
 } // namespace grimlock::game

@@ -84,6 +84,12 @@ void validateLevelDefinition(const LevelDefinition& definition) {
         }
     }
     std::set<std::string> names;
+    for (const auto& hero : definition.availableHeroes) {
+        if ((hero != "knight" && hero != "ranger" && hero != "mage") || !names.insert(hero).second) {
+            throw std::invalid_argument("Available heroes must be unique knight, ranger or mage IDs.");
+        }
+    }
+    names.clear();
     for (const auto& position : definition.heroSpawns) {
         if (!std::isfinite(glm::length(position))) {
             throw std::invalid_argument("Hero spawns must be finite world positions.");
@@ -131,6 +137,9 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     result.name = document.at("name").get<std::string>();
     result.id = document.value("id", std::string{});
     result.description = document.value("description", std::string{});
+    if (document.contains("available_heroes")) {
+        result.availableHeroes = document.at("available_heroes").get<std::vector<std::string>>();
+    }
     result.scene = document.at("scene").get<std::string>();
     result.startingGold = document.contains("starting_gold") ? gold(document.at("starting_gold")) : 0;
     if (document.contains("hero_spawns")) {
@@ -219,6 +228,7 @@ void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinitio
         document["waves"].push_back(std::move(entry));
     }
     std::ofstream file{path};
+    document["available_heroes"] = definition.availableHeroes;
     if (!definition.heroSpawns.empty()) {
         document["hero_spawns"] = nlohmann::json::array();
         for (const auto& point : definition.heroSpawns) {

@@ -1,8 +1,8 @@
 # Game menus
 
 The playable `game/assets/levels/` library contains only the existing **Level 01 -
-Forest Defense**. Its gameplay scene, waves, heroes, construction zones and economy
-are unchanged by this menu work. Five former demo definitions now live under
+Forest Defense**. Its current reference-inspired layout is documented in the
+[level guide](forest_defense.md). Five former demo definitions now live under
 `game/assets/test_fixtures/levels/`; automated tests and the existing Editor load
 shortcuts use those paths. Their reusable scenes and models remain available.
 
@@ -30,8 +30,8 @@ the menu does not render a live environment or require the Editor.
 ## Captures and licenses
 
 `assets/ui/menu_background.png` is an actual 1600x900 Vulkan capture of a dedicated
-Nature Kit composition: grassy tiles, elevated rock banks, a winding dirt path,
-trees, bushes, fences, a tent and a campfire, with warm directional lighting and a
+Platformer Kit composition: grassy blocks, elevated banks, a winding stone trail,
+trees, plants, fences, a supply chest and barrel, with warm directional lighting and a
 three-quarter camera. This non-playable composition exists only during capture;
 it does not add a level or duplicate terrain assets.
 

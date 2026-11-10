@@ -1,62 +1,166 @@
 [
-  {
-    "name": "Goblin", "aliases": ["Grunt"], "model": "enemies/orcs/character-orc.glb",
-    "maximum_health": 60, "speed": 1.6, "radius": 0.23, "height": 0.9, "visual_height": 0.9,
-    "idle_animation": "idle", "movement_animation": "walk", "run_animation": "sprint", "death_animation": "die",
-    "combat": {
-      "damage": 5, "range": 0.35, "attack_interval": 0.9, "impact_time": 0.22,
-      "aggression_range": 2.6, "pursuit_range": 4,
-      "targeting": "first_detected", "attack_animation": "attack-melee-right", "threat_memory": 0
+    {
+        "name":  "Goblin",
+        "aliases":  [
+                        "Grunt"
+                    ],
+        "model":  "enemies/orcs/character-orc.glb",
+        "maximum_health":  60,
+        "speed":  1.6,
+        "radius":  0.23,
+        "height":  0.9,
+        "visual_height":  0.9,
+        "idle_animation":  "idle",
+        "movement_animation":  "walk",
+        "run_animation":  "sprint",
+        "death_animation":  "die",
+        "combat":  {
+                       "damage":  5,
+                       "range":  0.35,
+                       "attack_interval":  0.9,
+                       "impact_time":  0.22,
+                       "aggression_range":  2.6,
+                       "pursuit_range":  4,
+                       "targeting":  "first_detected",
+                       "attack_animation":  "attack-melee-right",
+                       "threat_memory":  0
+                   }
+    },
+    {
+        "name":  "Siege",
+        "animal":  "Deer",
+        "maximum_health":  300,
+        "speed":  0.95,
+        "combat":  {
+                       "damage":  14,
+                       "range":  0.4,
+                       "attack_interval":  1.2,
+                       "impact_time":  0.35,
+                       "aggression_range":  4.5,
+                       "pursuit_range":  6,
+                       "hero_priority":  2,
+                       "tower_priority":  3,
+                       "objective_priority":  1,
+                       "tower_damage_modifier":  2
+                   }
+    },
+    {
+        "name":  "Hunter",
+        "animal":  "Dog",
+        "maximum_health":  80,
+        "speed":  2.2,
+        "combat":  {
+                       "damage":  9,
+                       "range":  0.35,
+                       "attack_interval":  0.7,
+                       "impact_time":  0.2,
+                       "aggression_range":  4,
+                       "pursuit_range":  5.5,
+                       "hero_priority":  3,
+                       "tower_priority":  2,
+                       "objective_priority":  1,
+                       "hero_damage_modifier":  1.5
+                   }
+    },
+    {
+        "name":  "Iron Stag",
+        "animal":  "Deer",
+        "boss":  true,
+        "maximum_health":  1600,
+        "speed":  0.85,
+        "radius":  1.0,
+        "height":  2.0,
+        "visual_height":  1.8,
+        "combat":  {
+                       "damage":  45,
+                       "range":  0.65,
+                       "attack_interval":  1.5,
+                       "impact_time":  0.4,
+                       "aggression_range":  5,
+                       "pursuit_range":  7,
+                       "hero_priority":  2,
+                       "tower_priority":  3,
+                       "objective_priority":  1,
+                       "tower_damage_modifier":  1.5
+                   }
+    },
+    {
+        "name":  "Skeleton",
+        "model":  "enemies/undead/character-skeleton.glb",
+        "maximum_health":  40,
+        "speed":  1.6,
+        "radius":  0.23,
+        "height":  0.9,
+        "visual_height":  0.9,
+        "idle_animation":  "idle",
+        "movement_animation":  "walk",
+        "run_animation":  "sprint",
+        "death_animation":  "die",
+        "bone_health":  5,
+        "resurrection_time":  3,
+        "combat":  {
+                       "damage":  5,
+                       "range":  0.35,
+                       "attack_interval":  0.9,
+                       "impact_time":  0.22,
+                       "aggression_range":  2.6,
+                       "pursuit_range":  4,
+                       "targeting":  "first_detected",
+                       "attack_animation":  "attack-melee-right",
+                       "threat_memory":  0
+                   }
+    },
+    {
+        "name":  "Ghost",
+        "model":  "enemies/undead/character-ghost.glb",
+        "maximum_health":  30,
+        "speed":  1.5,
+        "radius":  0.23,
+        "height":  0.9,
+        "visual_height":  0.85,
+        "idle_animation":  "idle",
+        "movement_animation":  "walk",
+        "death_animation":  "die",
+        "intangible":  true,
+        "magic_only":  true,
+        "hover_height":  0.2,
+        "hover_amplitude":  0.04,
+        "combat":  {
+                       "damage":  5,
+                       "range":  0.35,
+                       "attack_interval":  0.9,
+                       "impact_time":  0.22,
+                       "aggression_range":  2.6,
+                       "pursuit_range":  4,
+                       "attack_animation":  "attack-melee-right"
+                   }
+    },
+    {
+        "name":  "Goblin Boss",
+        "aliases":  [
+
+                    ],
+        "model":  "enemies/orcs/character-orc.glb",
+        "maximum_health":  900,
+        "speed":  1.1,
+        "radius":  0.4,
+        "height":  1.5,
+        "visual_height":  1.5,
+        "idle_animation":  "idle",
+        "movement_animation":  "walk",
+        "run_animation":  "sprint",
+        "death_animation":  "die",
+        "combat":  {
+                       "damage":  18,
+                       "range":  0.45,
+                       "attack_interval":  1.2,
+                       "impact_time":  0.22,
+                       "aggression_range":  2.6,
+                       "pursuit_range":  4,
+                       "targeting":  "first_detected",
+                       "attack_animation":  "attack-melee-right",
+                       "threat_memory":  0
+                   },
+        "boss":  true
     }
-  },
-  {
-    "name": "Siege", "animal": "Deer", "maximum_health": 300, "speed": 0.95,
-    "combat": {
-      "damage": 14, "range": 0.4, "attack_interval": 1.2, "impact_time": 0.35,
-      "aggression_range": 4.5, "pursuit_range": 6,
-      "hero_priority": 2, "tower_priority": 3, "objective_priority": 1,
-      "tower_damage_modifier": 2
-    }
-  },
-  {
-    "name": "Hunter", "animal": "Dog", "maximum_health": 80, "speed": 2.2,
-    "combat": {
-      "damage": 9, "range": 0.35, "attack_interval": 0.7, "impact_time": 0.2,
-      "aggression_range": 4, "pursuit_range": 5.5,
-      "hero_priority": 3, "tower_priority": 2, "objective_priority": 1,
-      "hero_damage_modifier": 1.5
-    }
-  },
-  {
-    "name": "Iron Stag", "animal": "Deer", "boss": true,
-    "maximum_health": 1600, "speed": 0.85,
-    "radius": 1.0, "height": 2.0, "visual_height": 1.8,
-    "combat": {
-      "damage": 45, "range": 0.65, "attack_interval": 1.5, "impact_time": 0.4,
-      "aggression_range": 5, "pursuit_range": 7,
-      "hero_priority": 2, "tower_priority": 3, "objective_priority": 1,
-      "tower_damage_modifier": 1.5
-    }
-  },
-  {
-    "name": "Skeleton", "model": "enemies/undead/character-skeleton.glb",
-    "maximum_health": 40, "speed": 1.6, "radius": 0.23, "height": 0.9, "visual_height": 0.9,
-    "idle_animation": "idle", "movement_animation": "walk", "run_animation": "sprint", "death_animation": "die",
-    "bone_health": 5, "resurrection_time": 3,
-    "combat": {
-      "damage": 5, "range": 0.35, "attack_interval": 0.9, "impact_time": 0.22,
-      "aggression_range": 2.6, "pursuit_range": 4,
-      "targeting": "first_detected", "attack_animation": "attack-melee-right", "threat_memory": 0
-    }
-  },
-  {
-    "name": "Ghost", "model": "enemies/undead/character-ghost.glb",
-    "maximum_health": 30, "speed": 1.5, "radius": 0.23, "height": 0.9, "visual_height": 0.85,
-    "idle_animation": "idle", "movement_animation": "walk", "death_animation": "die",
-    "intangible": true, "magic_only": true, "hover_height": 0.2, "hover_amplitude": 0.04,
-    "combat": {
-      "damage": 5, "range": 0.35, "attack_interval": 0.9, "impact_time": 0.22,
-      "aggression_range": 2.6, "pursuit_range": 4, "attack_animation": "attack-melee-right"
-    }
-  }
 ]

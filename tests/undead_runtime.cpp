@@ -196,14 +196,17 @@ void ghostCombat(Engine& engine) {
 void mausoleumSiege(Engine& engine) {
     LevelRuntime runtime;
     runtime.load(engine, "assets/levels/forest_defense.json");
-    for (const auto* name : {"Goblin", "Skeleton", "Ghost"}) {
+    for (const auto* name : {"Goblin", "Skeleton", "Ghost", "Siege", "Hunter", "Iron Stag"}) {
         auto& navigation = runtime.navigation();
         auto& enemies = *navigation.enemies();
         runtime.heroes()->clear();
         const auto type = typeOf(navigation, name);
         const auto original = engine.scene()->object(105).local;
-        require(engine.scene()->object(105).model == "environment/graveyard/crypt.glb", "Mausoleum model missing");
-        require(navigation.spawnAt(engine, type, {{4, 12}, {4, 12}, 2}, 1) == 1, "Mausoleum attacker could not spawn");
+        require(engine.scene()->object(105).model == "environment/graveyard/crypt-large.glb",
+                "Mausoleum model missing");
+        const double approachZ = enemies.definition(type).combat.firstDetected ? 9.9 : 10.8;
+        require(navigation.spawnAt(engine, type, {{-8.5, approachZ}, {-8.5, approachZ}, 2}, 1) == 1,
+                "Mausoleum attacker could not spawn");
         const auto id = enemies.enemies().front().id;
         runtime.startWave();
         for (int frame = 0; frame < 180; ++frame) {

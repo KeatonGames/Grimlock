@@ -42,13 +42,19 @@ void stop(Hero& hero, HeroState state) {
 }
 } // namespace
 
-HeroSystem::HeroSystem(Engine& engine)
+HeroSystem::HeroSystem(Engine& engine, std::optional<std::span<const std::string>> availableHeroes)
     : engine_(engine), scene_(engine.scene()), projectiles_(engine), heroes_(registry_.storage<Hero>()),
       teams_(registry_.storage<TeamComponent>()) {
     registry_.reserveEntities(8);
     registry_.reserve<Hero>(8);
     registry_.reserve<TeamComponent>(8);
     for (auto definition : loadHeroDefinitions(engine.assetRoot())) {
+        if (availableHeroes && !std::any_of(availableHeroes->begin(), availableHeroes->end(), [&](const auto& id) {
+                // The Knight retains the original Assassin type key in the character catalog.
+                return definition.id == id || (id == "knight" && definition.id == "assassin");
+            })) {
+            continue;
+        }
         auto type = std::make_unique<TypeResources>();
         type->definition = std::move(definition);
         type->model = engine.loadModel(engine.assetRoot() / type->definition.model);
@@ -72,6 +78,9 @@ HeroSystem::HeroSystem(Engine& engine)
             type->movementClip = clip(type->modelInfo, type->definition.walkAnimation);
         }
         types_.push_back(std::move(type));
+    }
+    if (availableHeroes && types_.size() != availableHeroes->size()) {
+        throw std::invalid_argument("Hero availability contains duplicate or unknown character IDs.");
     }
 }
 

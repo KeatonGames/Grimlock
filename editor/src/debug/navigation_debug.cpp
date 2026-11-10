@@ -479,6 +479,18 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
         definition.scene = scene;
     }
     ImGui::InputScalar("Starting Gold", ImGuiDataType_U64, &definition.startingGold);
+    ImGui::TextUnformatted("Available Heroes");
+    for (const auto& [id, name] : {std::pair{"knight", "Knight"}, {"ranger", "Ranger"}, {"mage", "Mage"}}) {
+        bool enabled = std::find(definition.availableHeroes.begin(), definition.availableHeroes.end(), id) !=
+                       definition.availableHeroes.end();
+        if (ImGui::Checkbox(name, &enabled)) {
+            if (enabled) {
+                definition.availableHeroes.emplace_back(id);
+            } else {
+                std::erase(definition.availableHeroes, id);
+            }
+        }
+    }
     ImGui::InputScalarN("Objective X/Z", ImGuiDataType_Double, &definition.objectivePosition.x, 2);
     ImGui::InputDouble("Objective Height", &definition.objectiveHeight, 0.1, 1, "%.3f");
     ImGui::InputScalar("Objective Health", ImGuiDataType_U64, &definition.objectiveHealth);

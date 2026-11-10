@@ -2,6 +2,7 @@
 #include "ui/game_hud.hpp"
 
 #include <SDL3/SDL.h>
+#include <algorithm>
 #include <fstream>
 #include <imgui_internal.h>
 #include <iostream>
@@ -474,6 +475,24 @@ int main() {
         finishBattle(engine, runtime);
         require(runtime.level().waves()->phase() == LevelPhase::defeat && runtime.level().economy().gold() == 20,
                 "Game defeat or reward handling incorrect");
+        for (const auto& roster :
+             {std::vector<std::string>{}, {"ranger"}, {"knight", "mage"}, {"knight", "ranger", "mage"}}) {
+            definition.availableHeroes = roster;
+            saveLevelDefinition(levelPath, definition);
+            require(loadLevelDefinition(levelPath).availableHeroes == roster, "Level hero roster did not round-trip");
+            runtime.restart(engine);
+            require(runtime.heroes()->heroes().size() == roster.size() &&
+                        runtime.heroes()->typeCount() == roster.size(),
+                    "Level availability did not restrict hero spawning and resources");
+            for (const auto& hero : runtime.heroes()->heroes()) {
+                auto id = runtime.heroes()->definition(hero).id;
+                if (id == "assassin") {
+                    id = "knight";
+                }
+                require(std::find(roster.begin(), roster.end(), id) != roster.end(), "Unavailable hero spawned");
+            }
+            tick(engine, runtime);
+        }
         std::cout << "PASS independent Game HUD, edited level loading, placement/economy/navigation, waves, "
                      "victory/defeat, restart and read-only authoring files.\n";
         return 0;

@@ -9,11 +9,13 @@ and development tools. Game does not link Editor or GameDebug.
 
 ## Features
 
-- Forest-themed Game menus with captured Nature Kit scenery, real level previews,
+- Forest-themed Game menus with captured Platformer Kit scenery, real level previews,
   persistent display options and a single playable Forest Defense level; see [menus](docs/menus.md).
 
-- **Level 01 - Forest Defense:** a handcrafted Kenney woodland with two elevations,
-  strategic build areas, five fixed waves and an Iron Stag finale; see [the level guide](docs/forest_defense.md).
+- **Level 01 - Forest Defense:** a handcrafted woodland with a timber bridge, raised
+  garden, four construction points and a walled mausoleum. This level is tower-only;
+  other levels can enable zero to three heroes in their definitions. Five fixed waves end
+  with a Goblin boss and four Goblins in one final swarm. See [the level guide](docs/forest_defense.md).
 - Vulkan 1.3+ Dynamic Rendering and Synchronization2, with window resizing and deterministic cleanup.
 - OBJ and glTF/GLB loading, textured PBR materials, punctual lights, image-based lighting and HDR tone mapping.
 - Shared model resources with independent skeletal, node and morph animation playback per instance.
@@ -60,7 +62,7 @@ game/
   src/{main.cpp,game.*}     Executable launcher and Game application
   assets/config/           Shared enemy, hero and tower definitions
   assets/levels/           Handcrafted levels, waves and economy settings
-  assets/environment/      Nature, castle, dungeon, graveyard and pirate GLBs
+  assets/environment/      Platformer terrain, nature, castle, dungeon, graveyard and pirate GLBs
   assets/towers/           Structures, weapons and projectile GLBs
   assets/enemies/          Animal, orc, undead and other enemy GLBs
   assets/heroes/           Knight, Ranger, Mage, other characters and shared rigs

@@ -6,8 +6,8 @@ The preview snaps to its construction point and facing. Green passes preliminary
 checks; red indicates an occupied zone, invalid footprint, terrain/collision problem,
 or a route rejection. Full route validation runs on confirmation. Gold is charged
 only after successful construction. Every available construction point uses the
-same 3-by-3 orange `construction-zone.glb` frame, sized for roughly four characters.
-Its thin 12-centimetre border matches the hero selection marker's visual weight.
+same compact 2-by-2-metre orange `construction-zone.glb` frame.
+Its 11-centimetre border matches the hero selection marker's visual weight.
 It closes the character-selection corners into a low, bevelled ground frame using
 the same kit material, rather than selection-b's upright ribbon. Regenerate it with
 `tools/prepare_build_zone.ps1`. The frame

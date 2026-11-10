@@ -57,7 +57,9 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
         engine.setScene(std::move(scene));
         level_.begin(engine, navigation_, std::move(definition));
         engine_ = &engine;
-        heroes_ = std::make_unique<HeroSystem>(engine);
+        heroes_ =
+            std::make_unique<HeroSystem>(engine,
+                                         std::span<const std::string>{level_.waves()->definition().availableHeroes});
         heroes_->shareCombatGeometry(navigation_.combatGeometry());
         heroes_->synchronize(navigation_.towers());
         spawnHeroesNearObjective();

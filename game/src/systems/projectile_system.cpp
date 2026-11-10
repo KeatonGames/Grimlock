@@ -1,5 +1,6 @@
 #include "systems/projectile_system.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <glm/ext/matrix_transform.hpp>
 #include <stdexcept>
@@ -76,6 +77,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
         projectiles_.back().splashRadius = definition.splashRadius;
         projectiles_.back().visualScale = definition.visualScale;
         projectiles_.back().damageType = definition.damageType;
+        projectiles_.back().whiteArrowTrail = definition.model.filename() == "arrow_white.glb";
         engine_.setTransform(*instance, projectileTransform(projectiles_.back()));
     } catch (...) {
         if (instance) {
@@ -90,6 +92,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
     if (!std::isfinite(delta) || delta < 0) {
         throw std::invalid_argument("Projectile delta must be finite and nonnegative.");
     }
+    updateTrails(delta);
     if (!geometry) {
         geometry_.synchronize(engine_);
         geometry = &geometry_;
@@ -119,6 +122,9 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         if (geometry->trace(projectile.position, next, projectile.radius, projectile.source)) {
             removeAt(index);
             continue;
+        }
+        if (projectile.whiteArrowTrail) {
+            addArrowTrail(projectile.position, next);
         }
         // Sweeping the entire homing segment prevents tunneling, even when one frame crosses the target.
         if (distance <= travel + projectile.radius + target->radius) {
@@ -154,6 +160,41 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
     }
 }
 
+void ProjectileSystem::addArrowTrail(glm::dvec3 from, glm::dvec3 to) {
+    const auto distance = glm::length(to - from);
+    if (distance < 0.001) {
+        return;
+    }
+    Projectile segment{};
+    segment.position = (from + to) * 0.5;
+    segment.velocity = to - from;
+    segment.visualScale = 1;
+    const auto transform = glm::scale(projectileTransform(segment), glm::vec3{0.035F, 0.035F, distance});
+    const auto instance = engine_.createInstance(*model_, true);
+    try {
+        engine_.setTint(instance, {1, 1, 1, 1});
+        engine_.setTransform(instance, transform);
+        arrowTrails_.push_back({instance, transform});
+    } catch (...) {
+        engine_.removeInstance(instance);
+        throw;
+    }
+}
+
+void ProjectileSystem::updateTrails(double delta) {
+    std::erase_if(arrowTrails_, [&](ArrowTrail& trail) {
+        trail.age += delta;
+        if (trail.age >= 0.155) {
+            engine_.removeInstance(trail.instance);
+            return true;
+        }
+        // Leave each segment in world space, tapering it away behind the moving arrow.
+        const float remaining = static_cast<float>(1 - trail.age / 0.16);
+        engine_.setTransform(trail.instance, glm::scale(trail.transform, glm::vec3{remaining, remaining, 1}));
+        return false;
+    });
+}
+
 void ProjectileSystem::removeAt(std::size_t index) noexcept {
     const auto entity = projectiles_.entities()[index];
     engine_.removeInstance(projectiles_[index].instance);
@@ -161,6 +202,10 @@ void ProjectileSystem::removeAt(std::size_t index) noexcept {
 }
 
 void ProjectileSystem::clear() noexcept {
+    for (const auto& trail : arrowTrails_) {
+        engine_.removeInstance(trail.instance);
+    }
+    arrowTrails_.clear();
     while (!projectiles_.empty()) {
         removeAt(projectiles_.size() - 1);
     }
