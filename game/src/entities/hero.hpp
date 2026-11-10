@@ -87,8 +87,12 @@ struct HeroRuntimeComponent : HealthComponent {
     glm::dvec3 position{0};
     glm::dvec3 defensivePosition{0};
     std::optional<EnemyId> avoidanceEnemy;
+    std::optional<HeroId> avoidanceHero;
     glm::dvec3 avoidancePoint{0};
     double yaw = 0, speed = 0, stuckTime = 0;
+    double progressRemaining = std::numeric_limits<double>::max();
+    std::uint32_t recoveryAttempts = 0;
+    MovementBlockage blockage = MovementBlockage::none;
     double visualYaw = 0;
     bool controllable = true;
     HeroState state = HeroState::idle;

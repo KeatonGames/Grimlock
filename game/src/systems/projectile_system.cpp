@@ -18,8 +18,13 @@ glm::mat4 projectileTransform(const Projectile& projectile) {
         transform[2] = glm::vec4{forward, 0};
     }
     transform[3] = glm::vec4{projectile.position, 1};
+    if (projectile.purpleFireball) {
+        transform = glm::rotate(transform, static_cast<float>(projectile.visualTime * 8), glm::vec3{0, 0, 1});
+    }
     const auto scale = projectile.visualScale > 0 ? projectile.visualScale : static_cast<float>(projectile.radius);
-    return glm::scale(transform, glm::vec3{scale});
+    const float pulse =
+        projectile.purpleFireball ? 1 + 0.08F * std::sin(static_cast<float>(projectile.visualTime * 12)) : 1;
+    return glm::scale(transform, glm::vec3{scale * pulse});
 }
 } // namespace
 
@@ -35,15 +40,14 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
                              double lifetime,
                              ecs::Entity sourceEntity) {
     const auto& statistics = definition.statistics(level);
-    spawn(origin,
-          target,
-          ProjectileDefinition{statistics.damage,
-                               definition.projectileSpeed,
-                               definition.projectileRadius,
-                               definition.projectileTint},
-          source,
-          {DefensiveTargetKind::tower, sourceEntity},
-          lifetime);
+    ProjectileDefinition projectile{statistics.damage,
+                                    definition.projectileSpeed,
+                                    definition.projectileRadius,
+                                    definition.projectileTint};
+    projectile.model = definition.projectileModel;
+    projectile.visualScale = definition.projectileScale;
+    projectile.damageType = definition.damageType;
+    spawn(origin, target, projectile, source, {DefensiveTargetKind::tower, sourceEntity}, lifetime);
 }
 
 void ProjectileSystem::spawn(glm::dvec3 origin,
@@ -78,6 +82,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
         projectiles_.back().visualScale = definition.visualScale;
         projectiles_.back().damageType = definition.damageType;
         projectiles_.back().whiteArrowTrail = definition.model.filename() == "arrow_white.glb";
+        projectiles_.back().purpleFireball = definition.model.filename() == "fireball_purple.glb";
         engine_.setTransform(*instance, projectileTransform(projectiles_.back()));
     } catch (...) {
         if (instance) {
@@ -101,6 +106,7 @@ void ProjectileSystem::update(EnemySystem& enemies, double delta, const CombatGe
         auto& projectile = projectiles_[index];
         auto& lifetime = *lifetimes_.get(projectiles_.entities()[index]);
         lifetime.elapsed += delta;
+        projectile.visualTime += delta;
         if (std::isfinite(lifetime.maximum) && lifetime.elapsed >= lifetime.maximum) {
             removeAt(index);
             continue;

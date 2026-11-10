@@ -105,8 +105,9 @@ void NavigationSession::buildNavigation() {
     terrain_.assign(levelGeometry_.boxes().begin(), levelGeometry_.boxes().end());
     geometry_ = levelGeometry_.navigation();
     for (const auto& tower : towers_.towers()) {
-        const auto box = tower.bounds();
-        geometry_.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
+        glm::mat4 transform{glm::mat4_cast(tower.rotation)};
+        transform[3] = glm::vec4{tower.position, 1};
+        geometry_.addBox(-glm::vec3{tower.halfExtent}, glm::vec3{tower.halfExtent}, transform);
     }
     if (navigation_.ready() || profileInUse(0)) {
         buildProfile(0);
@@ -239,8 +240,9 @@ void NavigationSession::preparePlacement(const Tower& tower) {
     candidate_.emplace(
         PlacementCandidate{tower, spawnArea_, *destination_, selectedType_, navigationRevision_, geometry_, {}, {}});
     auto& candidate = *candidate_;
-    const auto box = tower.bounds();
-    candidate.geometry.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
+    glm::mat4 transform{glm::mat4_cast(tower.rotation)};
+    transform[3] = glm::vec4{tower.position, 1};
+    candidate.geometry.addBox(-glm::vec3{tower.halfExtent}, glm::vec3{tower.halfExtent}, transform);
     const auto prepare = [&](EnemyTypeId type) {
         auto& current = navigationFor(type);
         auto trial = std::make_unique<NavMesh>();

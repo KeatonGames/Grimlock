@@ -90,6 +90,13 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
         d.visualHeight = entry.at("visual_height").get<float>();
         d.speed = entry.value("speed", d.speed);
         d.maximumHealth = entry.value("maximum_health", d.maximumHealth);
+        if (entry.contains("kill_reward")) {
+            const auto& reward = entry.at("kill_reward");
+            if (!reward.is_number_integer() || (!reward.is_number_unsigned() && reward.get<std::int64_t>() < 0)) {
+                throw std::invalid_argument("Enemy kill reward must be a nonnegative integer.");
+            }
+            d.killReward = reward.get<std::uint64_t>();
+        }
         d.showHealthBar = entry.value("show_health_bar", d.showHealthBar);
         d.boss = entry.value("boss", d.boss);
         d.acceleration = entry.value("acceleration", d.acceleration);
@@ -159,6 +166,13 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
                 }
             }
             d.maximumHealth = entry.at("maximum_health").get<float>();
+            if (entry.contains("kill_reward")) {
+                const auto& reward = entry.at("kill_reward");
+                if (!reward.is_number_integer() || (!reward.is_number_unsigned() && reward.get<std::int64_t>() < 0)) {
+                    throw std::invalid_argument("Enemy kill reward must be a nonnegative integer.");
+                }
+                d.killReward = reward.get<std::uint64_t>();
+            }
             d.speed = entry.at("speed").get<double>();
             d.radius = entry.value("radius", d.radius);
             d.height = entry.value("height", d.height);

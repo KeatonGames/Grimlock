@@ -73,6 +73,10 @@ public:
         return triangles_;
     }
 
+    [[nodiscard]] std::span<const std::array<glm::vec3, 2>> debugConnections() const noexcept {
+        return connections_;
+    }
+
     [[nodiscard]] std::optional<NavigationPoint> project(glm::dvec3 position, double horizontalExtent = 1) const;
     [[nodiscard]] bool contains(glm::dvec3 position, double tolerance = 0.02) const;
     [[nodiscard]] bool findPath(glm::dvec3 start, glm::dvec3 destination, NavigationPath& path) const;
@@ -98,6 +102,7 @@ private:
     std::uint64_t revision_ = 0;
     std::string status_ = "No navigation geometry";
     std::vector<std::array<glm::vec3, 3>> triangles_;
+    std::vector<std::array<glm::vec3, 2>> connections_;
 };
 
 } // namespace grimlock::game

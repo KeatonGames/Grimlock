@@ -1,5 +1,6 @@
 #include "entities/tower_definition.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -43,6 +44,8 @@ Tower TowerDefinition::instance() const {
     tower.model = model;
     tower.halfExtent = halfExtent;
     tower.visualScale = visualScale;
+    tower.firingHeight = firingHeight;
+    tower.firingOffset = {operatorOffset.x, operatorOffset.z};
     return tower;
 }
 
@@ -83,6 +86,44 @@ std::vector<TowerDefinition> loadTowerDefinitions(const std::filesystem::path& a
         }
         definition.projectileSpeed = entry.value("projectile_speed", definition.projectileSpeed);
         definition.projectileRadius = entry.value("projectile_radius", definition.projectileRadius);
+        definition.projectileModel = entry.value("projectile_model", std::string{});
+        definition.projectileScale = entry.value("projectile_scale", 0.0F);
+        definition.firingHeight = entry.value("firing_height", 0.0);
+        const auto damageType = entry.value("damage_type", std::string{"physical"});
+        if (damageType != "physical" && damageType != "magic") {
+            throw std::invalid_argument("Unknown tower damage type.");
+        }
+        definition.damageType = damageType == "magic" ? DamageType::magic : DamageType::physical;
+        if (entry.contains("operator")) {
+            const auto& character = entry.at("operator");
+            definition.operatorModel = character.at("model").get<std::string>();
+            const auto offset = character.at("offset").get<std::array<double, 3>>();
+            definition.operatorOffset = {offset[0], offset[1], offset[2]};
+            definition.operatorHeight = character.at("visual_height").get<double>();
+            definition.operatorIdle = character.at("idle_animation").get<std::string>();
+            definition.operatorAttack = character.at("attack_animation").get<std::string>();
+        }
+        const auto validOptionalAsset = [&](const std::filesystem::path& path) {
+            if (path.empty()) {
+                return true;
+            }
+            return !path.is_absolute() && !path.has_root_name() &&
+                   std::none_of(path.begin(),
+                                path.end(),
+                                [](const auto& part) {
+                                    return part == "..";
+                                }) &&
+                   std::filesystem::is_regular_file(assetRoot / path);
+        };
+        if (!validOptionalAsset(definition.projectileModel) || !validOptionalAsset(definition.operatorModel) ||
+            !std::isfinite(definition.projectileScale) || definition.projectileScale < 0 ||
+            !std::isfinite(definition.firingHeight) || definition.firingHeight < 0 ||
+            !std::isfinite(glm::length(definition.operatorOffset)) || !std::isfinite(definition.operatorHeight) ||
+            definition.operatorHeight <= 0 ||
+            (!definition.operatorModel.empty() &&
+             (definition.operatorIdle.empty() || definition.operatorAttack.empty()))) {
+            throw std::invalid_argument("Invalid tower projectile or operator visuals.");
+        }
         if (entry.contains("projectile_tint")) {
             const auto color = entry.at("projectile_tint").get<std::array<float, 4>>();
             definition.projectileTint = {color[0], color[1], color[2], color[3]};

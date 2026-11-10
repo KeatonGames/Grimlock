@@ -51,7 +51,7 @@ void BuildZoneMarkers::synchronize(Engine& engine, std::span<const BuildZone> zo
         }
         Transform transform;
         transform.position = zone.constructionPosition() + glm::dvec3{0, 0.015, 0};
-        transform.rotation = glm::angleAxis(zone.yaw + zone.constructionYaw, glm::dvec3{0, 1, 0});
+        transform.rotation = glm::angleAxis(zone.yaw, glm::dvec3{0, 1, 0});
         transform.scale = {2, 1, 2};
         engine.setTransform(found->second, transform);
     }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "entities/enemy_definition.hpp"
 #include "entities/tower.hpp"
 
 namespace grimlock::game {
@@ -23,6 +24,14 @@ struct TowerDefinition {
     double projectileSpeed = 9;
     double projectileRadius = 0.06;
     glm::vec4 projectileTint{1, 0.8F, 0.25F, 1};
+    std::filesystem::path projectileModel;
+    float projectileScale = 0;
+    DamageType damageType = DamageType::physical;
+    double firingHeight = 0;
+    std::filesystem::path operatorModel;
+    glm::dvec3 operatorOffset{0};
+    double operatorHeight = 1.05;
+    std::string operatorIdle, operatorAttack;
     [[nodiscard]] Tower instance() const;
     [[nodiscard]] const TowerLevelDefinition& statistics(std::size_t level = 1) const;
 };

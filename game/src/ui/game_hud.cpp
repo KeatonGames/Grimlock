@@ -7,9 +7,11 @@
 #include <cmath>
 #include <cstdio>
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <grimlock/input.hpp>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
+#include <stdexcept>
 
 namespace grimlock::game {
 
@@ -35,6 +37,7 @@ GameHud::GameHud(Engine& engine,
 }
 
 GameHud::~GameHud() {
+    clearTowerPreview();
     clearSelectionMarker();
     buildZoneMarkers_.clear();
     engine_.detachOverlay();
@@ -154,6 +157,7 @@ OverlayInput GameHud::frame() {
 }
 
 void GameHud::clearFeedback() {
+    clearTowerPreview();
     clearSelectionMarker();
     buildZoneMarkers_.clear();
     hoveredObject_.reset();
@@ -246,8 +250,10 @@ void GameHud::notifications() {
         if (waves->phase() == LevelPhase::battle) {
             notification_ = "Wave " + std::to_string(waves->wave() + 1) + " | Defend the objective";
         } else if (displayedPhase_ == LevelPhase::battle && waves->phase() == LevelPhase::preparation) {
-            notification_ =
-                "Wave cleared | +" + std::to_string(runtime_.level().lastWaveReward().value_or(0)) + " gold";
+            notification_ = "Wave cleared";
+            if (const auto reward = runtime_.level().lastWaveReward().value_or(0); reward > 0) {
+                notification_ += " | +" + std::to_string(reward) + " gold";
+            }
         } else {
             notification_ = "Preparation | Build and position your defenders";
         }
@@ -673,6 +679,7 @@ void GameHud::finishFrame(const Camera& camera) {
         (runtime_.level().waves() && (runtime_.level().waves()->phase() == LevelPhase::victory ||
                                       runtime_.level().waves()->phase() == LevelPhase::defeat))) {
         clearSelectionMarker();
+        clearTowerPreview();
         buildZoneMarkers_.clear();
         ImGui::Render();
         return;
@@ -739,6 +746,7 @@ void GameHud::finishFrame(const Camera& camera) {
         }
     }
     updateSelectionMarker();
+    updateTowerPreview();
     buildZoneMarkers_.synchronize(engine_, runtime_.navigation().placement().zones());
     updateHeroPathPreview(ray);
     placementOverlay(camera);
@@ -787,6 +795,69 @@ void GameHud::updateHeroPathPreview(const std::optional<Ray>& ray) {
     hoverDestination_ = ground;
     hoverQueryTime_ = now;
     (void)mesh.findPath(hero->position, *ground, hoverPath_);
+}
+
+void GameHud::clearTowerPreview() {
+    if (towerDefenderPreview_) {
+        engine_.removeInstance(*towerDefenderPreview_);
+        towerDefenderPreview_.reset();
+    }
+    if (towerPreview_) {
+        engine_.removeInstance(*towerPreview_);
+        towerPreview_.reset();
+    }
+    towerPreviewType_.clear();
+}
+
+void GameHud::updateTowerPreview() {
+    const auto& tower = runtime_.preview();
+    if (!runtime_.placing() || !tower) {
+        clearTowerPreview();
+        return;
+    }
+    const auto& definition = runtime_.navigation().towers().definition(tower->type);
+    if (!towerPreview_ || towerPreviewType_ != tower->type) {
+        clearTowerPreview();
+        try {
+            towerPreview_ = engine_.createInstance(engine_.loadModel(engine_.assetRoot() / tower->model), true);
+            if (!definition.operatorModel.empty()) {
+                const auto model = engine_.loadModel(engine_.assetRoot() / definition.operatorModel);
+                const auto info = engine_.modelInfo(model);
+                if (info.maximum.y <= info.minimum.y) {
+                    throw std::runtime_error("Tower preview defender needs a nonzero model height.");
+                }
+                const auto center = (info.minimum + info.maximum) * 0.5F;
+                towerDefenderFoot_ = {center.x, info.minimum.y, center.z};
+                towerDefenderScale_ = static_cast<float>(definition.operatorHeight / (info.maximum.y - info.minimum.y));
+                towerDefenderPreview_ = engine_.createInstance(model, true);
+                const auto clip =
+                    std::find(info.animationNames.begin(), info.animationNames.end(), definition.operatorIdle);
+                if (clip == info.animationNames.end()) {
+                    throw std::runtime_error("Tower preview defender is missing its idle animation.");
+                }
+                engine_.animation(*towerDefenderPreview_)
+                    .play(static_cast<std::size_t>(clip - info.animationNames.begin()));
+            }
+            towerPreviewType_ = tower->type;
+        } catch (...) {
+            clearTowerPreview();
+            throw;
+        }
+    }
+    const auto transform = glm::translate(glm::mat4{1}, glm::vec3{tower->position}) *
+                           glm::mat4_cast(glm::quat{tower->rotation}) *
+                           glm::scale(glm::mat4{1}, glm::vec3{tower->visualScale});
+    engine_.setTransform(*towerPreview_, transform);
+    const bool valid = runtime_.placementError().empty();
+    const glm::vec4 tint = valid ? glm::vec4{0.65F, 1, 0.7F, 0.7F} : glm::vec4{1, 0.25F, 0.2F, 0.7F};
+    engine_.setTint(*towerPreview_, tint);
+    if (towerDefenderPreview_) {
+        const auto offset = glm::vec3{definition.operatorOffset} - towerDefenderFoot_ * towerDefenderScale_;
+        const auto defender =
+            transform * glm::translate(glm::mat4{1}, offset) * glm::scale(glm::mat4{1}, glm::vec3{towerDefenderScale_});
+        engine_.setTransform(*towerDefenderPreview_, defender);
+        engine_.setTint(*towerDefenderPreview_, tint);
+    }
 }
 
 void GameHud::clearSelectionMarker() {
@@ -860,7 +931,8 @@ void GameHud::heroMovementOverlay(const Camera& camera) {
             visual.update(mesh,
                           hero->position,
                           *path,
-                          hero->avoidanceEnemy ? std::optional{hero->avoidancePoint} : std::nullopt);
+                          hero->avoidanceEnemy || hero->avoidanceHero ? std::optional{hero->avoidancePoint}
+                                                                      : std::nullopt);
             for (const auto& dash : visual.dashes()) {
                 line(dash.from, dash.to, 0.075, IM_COL32(255, 215, 40, 230));
             }
@@ -1070,39 +1142,26 @@ void GameHud::placementOverlay(const Camera& camera) {
         const auto level = runtime_.preview() ? 1 : towers.progress(rangeTower->object).level;
         const auto range = towers.definition(rangeTower->type).statistics(level).attackRange;
         const bool flashing = upgradedTower_ == rangeTower->object && upgradeFlashRemaining_ > 0;
-        const auto color = flashing ? IM_COL32(235, 195, 85, 130) : IM_COL32(115, 205, 200, 75);
+        const bool valid = !runtime_.preview() || runtime_.placementError().empty();
+        const auto color = valid ? IM_COL32(255, 218, 70, 245) : IM_COL32(255, 85, 65, 245);
+        const auto fill = valid ? IM_COL32(255, 218, 70, flashing ? 36 : 18) : IM_COL32(255, 85, 65, 18);
         const auto center = rangeTower->position - glm::dvec3{0, rangeTower->halfExtent.y - 0.025, 0};
         constexpr int segments = 80;
         for (int index = 0; index < segments; ++index) {
             const double a = glm::two_pi<double>() * index / segments;
             const double b = glm::two_pi<double>() * (index + 1) / segments;
             const glm::dvec3 first{std::cos(a), 0, std::sin(a)}, second{std::cos(b), 0, std::sin(b)};
-            const std::array<glm::dvec3, 4> vertices{center + first * range,
-                                                     center + second * range,
-                                                     center + second * (range - 0.035),
-                                                     center + first * (range - 0.035)};
-            polygon(vertices, color, false);
-        }
-    }
-    if (const auto& tower = runtime_.preview()) {
-        std::array<glm::dvec3, 8> corners;
-        for (int i = 0; i < 8; ++i) {
-            const glm::dvec3 local{(i & 1 ? 1 : -1) * tower->halfExtent.x,
-                                   (i & 2 ? 1 : -1) * tower->halfExtent.y,
-                                   (i & 4 ? 1 : -1) * tower->halfExtent.z};
-            corners[i] = tower->position + tower->rotation * local;
-        }
-        constexpr std::array<std::array<int, 4>, 6> faces{
-            {{0, 1, 5, 4}, {2, 6, 7, 3}, {0, 2, 3, 1}, {4, 5, 7, 6}, {0, 4, 6, 2}, {1, 3, 7, 5}}};
-        const bool valid = runtime_.placementError().empty();
-        const int alpha = 45 + static_cast<int>(10 * (0.5 + 0.5 * std::sin(ImGui::GetTime() * 4)));
-        const auto color = valid ? IM_COL32(92, 216, 171, alpha) : IM_COL32(235, 100, 91, alpha);
-        for (const auto& face : faces) {
-            const std::array<glm::dvec3, 4> vertices{corners[face[0]],
-                                                     corners[face[1]],
-                                                     corners[face[2]],
-                                                     corners[face[3]]};
-            polygon(vertices, color);
+            const std::array<glm::dvec3, 3> area{center, center + first * range, center + second * range};
+            polygon(area, fill, false);
+            const auto band = [&](double outer, double inner, ImU32 tint) {
+                const std::array<glm::dvec3, 4> vertices{center + first * outer,
+                                                         center + second * outer,
+                                                         center + second * inner,
+                                                         center + first * inner};
+                polygon(vertices, tint, false);
+            };
+            band(range + 0.045, range - 0.16, IM_COL32(24, 22, 14, 220));
+            band(range, range - 0.11, color);
         }
     }
 }

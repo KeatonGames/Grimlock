@@ -16,6 +16,8 @@ double distance(glm::dvec3 first, glm::dvec3 second) {
 } // namespace
 
 void HeroCombatSystem::stop(Hero& hero) {
+    hero.avoidanceEnemy.reset();
+    hero.avoidanceHero.reset();
     hero.destination.reset();
     hero.path.valid = false;
     hero.speed = hero.stuckTime = 0;
@@ -260,6 +262,7 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         hero.destination = hero.path.destination;
         hero.state = HeroState::moving;
         hero.stuckTime = 0;
+        hero.progressRemaining = std::numeric_limits<double>::max();
     }
 }
 

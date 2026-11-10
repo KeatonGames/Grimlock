@@ -64,6 +64,14 @@ rcConfig buildConfiguration(const NavigationGeometry& geometry, const NavMeshCon
                   "Invalid solid geometry bounds");
         }
     }
+    for (const auto& volume : geometry.solidVolumes) {
+        check(volume.footprint.size() >= 3 && volume.footprint.size() <= 65535 && std::isfinite(volume.minimumHeight) &&
+                  std::isfinite(volume.maximumHeight) && volume.minimumHeight <= volume.maximumHeight,
+              "Invalid solid navigation volume");
+        for (const auto point : volume.footprint) {
+            check(finite(point), "Invalid solid navigation footprint");
+        }
+    }
 
     rcConfig config{};
     config.cs = settings.cellSize;
@@ -110,6 +118,7 @@ void NavMesh::replaceWith(NavMesh&& candidate) noexcept {
     statistics_ = candidate.statistics_;
     status_ = std::move(candidate.status_);
     triangles_ = std::move(candidate.triangles_);
+    connections_ = std::move(candidate.connections_);
     ++revision_;
 }
 
@@ -120,6 +129,7 @@ bool NavMesh::ready() const noexcept {
 void NavMesh::reset() {
     data_.reset();
     triangles_.clear();
+    connections_.clear();
     statistics_ = {};
     status_ = "No navigation geometry";
     ++revision_;
@@ -182,6 +192,15 @@ bool NavMesh::build(const NavigationGeometry& geometry, NavMeshConfiguration con
         // floor spans inside that volume; they must not become walkable rooms.
         for (const auto& box : geometry.solidBoxes) {
             rcMarkBoxArea(&context, &box[0].x, &box[1].x, RC_NULL_AREA, *compact);
+        }
+        for (const auto& volume : geometry.solidVolumes) {
+            rcMarkConvexPolyArea(&context,
+                                 &volume.footprint.front().x,
+                                 static_cast<int>(volume.footprint.size()),
+                                 volume.minimumHeight,
+                                 volume.maximumHeight,
+                                 RC_NULL_AREA,
+                                 *compact);
         }
         check(rcErodeWalkableArea(&context, config.walkableRadius, *compact), "Cannot erode agent clearance");
         check(rcBuildDistanceField(&context, *compact) && rcBuildRegions(&context, *compact, 0, 0, 0),
@@ -247,9 +266,29 @@ bool NavMesh::build(const NavigationGeometry& geometry, NavMeshConfiguration con
             }
         }
         status_ = "Ready";
+        const auto* tile = static_cast<const dtNavMesh&>(*data_->mesh).getTile(0);
+        const auto center = [&](int index) {
+            const auto& poly = tile->polys[index];
+            glm::vec3 point{0};
+            for (int vertex = 0; vertex < poly.vertCount; ++vertex) {
+                const auto* p = tile->verts + poly.verts[vertex] * 3;
+                point += glm::vec3{p[0], p[1], p[2]};
+            }
+            return point / static_cast<float>(poly.vertCount) + glm::vec3{0, 0.06F, 0};
+        };
+        for (int index = 0; index < tile->header->polyCount; ++index) {
+            const auto& poly = tile->polys[index];
+            for (int edge = 0; edge < poly.vertCount; ++edge) {
+                const auto neighbor = poly.neis[edge];
+                if (neighbor && !(neighbor & DT_EXT_LINK) && neighbor - 1 > index) {
+                    connections_.push_back({center(index), center(neighbor - 1)});
+                }
+            }
+        }
     } catch (const std::exception& error) {
         data_.reset();
         triangles_.clear();
+        connections_.clear();
         status_ = error.what();
     }
     statistics_.buildMilliseconds =
@@ -356,10 +395,15 @@ std::optional<glm::dvec3> NavMesh::steering(glm::dvec3 position, NavigationPath&
         }
         return path.destination;
     }
-    const auto current = std::find(path.polygons.begin(), path.polygons.end(), from->polygon);
+    auto current = std::find(path.polygons.begin(), path.polygons.end(), from->polygon);
     if (current == path.polygons.end()) {
-        path.valid = false;
-        return {};
+        // Local wall sliding or crowd avoidance can enter a neighboring polygon outside the
+        // cached corridor. Repair it immediately while the position is still on valid terrain.
+        const auto destination = path.destination;
+        if (!findPath(position, destination, path)) {
+            return {};
+        }
+        current = path.polygons.begin();
     }
     path.polygons.erase(path.polygons.begin(), current);
     std::array<float, maximumPath * 3> points{};
@@ -390,7 +434,11 @@ std::optional<glm::dvec3> NavMesh::steering(glm::dvec3 position, NavigationPath&
     // Anticipate a nearby funnel corner. Surface-constrained movement still
     // clips against the boundary; exact floating-point corner hits are not required.
     const glm::dvec3 first{points[3], points[4], points[5]};
-    const int index = count > 2 && horizontalDistance(position, first) < configuration_.agentRadius * 0.75 ? 2 : 1;
+    const glm::dvec3 second = count > 2 ? glm::dvec3{points[6], points[7], points[8]} : first;
+    const int index = count > 2 && horizontalDistance(position, first) < configuration_.agentRadius * 0.75 &&
+                              visibleFrom(*from, second)
+                          ? 2
+                          : 1;
     return glm::dvec3{points[index * 3], points[index * 3 + 1], points[index * 3 + 2]};
 }
 

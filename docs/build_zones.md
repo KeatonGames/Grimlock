@@ -22,6 +22,10 @@ or delete zones. **Construction Offset (metres)** sets the tower's foot position
 relative to the zone's rotated frame; **Construction Facing (degrees)** sets its
 additional yaw. Offsets do not scale with zone dimensions when using these controls.
 The default construction point is the rectangle's center, facing along its yaw.
+Each level authors this hidden facing toward its main enemy traffic lane. Placement previews and completed
+towers inherit it automatically. Both tower models use local +Z as their construction front; the Archer's
+balcony and defender are aligned to that front. Changing construction facing does not rotate the square ground
+marker or add an orientation arrow. Defenders continue turning toward individual targets during combat.
 Set the zone's Y to the supporting terrain elevation. Elevated points use the same
 terrain support, collision, and Recast route checks as ground-level points.
 

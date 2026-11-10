@@ -22,8 +22,8 @@ levels retain their original combat statistics and targeting behavior.
 
 | Type ID | Display name | Cost | Damage/hit | Range | Shots/sec | Projectile speed | Projectile radius |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `basic` | Small Tower | 30 | 25 | 3.5 | 1.5 | 9 | 0.06 |
-| `wide` | Large Tower | 60 | 55 | 4.2 | 1 | 12 | 0.10 |
+| `basic` | Archer Tower | 10 | 25 | 3.5 | 1.5 | 9 | 0.06 |
+| `wide` | Mage Tower | 15 | 55 | 4.2 | 1 | 12 | 0.10 |
 
 Each type stores `construction_cost`, `projectile_speed`, `projectile_radius`, and
 RGBA `projectile_tint`. Its ordered `levels` entries hold `damage`, `attack_range`,
@@ -34,15 +34,22 @@ Ranges use 3D world distance between terrain-level entity anchors. Visibility an
 projectile sweeps run from the firing point to the target's physical body center.
 Existing `half_extent`, `visual_scale`, model paths and scene role IDs are independent
 of these statistics. Old catalogs without combat fields receive compatible defaults.
-`maximum_health` is 250 for Small Towers and 500 for Large Towers, independent of
+`maximum_health` is 250 for Archer Towers and 500 for Mage Towers, independent of
 their combat levels/physical footprints. Upgrades do not heal towers. Runtime damage
 is not saved into the authored scene, and restarting restores initial health.
+Tower projectile models and visual scales are configured separately from collision radii. Archer arrows retain
+their white trails; Mage fireballs use the existing magic damage channel, with a rotating purple flame mesh.
+`firing_height` and the defender's horizontal offset place shots beside the raised character, while range still
+uses the terrain-level tower anchor. See [tower visuals](towers.md) for model/animation ownership.
 Rebuild to stage asset changes, or launch with an absolute source level path as
 described in [runtime applications](runtime.md).
 
 Enemy `maximum_health` belongs in `game/assets/config/animals.json` and defaults to
 100 for existing definitions. Each spawn copies it into maximum/current health.
-Enemy deaths grant no gold; the existing fixed wave rewards remain unchanged.
+Goblin and Goblin Boss kills each grant 2 coins immediately. Level 1 starts with 20 coins and grants no wave bonuses.
+The enemy catalog's nonnegative integer `kill_reward` defaults to zero for other archetypes. Only permanent
+deaths increment the payout ledger; nonlethal hits, resurrection transitions and duplicate damage do not pay.
+Tower, hero and projectile kills use the same death path, and level restart clears the wallet and payout ledger.
 
 Each animal's `combat` object defines explicit `damage`, `range`, `attack_interval`,
 `impact_time`, `aggression_range`, `pursuit_range`, `attack_animation`, and integer

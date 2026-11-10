@@ -34,8 +34,13 @@ function Add-Fence($position, [double]$yaw = 0, [double]$length = 3) {
     $null = Add-Object 'Low timber boundary fence' 'environment/platformer/fence-low-straight.glb' $position @(
         $length,2,1.3) $yaw -parent '3'
 }
-function Add-Zone([string]$name, $position, [string]$id) {
+function Add-Zone([string]$name, $position, [string]$id, $lane) {
     $null = Add-Object $name '' $position @(1.3,1,1.3) 0 'grimlock.build_zone' -id $id
+    $anchor = [string]([int]$id * 10 + 1)
+    $point = [string]([int]$id * 10 + 2)
+    $yaw = [Math]::Atan2(($lane[0]-$position[0]),($lane[1]-$position[2])) * 180 / [Math]::PI
+    $null = Add-Object 'Construction anchor' '' @(0,0,0) @((1/1.3),1,(1/1.3)) 0 'grimlock.construction_anchor' $id -id $anchor
+    $null = Add-Object 'Construction point' '' @(0,0,0) @(1,1,1) $yaw 'grimlock.construction_point' $anchor -id $point
 }
 
 $null = Add-Object 'Reference layout terrain' '' @(0,0,0) -id '1'
@@ -74,10 +79,10 @@ foreach ($z in @(-1.85,1.85)) {
         3.5,0.12,0.1) 0 -parent '2' -tint @(0.66,0.34,0.13,1)
 }
 
-Add-Zone 'Entrance meadow construction point' @(-5.5,0,-4.6) '108'
-Add-Zone 'Raised western garden construction point' @(-7,1,4.6) '109'
-Add-Zone 'Eastern meadow construction point' @(7.5,0,-2.4) '110'
-Add-Zone 'Mausoleum terrace construction point' @(5.8,2,10.8) '111'
+Add-Zone 'Entrance meadow construction point' @(-5.5,0,-4.6) '108' @(-5,-1.5)
+Add-Zone 'Raised western garden construction point' @(-7,1,4.6) '109' @(-3,0)
+Add-Zone 'Eastern meadow construction point' @(7.5,0,-2.4) '110' @(5,0.5)
+Add-Zone 'Mausoleum terrace construction point' @(5.8,2,10.8) '111' @(7,7.5)
 
 # Portal opens toward the route; its glow is scenery and does not alter spawning.
 foreach ($z in @(-4.9,-2.5)) {

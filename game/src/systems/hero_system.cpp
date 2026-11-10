@@ -35,6 +35,7 @@ std::optional<std::size_t> clip(const ModelInfo& model, const std::string& reque
 
 void stop(Hero& hero, HeroState state) {
     hero.avoidanceEnemy.reset();
+    hero.avoidanceHero.reset();
     hero.state = state;
     hero.speed = hero.stuckTime = 0;
     hero.destination.reset();
@@ -132,8 +133,9 @@ void HeroSystem::synchronize(const TowerSystem& towers) {
     }
     auto geometry = levelGeometry_.navigation();
     for (const auto& tower : towers.towers()) {
-        const auto box = tower.bounds();
-        geometry.addBox(box.center - box.halfExtent, box.center + box.halfExtent, false);
+        glm::mat4 transform{glm::mat4_cast(tower.rotation)};
+        transform[3] = glm::vec4{tower.position, 1};
+        geometry.addBox(-glm::vec3{tower.halfExtent}, glm::vec3{tower.halfExtent}, transform);
     }
     for (auto& type : types_) {
         NavMeshConfiguration config;
@@ -283,6 +285,11 @@ bool HeroSystem::command(HeroId id, glm::dvec3 destination) {
     hero->defensivePosition = *hero->destination;
     hero->state = HeroState::moving;
     hero->stuckTime = 0;
+    hero->progressRemaining = std::numeric_limits<double>::max();
+    hero->recoveryAttempts = 0;
+    hero->blockage = MovementBlockage::none;
+    hero->avoidanceEnemy.reset();
+    hero->avoidanceHero.reset();
     return true;
 }
 
@@ -343,6 +350,11 @@ bool HeroSystem::navigate(Hero& hero, glm::dvec3 destination) {
     hero.destination = hero.path.destination;
     hero.state = HeroState::moving;
     hero.stuckTime = 0;
+    hero.progressRemaining = std::numeric_limits<double>::max();
+    hero.recoveryAttempts = 0;
+    hero.blockage = MovementBlockage::none;
+    hero.avoidanceEnemy.reset();
+    hero.avoidanceHero.reset();
     return true;
 }
 
@@ -364,6 +376,7 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
         target = mesh.steering(hero.position, hero.path, &remaining);
     }
     if (!target) {
+        hero.blockage = MovementBlockage::navigation;
         stop(hero, HeroState::blocked);
         return;
     }
@@ -385,44 +398,70 @@ void HeroSystem::step(Hero& hero, double delta, std::span<const Enemy> enemies) 
                             hero.speed + config.acceleration * delta);
     auto displacement = direction * std::min({remaining, distance, hero.speed * delta});
     auto next = hero.position;
+    bool contactedUnit = false;
     for (int contact = 0; contact < 4 && glm::length(displacement) > 1e-10; ++contact) {
         const auto surface = mesh.move(next, displacement);
         displacement = {surface.x - next.x, surface.z - next.z};
-        const Enemy* neighbor = nullptr;
+        std::optional<glm::dvec3> neighbor;
         double fraction = 1;
+        const auto collide = [&](glm::dvec3 position, double radius, double height) {
+            if (next.y >= position.y + height || position.y >= next.y + config.height) {
+                return;
+            }
+            const double t =
+                contactFraction({next.x - position.x, next.z - position.z}, displacement, config.radius + radius);
+            if (t < fraction) {
+                fraction = t;
+                neighbor = position;
+            }
+        };
         for (const auto& enemy : enemies) {
             if (!enemy.active || !enemy.alive || enemy.intangible ||
                 (next.y >= enemy.position.y + enemy.height || enemy.position.y >= next.y + config.height)) {
                 continue;
             }
-            const double t = contactFraction({next.x - enemy.position.x, next.z - enemy.position.z},
-                                             displacement,
-                                             config.radius + enemy.radius);
-            if (t < fraction) {
-                fraction = t;
-                neighbor = &enemy;
+            collide(enemy.position, enemy.radius, enemy.height);
+        }
+        for (const auto& other : heroes_) {
+            if (other.id != hero.id && other.health > 0) {
+                collide(other.position, definition(other).radius, definition(other).height);
             }
         }
         next = mesh.move(next, displacement * fraction);
         if (!neighbor) {
             break;
         }
-        const glm::dvec2 contactOffset{next.x - neighbor->position.x, next.z - neighbor->position.z};
+        contactedUnit = true;
+        const glm::dvec2 contactOffset{next.x - neighbor->x, next.z - neighbor->z};
         const auto normal = glm::length(contactOffset) > 1e-8 ? glm::normalize(contactOffset) : glm::dvec2{1, 0};
         displacement *= 1 - fraction;
         displacement -= normal * std::min(0.0, glm::dot(displacement, normal));
     }
-    const double traveled = glm::length(next - hero.position);
-    hero.stuckTime = traveled < 1e-6 ? hero.stuckTime + delta : 0;
+    const auto actual = next - hero.position;
+    const double traveled = glm::length(actual);
+    if (remaining < hero.progressRemaining - config.radius * 0.25) {
+        hero.progressRemaining = remaining;
+        hero.stuckTime = 0;
+    } else {
+        hero.stuckTime += delta;
+    }
+    hero.position = next;
     if (hero.stuckTime > 1) {
-        stop(hero, HeroState::blocked);
+        hero.blockage = contactedUnit ? MovementBlockage::crowd : MovementBlockage::noProgress;
+        hero.avoidanceEnemy.reset();
+        hero.avoidanceHero.reset();
+        hero.stuckTime = 0;
+        hero.progressRemaining = std::numeric_limits<double>::max();
+        ++hero.recoveryAttempts;
+        if (hero.recoveryAttempts > 3 || !mesh.findPath(hero.position, *hero.destination, hero.path)) {
+            stop(hero, HeroState::blocked);
+        }
         return;
     }
     if (traveled > 1e-6) {
-        const auto yaw = std::atan2(next.x - hero.position.x, next.z - hero.position.z);
+        const auto yaw = std::atan2(actual.x, actual.z);
         hero.yaw += std::remainder(yaw - hero.yaw, 2 * std::acos(-1.0)) * (1 - std::exp(-config.turningSpeed * delta));
     }
-    hero.position = next;
 }
 
 glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::span<const Enemy> enemies) const {
@@ -431,15 +470,19 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     const auto horizontal = [](glm::dvec3 value) {
         return glm::dvec2{value.x, value.z};
     };
-    if (hero.avoidanceEnemy) {
+    if (hero.avoidanceEnemy || hero.avoidanceHero) {
         const auto found = std::find_if(enemies.begin(), enemies.end(), [&](const Enemy& enemy) {
-            return enemy.id == *hero.avoidanceEnemy && enemy.alive && enemy.active && !enemy.intangible;
+            return hero.avoidanceEnemy && enemy.id == *hero.avoidanceEnemy && enemy.alive && enemy.active &&
+                   !enemy.intangible;
         });
-        if (found != enemies.end() && glm::length(horizontal(hero.avoidancePoint - hero.position)) > 0.12 &&
+        const auto* other = hero.avoidanceHero ? find(*hero.avoidanceHero) : nullptr;
+        if ((found != enemies.end() || (other && other->health > 0)) &&
+            glm::length(horizontal(hero.avoidancePoint - hero.position)) > 0.12 &&
             mesh.visible(hero.position, hero.avoidancePoint)) {
             return hero.avoidancePoint;
         }
         hero.avoidanceEnemy.reset();
+        hero.avoidanceHero.reset();
     }
     const auto offset = horizontal(target - hero.position);
     const double distance = glm::length(offset);
@@ -448,7 +491,8 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     }
     const auto forward = offset / distance;
     const glm::dvec2 side{-forward.y, forward.x};
-    const Enemy* obstacle = nullptr;
+    std::optional<MovementBody> obstacle;
+    std::optional<HeroId> obstacleHero;
     double nearest = distance;
     for (const auto& enemy : enemies) {
         if (!enemy.alive || !enemy.active || enemy.intangible ||
@@ -461,7 +505,23 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
         const double clearance = config.radius + enemy.radius + 0.1;
         if (along > 0 && along < nearest && along < clearance + config.speed * 0.35 &&
             std::abs(glm::dot(relative, side)) < clearance) {
-            obstacle = &enemy;
+            obstacle = MovementBody{enemy.position, enemy.radius, enemy.height, enemy.id};
+            nearest = along;
+        }
+    }
+    for (const auto& other : heroes_) {
+        if (other.id == hero.id || other.health <= 0 ||
+            hero.position.y >= other.position.y + definition(other).height ||
+            other.position.y >= hero.position.y + config.height) {
+            continue;
+        }
+        const auto relative = horizontal(other.position - hero.position);
+        const double along = glm::dot(relative, forward);
+        const double clearance = config.radius + definition(other).radius + 0.1;
+        if (along > 0 && along < nearest && along < clearance + config.speed * 0.35 &&
+            std::abs(glm::dot(relative, side)) < clearance) {
+            obstacle = MovementBody{other.position, definition(other).radius, definition(other).height, other.id};
+            obstacleHero = other.id;
             nearest = along;
         }
     }
@@ -487,7 +547,8 @@ glm::dvec3 HeroSystem::steerAroundEnemies(Hero& hero, glm::dvec3 target, std::sp
     if (!best) {
         return target;
     }
-    hero.avoidanceEnemy = obstacle->id;
+    hero.avoidanceEnemy = obstacleHero ? std::nullopt : std::optional{obstacle->id};
+    hero.avoidanceHero = obstacleHero;
     hero.avoidancePoint = *best;
     return *best;
 }

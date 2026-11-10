@@ -44,6 +44,63 @@ void verifyAssets(const std::filesystem::path& root) {
     std::cout << "PASS all " << count << " Platformer Kit environment assets imported.\n";
 }
 
+void traversal(Engine& engine) {
+    // Exercise the shipped GLB terrain rather than a simplified replacement ramp.
+    for (int reload = 0; reload < 2; ++reload) {
+        LevelRuntime runtime;
+        runtime.load(engine, "assets/levels/forest_defense.json");
+        auto& navigation = runtime.navigation();
+        HeroSystem heroes{engine};
+        heroes.synchronize(navigation.towers());
+        const glm::dvec3 start{5.5, 0, -4.6};
+        for (std::size_t type = 0; type < heroes.typeCount(); ++type) {
+            for (const int fps : {15, 60, 144}) {
+                const auto id = heroes.deploy(start, {}, type);
+                for (const auto goal : {glm::dvec3{7, 1, 4.6}, start, glm::dvec3{-8.5, 2, 10.8}, start}) {
+                    require(heroes.command(id, goal), "Forest hero ramp command rejected");
+                    for (int frame = 0; frame < fps * 40 && heroes.find(id)->state == HeroState::moving; ++frame) {
+                        const auto before = heroes.find(id)->position;
+                        heroes.update(1.0 / fps, true);
+                        const auto* hero = heroes.find(id);
+                        require(heroes.navigation(type).contains(hero->position), "Hero left a ramp or bridge surface");
+                        require(std::abs(hero->position.y - before.y) < heroes.definition(type).speed / fps + 0.2,
+                                "Hero snapped between terrain elevations");
+                    }
+                    require(heroes.find(id)->state == HeroState::reached,
+                            "Forest hero failed to traverse a ramp/bridge in both directions at " +
+                                std::to_string(fps) + " FPS");
+                }
+                require(heroes.remove(id), "Traversal hero cleanup failed");
+            }
+        }
+        auto& enemies = *navigation.enemies();
+        for (const int fps : {15, 60, 144}) {
+            navigation.reset(engine);
+            navigation.setDestination(glm::dvec2{-8.5, 10.8});
+            navigation.setDestinationHeight(2);
+            for (const std::string name : {"Goblin", "Skeleton", "Goblin Boss"}) {
+                EnemyTypeId type = 0;
+                while (type < enemies.typeCount() && enemies.definition(type).name != name) {
+                    ++type;
+                }
+                require(type < enemies.typeCount(), "Traversal enemy archetype missing");
+                require(navigation.spawnAt(engine, type, {{3, -5}, {10, -1}, 0}, 12) == 12,
+                        "Mixed traversal group did not fit on entrance terrain");
+            }
+            for (int frame = 0; frame < fps * 120 && !enemies.enemies().empty(); ++frame) {
+                navigation.update(engine, 1.0 / fps);
+                for (const auto& enemy : enemies.enemies()) {
+                    require(enemy.navigation->contains(enemy.position), "Mixed crowd left its own terrain profile");
+                }
+            }
+            require(enemies.enemies().empty() && enemies.metrics().arrived == 36,
+                    "Mixed Goblin/Skeleton/boss crowd stuck on the Forest ramps or bridge");
+        }
+        heroes.clear();
+        runtime.unload(engine);
+    }
+}
+
 void terrain(Engine& engine) {
     LevelRuntime runtime;
     runtime.load(engine, "assets/levels/forest_defense.json");
@@ -69,6 +126,19 @@ void terrain(Engine& engine) {
             "Forest is missing from Game discovery");
     auto& navigation = runtime.navigation();
     require(navigation.placement().zones().size() == 4, "Forest construction zones missing");
+    const std::array<glm::dvec2, 4> lanes{{{5, -1.5}, {3, 0}, {-5, 0.5}, {-7, 7.5}}};
+    for (std::size_t index = 0; index < lanes.size(); ++index) {
+        const auto& zone = navigation.placement().zones()[index];
+        require(zone.object == 108 + index && zone.constructionObject != 0,
+                "Forest zone is missing its authored construction facing");
+        const auto foot = zone.constructionPosition();
+        const auto expected = glm::normalize(glm::dvec3{lanes[index].x - foot.x, 0, lanes[index].y - foot.z});
+        for (const auto* type : {"basic", "wide"}) {
+            const auto tower = zone.snap(navigation.towers().definition(type).instance());
+            require(glm::dot(tower.rotation * glm::dvec3{0, 0, 1}, expected) > 0.9999,
+                    "Tower does not face the zone's level-specific enemy lane");
+        }
+    }
     NavigationPath path;
     require(navigation.navigation().findPath({10, 0, -3.5}, {-8.5, 2, 10.8}, path),
             "Forest spawn cannot reach hill objective");
@@ -108,7 +178,7 @@ void terrain(Engine& engine) {
     require(std::abs(runtime.preview()->position.y - runtime.preview()->halfExtent.y - 2) < 1e-5,
             "Tower foundation ignored hill elevation");
     runtime.updatePlacement(engine, hill, true);
-    require(navigation.towers().towers().size() == 1 && runtime.level().economy().gold() == 60,
+    require(navigation.towers().towers().size() == 1 && runtime.level().economy().gold() == 5,
             "Game hill placement did not commit tower/cost");
     require(engine.update(), "Forest rendering failed");
     std::set<std::filesystem::path> referenced;
@@ -177,10 +247,12 @@ void play(Engine& engine, bool defended) {
     auto& navigation = runtime.navigation();
     auto& heroes = *runtime.heroes();
 
-    ObjectId lastStand = 0, center = 0;
+    ObjectId lastStand = 0;
     const auto build = [&](const char* type, glm::dvec3 ground) {
         auto tower = navigation.towers().definition(type).instance();
-        tower.position = ground + glm::dvec3{0, tower.halfExtent.y, 0};
+        const auto* zone = navigation.placement().zoneAt(ground);
+        require(zone != nullptr, "Forest strategy has no construction point");
+        tower = zone->snap(tower);
         require(heroes.towerError(tower).empty(), "Forest strategy overlaps a hero");
         const auto error = navigation.checkTower(engine, tower, false);
         require(error.empty(),
@@ -190,7 +262,6 @@ void play(Engine& engine, bool defended) {
     };
     if (defended) {
         (void)build("basic", {5.5, 0, -4.6});
-        center = build("wide", {-7.5, 0, -2.4});
         lastStand = build("basic", {-5.8, 2, 10.8});
     }
 
@@ -198,13 +269,17 @@ void play(Engine& engine, bool defended) {
     std::optional<EnemyId> boss;
     while (session.waves()->phase() == LevelPhase::preparation) {
         const auto wave = session.waves()->wave();
-        if (defended && wave > 0) {
-            const auto tower = wave == 1 || wave == 3 ? lastStand : center;
+        if (defended && wave == 1) {
+            (void)build("basic", {-7.5, 0, -2.4});
+        }
+        if (defended && wave >= 3) {
+            const auto tower = lastStand;
             if (navigation.towers().contains(tower) && session.upgradeError(navigation, tower).empty()) {
                 session.upgradeTower(engine, navigation, tower);
             }
         }
         const auto gold = session.economy().gold();
+        const auto killGold = navigation.enemies()->metrics().killGold;
         runtime.startWave();
         double time = 0;
         while (session.waves()->phase() == LevelPhase::battle && time < 180) {
@@ -247,11 +322,11 @@ void play(Engine& engine, bool defended) {
             }
         }
         require(session.waves()->phase() != LevelPhase::battle, "Forest wave failed to finish");
-        const auto reward =
-            session.waves()->phase() == LevelPhase::defeat ? 0 : session.waves()->definition().waves[wave].goldReward;
-        require(session.economy().gold() == gold + reward, "Forest wave reward changed or repeated");
+        require(session.waves()->definition().waves[wave].goldReward == 0, "Forest still awards wave bonuses");
+        const auto earned = navigation.enemies()->metrics().killGold - killGold;
+        require(session.economy().gold() == gold + earned, "Forest wave or kill rewards are incorrect");
         runtime.update(engine, 0);
-        require(session.economy().gold() == gold + reward, "Forest reward was granted twice");
+        require(session.economy().gold() == gold + earned, "Forest reward was granted twice");
     }
     require(session.waves()->phase() == (defended ? LevelPhase::victory : LevelPhase::defeat),
             "Forest does not distinguish defended and undefended strategies");
@@ -260,6 +335,8 @@ void play(Engine& engine, bool defended) {
                 "Final forest boss or its health bar was not exercised");
         require(navigation.enemies()->metrics().defeated + navigation.enemies()->metrics().arrived == 45,
                 "Forest skipped scheduled enemies");
+        require(navigation.enemies()->metrics().killGold == 90,
+                "The 45 Goblins, including the boss, did not each award two coins");
     }
     const auto levelId = session.waves()->definition().id;
     PlayerProgress saved{progressPath};
@@ -268,7 +345,7 @@ void play(Engine& engine, bool defended) {
                 record->completed == defended && saved.lastPlayed() == levelId,
             "Forest results did not persist through the shared progression system");
     runtime.restart(engine);
-    require(session.waves()->phase() == LevelPhase::preparation && session.economy().gold() == 120 &&
+    require(session.waves()->phase() == LevelPhase::preparation && session.economy().gold() == 20 &&
                 navigation.towers().towers().empty() && runtime.heroes()->heroes().empty(),
             "Forest restart retained runtime state");
     runtime.unload(engine);
@@ -294,6 +371,7 @@ int main(int argc, char** argv) {
         terrain(engine);
         play(engine, true);
         play(engine, false);
+        traversal(engine);
         std::cout << "PASS Forest Defense assets, navigation, elevation, placement, five waves, boss, editor and "
                      "lifecycle.\n";
         return 0;

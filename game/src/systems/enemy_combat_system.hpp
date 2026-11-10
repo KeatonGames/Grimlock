@@ -44,6 +44,7 @@ private:
     static int priority(const EnemyCombatDefinition& definition, DefensiveTargetKind kind);
     static void release(EnemySystem& enemies, Enemy& enemy, bool rejected);
     std::vector<Target> targets_;
+    std::vector<MovementBody> movementBodies_;
     std::vector<EnemyId> arrivals_;
     std::vector<std::pair<double, std::size_t>> candidates_;
     NavigationPath approachPath_;

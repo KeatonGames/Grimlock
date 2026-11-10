@@ -103,6 +103,14 @@ void NavigationDebug::menu(Engine& engine) {
     ImGui::Separator();
     ImGui::TextUnformatted("NavMesh");
     ImGui::Checkbox("Show NavMesh", &showNavMesh_);
+    if (ImGui::BeginMenu("Movement Debug")) {
+        ImGui::Checkbox("Show Unit Collisions", &showCollisions_);
+        ImGui::Checkbox("Show Terrain / Obstacle Bounds", &showGeometry_);
+        ImGui::Checkbox("Show Walkable Connections", &showConnections_);
+        ImGui::Checkbox("Show Unit Paths", &showPaths_);
+        ImGui::Checkbox("Show Stuck Units", &showStuck_);
+        ImGui::EndMenu();
+    }
     ImGui::Checkbox("Show Combat Visibility", &showCombat_);
     if (ImGui::Checkbox("Show Performance", &showPerformance_)) {
         engine.setPerformanceEnabled(showPerformance_);
@@ -166,6 +174,7 @@ bool NavigationDebug::viewport(Engine& engine, const editor::ViewportInput& inpu
     const bool changed = std::exchange(sceneChanged_, false);
     session_.synchronize(engine);
     combatDebug(engine);
+    movementDebug(engine);
     if (showZones_ || placingTower_) {
         buildZoneMarkers_.synchronize(engine, session_.placement().zones());
     } else {
@@ -316,6 +325,104 @@ void NavigationDebug::combatDebug(Engine& engine) {
     }
 }
 
+void NavigationDebug::movementDebug(Engine& engine) {
+    const auto line = [&](glm::dvec3 a, glm::dvec3 b, glm::vec4 color) {
+        combatLines_.push_back({a, b, color});
+    };
+    const auto cylinder = [&](glm::dvec3 foot, double radius, double height, glm::vec4 color) {
+        for (int segment = 0; segment < 24; ++segment) {
+            const auto point = [&](int i, double y) {
+                const double angle = glm::radians(360.0) * i / 24;
+                return foot + glm::dvec3{std::cos(angle) * radius, y, std::sin(angle) * radius};
+            };
+            line(point(segment, 0.02), point(segment + 1, 0.02), color);
+            line(point(segment, height), point(segment + 1, height), color);
+            if (segment % 6 == 0) {
+                line(point(segment, 0.02), point(segment, height), color);
+            }
+        }
+    };
+    if (showConnections_) {
+        for (const auto& connection : session_.navigation().debugConnections()) {
+            line(connection[0], connection[1], {0.1F, 1, 0.8F, 0.9F});
+        }
+    }
+    if (showCollisions_ && engine.scene()) {
+        for (const auto& [id, object] : engine.scene()->objects()) {
+            if (object.role != "grimlock.hero" || !object.model || !engine.scene()->enabledInHierarchy(id)) {
+                continue;
+            }
+            if (debugHeroDefinitions_.empty()) {
+                debugHeroDefinitions_ = loadHeroDefinitions(engine.assetRoot());
+            }
+            for (const auto& definition : debugHeroDefinitions_) {
+                if (definition.model != *object.model) {
+                    continue;
+                }
+                const auto info = engine.modelInfo(engine.loadModel(engine.assetRoot() / *object.model));
+                const auto center = (info.minimum + info.maximum) * 0.5F;
+                const auto foot = engine.scene()->worldTransform(id) * glm::vec4{center.x, info.minimum.y, center.z, 1};
+                cylinder(foot, definition.radius, definition.height, {0.2F, 1, 0.4F, 0.9F});
+            }
+        }
+    }
+    if (session_.enemies()) {
+        for (const auto& enemy : session_.enemies()->enemies()) {
+            if (!enemy.active || !enemy.alive) {
+                continue;
+            }
+            if (showCollisions_) {
+                cylinder(enemy.position,
+                         enemy.radius,
+                         enemy.height,
+                         enemy.intangible ? glm::vec4{0.7F, 0.5F, 1, 0.8F} : glm::vec4{0.2F, 0.8F, 1, 0.8F});
+            }
+            if (showStuck_ && (enemy.state == EnemyState::blocked || enemy.stuckTime > 0.5)) {
+                cylinder(enemy.position, enemy.radius + 0.08, enemy.height + 0.2, {1, 0.15F, 0.1F, 1});
+            }
+            if (showPaths_ && enemy.navigation) {
+                const auto points = enemy.navigation->corners(enemy.position, enemy.path, true);
+                for (std::size_t i = 1; i < points.size(); ++i) {
+                    line(points[i - 1] + glm::vec3{0, 0.04F, 0},
+                         points[i] + glm::vec3{0, 0.04F, 0},
+                         {1, 0.85F, 0.1F, 1});
+                }
+                if (enemy.destination) {
+                    const glm::dvec3 goal{enemy.destination->x,
+                                          enemy.destinationHeight.value_or(enemy.position.y),
+                                          enemy.destination->y};
+                    line(goal, goal + glm::dvec3{0, 0.5, 0}, {1, 0.85F, 0.1F, 1});
+                }
+            }
+        }
+    }
+    if (showGeometry_) {
+        const auto& geometry = session_.collisionGeometry();
+        for (std::size_t i = 0; i < geometry.triangles.size(); i += 3) {
+            const auto vertex = [&](int corner) {
+                const auto index = static_cast<std::size_t>(geometry.triangles[i + corner]) * 3;
+                return glm::vec3{geometry.vertices[index], geometry.vertices[index + 1], geometry.vertices[index + 2]};
+            };
+            const auto color =
+                geometry.walkable[i / 3] ? glm::vec4{0.6F, 0.8F, 0.3F, 0.5F} : glm::vec4{1, 0.6F, 0.2F, 0.6F};
+            for (int edge = 0; edge < 3; ++edge) {
+                line(vertex(edge), vertex((edge + 1) % 3), color);
+            }
+        }
+        for (const auto& volume : geometry.solidVolumes) {
+            for (std::size_t i = 0; i < volume.footprint.size(); ++i) {
+                auto a = volume.footprint[i], b = volume.footprint[(i + 1) % volume.footprint.size()];
+                a.y = b.y = volume.minimumHeight;
+                line(a, b, {1, 0.25F, 0.1F, 0.8F});
+                auto topA = a, topB = b;
+                topA.y = topB.y = volume.maximumHeight;
+                line(topA, topB, {1, 0.25F, 0.1F, 0.8F});
+                line(a, topA, {1, 0.25F, 0.1F, 0.8F});
+            }
+        }
+    }
+}
+
 void NavigationDebug::enemyInspector(EnemySystem& enemies) {
     if (!ImGui::BeginMenu("Inspect Enemy", !enemies.enemies().empty())) {
         return;
@@ -347,6 +454,10 @@ void NavigationDebug::enemyInspector(EnemySystem& enemies) {
     }
     ImGui::Text("State: %s", enemyStateName(selected->state));
     ImGui::Text("Position: %.2f, %.2f, %.2f", selected->position.x, selected->position.y, selected->position.z);
+    ImGui::Text("Movement: %s | retries: %u | no progress: %.2f s",
+                movementBlockageName(selected->blockage),
+                selected->recoveryAttempts,
+                selected->stuckTime);
     auto destination = selected->destination.value_or(glm::dvec2{selected->position.x, selected->position.z});
     if (ImGui::InputScalarN("Enemy Destination X/Z",
                             ImGuiDataType_Double,

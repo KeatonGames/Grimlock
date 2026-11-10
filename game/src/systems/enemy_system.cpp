@@ -9,6 +9,7 @@
 #include <cmath>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -372,6 +373,9 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
         return true;
     }
 
+    if (configuration.killReward > std::numeric_limits<std::uint64_t>::max() - metrics_.killGold) {
+        throw std::overflow_error("Enemy kill rewards exceed the currency limit.");
+    }
     enemy.active = enemy.alive = false;
     enemy.velocity = enemy.desiredVelocity = {0, 0};
     enemy.path.valid = false;
@@ -404,6 +408,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
     deaths_.push_back({*enemy.instance, duration, !types_[enemy.type].definition.deathAnimation.empty()});
     enemy.instance.reset();
     ++metrics_.defeated;
+    metrics_.killGold += configuration.killReward;
     removeAt(index);
     return true;
 }
@@ -504,6 +509,7 @@ bool EnemySystem::remove(EnemyId id) noexcept {
 }
 
 void EnemySystem::clear() noexcept {
+    movement_.setObstacles({});
     while (!enemies_.empty()) {
         removeAt(enemies_.size() - 1);
     }

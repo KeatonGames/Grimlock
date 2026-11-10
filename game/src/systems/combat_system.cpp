@@ -34,7 +34,7 @@ void CombatSystem::update(TowerSystem& towers, EnemySystem& enemies, double delt
             const auto base = tower.position - glm::dvec3{0, tower.halfExtent.y, 0};
             const auto valid = [&](const Enemy& enemy) {
                 const auto offset = enemy.position - base;
-                return enemies.canDamage(enemy, DamageType::physical) &&
+                return enemies.canDamage(enemy, definition.damageType) &&
                        hostile(towers.team(tower.entity), enemies.team(enemy.id)) &&
                        glm::dot(offset, offset) <= statistics.attackRange * statistics.attackRange &&
                        !geometry->trace(origin, combatAim(enemy), definition.projectileRadius, tower.object);
@@ -78,6 +78,11 @@ void CombatSystem::update(TowerSystem& towers, EnemySystem& enemies, double delt
             attack.geometryRevision = geometry->revision();
             attack.enemyCount = enemies.enemies().size();
             attack.target = nearest ? std::optional{nearest->id} : std::nullopt;
+            towers.updateOperator(engine_,
+                                  tower.object,
+                                  nearest ? std::optional{combatAim(*nearest)} : std::nullopt,
+                                  attack.target && attack.cooldown <= 1e-10,
+                                  step);
             if (attack.target && attack.cooldown <= 1e-10) {
                 projectiles_.spawn(origin,
                                    *attack.target,

@@ -63,6 +63,9 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
         heroes_->shareCombatGeometry(navigation_.combatGeometry());
         heroes_->synchronize(navigation_.towers());
         spawnHeroesNearObjective();
+        for (const auto& [id, object] : engine.scene()->objects()) {
+            engine.scene()->setSelectionHighlight(id, false);
+        }
         levelPath_ = path;
         if (progress_) {
             progress_->startAttempt(level_.waves()->definition().id);
@@ -130,6 +133,7 @@ void LevelRuntime::update(Engine& engine, double delta) {
                                step,
                                level_.waves() && level_.waves()->phase() == LevelPhase::battle,
                                level_.waves() && level_.waves()->phase() == LevelPhase::preparation);
+            level_.collectKillRewards(*navigation_.enemies());
         }
         delta -= step;
         const auto current = level_.waves()->phase();
@@ -196,6 +200,7 @@ void LevelRuntime::selectObject(Engine& engine, const std::optional<Ray>& ray) {
         inspectedTower_ = navigation_.towers().entityForObject(*object);
     }
     if (selectedHero_ || inspectedTower_) {
+        engine.scene()->setSelectionHighlight(*object, false);
         engine.scene()->selectObject(object);
     } else {
         engine.clearSelection();
@@ -298,7 +303,8 @@ void LevelRuntime::updatePlacement(Engine& engine, const std::optional<Ray>& ray
     }
     if (confirm && placementError_.empty()) {
         try {
-            (void)level_.buildTower(engine, navigation_, *preview_);
+            const auto tower = level_.buildTower(engine, navigation_, *preview_);
+            engine.scene()->setSelectionHighlight(tower, false);
             rejectedError_.clear();
             placementError_ = navigation_.checkTower(engine, *preview_, false);
         } catch (const std::exception& error) {

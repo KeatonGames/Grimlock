@@ -71,9 +71,12 @@ Result play(Engine& engine, Strategy strategy) {
                 if (wave >= 3 && !fourth && session.economy().gold() >= 30) {
                     fourth = build("basic", {3.7, 0});
                 }
-                upgrade(first);
+                // Fortify the shared approach before the single-lane entrance tower;
+                // units now spread around defenders instead of stacking inside them.
                 upgrade(second);
                 upgrade(third);
+                upgrade(fourth);
+                upgrade(first);
                 // Rebuild destroyed defenses at their original, now available construction points.
                 if (wave >= 3 && !navigation.towers().contains(second) && session.economy().gold() >= 30) {
                     second = build("basic", {0.1, 0});
@@ -101,7 +104,9 @@ Result play(Engine& engine, Strategy strategy) {
                     upgrade(first);
                 }
             }
-            if (((wave == 2 && strategy == Strategy::mixed) || (wave == 3 && strategy == Strategy::small)) &&
+            // Move the melee defender behind the center battery before the dogs arrive.
+            // Physical hero/enemy contact now prevents the old overlapping interception position.
+            if (wave == 2 && (strategy == Strategy::mixed || strategy == Strategy::small) &&
                 runtime.heroes()->find(hero)->health > 0) {
                 runtime.heroes()->synchronize(navigation.towers());
                 (void)runtime.heroes()->deploy({4, 0, -1.3}, hero);

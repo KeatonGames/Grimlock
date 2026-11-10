@@ -1,4 +1,5 @@
 #include "systems/crowd_movement.hpp"
+#include "systems/enemy_ai.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -257,6 +258,53 @@ void checkMixedNavigation() {
             "mixed navigation searched every frame");
 }
 
+void checkPassingStationaryUnit() {
+    NavMesh navigation;
+    require(navigation.build(openFloor()), "passing floor build failed");
+    auto enemies = makeEnemies(2);
+    enemies[0].position = {0, 0, 0};
+    enemies[1].position = {2, 0, 0};
+    EnemyAi::setDestination(enemies[0], glm::dvec2{6, 0});
+    EnemyAi::setDestination(enemies[1], {});
+    CrowdMovement movement;
+    for (int frame = 0; frame < 60 * 15 && enemies[0].active; ++frame) {
+        movement.update(navigation, enemies, 1.0 / 60);
+        checkClearance(navigation, enemies);
+    }
+    require(!enemies[0].active, "moving enemy deadlocked behind a stationary unit on open ground");
+}
+
+void checkOpposingTrafficAndDefenders() {
+    NavMesh navigation;
+    require(navigation.build(openFloor()), "opposing traffic floor build failed");
+    for (const int fps : {15, 60, 144}) {
+        auto enemies = makeEnemies(2);
+        enemies[0].position = {0, 0, 0};
+        enemies[1].position = {6, 0, 0};
+        EnemyAi::setDestination(enemies[0], glm::dvec2{6, 0});
+        EnemyAi::setDestination(enemies[1], glm::dvec2{0, 0});
+        CrowdMovement movement;
+        for (int frame = 0; frame < fps * 15 && (enemies[0].active || enemies[1].active); ++frame) {
+            movement.update(navigation, enemies, 1.0 / fps);
+            checkClearance(navigation, enemies);
+        }
+        require(!enemies[0].active && !enemies[1].active, "opposing traffic deadlocked");
+
+        enemies = makeEnemies(1);
+        enemies[0].position = {0, 0, 0};
+        EnemyAi::setDestination(enemies[0], glm::dvec2{6, 0});
+        const std::array defenders{MovementBody{{2, 0, 0}, 0.28, 1.4, 17}};
+        movement.setObstacles(defenders);
+        for (int frame = 0; frame < fps * 15 && enemies[0].active; ++frame) {
+            movement.update(navigation, enemies, 1.0 / fps);
+            require(glm::length(glm::dvec2{enemies[0].position.x - 2, enemies[0].position.z}) >=
+                        enemies[0].radius + 0.28 - 1e-5,
+                    "enemy overlapped a hero's physical footprint");
+        }
+        require(!enemies[0].active, "enemy could not pass a defender without combat orders");
+    }
+}
+
 void checkChickenMap(const std::filesystem::path& scenePath) {
     constexpr std::size_t count = 100;
     const auto scene = Scene::load(scenePath);
@@ -315,6 +363,8 @@ int main(int argc, char** argv) {
         checkRecoveryAndSpikes();
         checkCompactSpacing();
         checkMixedNavigation();
+        checkPassingStationaryUnit();
+        checkOpposingTrafficAndDefenders();
         checkCrowd(100, false);
         checkCrowd(100, true);
         checkCrowd(500, false);

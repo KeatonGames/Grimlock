@@ -4138,6 +4138,154 @@
                                      0.018,
                                      1
                                  ]
+                    },
+                    {
+                        "transform":  {
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "108",
+                        "name":  "Construction anchor",
+                        "id":  "1081",
+                        "role":  "grimlock.construction_anchor"
+                    },
+                    {
+                        "transform":  {
+                                          "rotation":  [
+                                                           0,
+                                                           -0.079871394401728316,
+                                                           0,
+                                                           0.99680517673029945
+                                                       ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "1081",
+                        "name":  "Construction point",
+                        "id":  "1082",
+                        "role":  "grimlock.construction_point"
+                    },
+                    {
+                        "transform":  {
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "109",
+                        "name":  "Construction anchor",
+                        "id":  "1091",
+                        "role":  "grimlock.construction_anchor"
+                    },
+                    {
+                        "transform":  {
+                                          "rotation":  [
+                                                           0,
+                                                           -0.93664441549701893,
+                                                           0,
+                                                           0.35028165655404758
+                                                       ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "1091",
+                        "name":  "Construction point",
+                        "id":  "1092",
+                        "role":  "grimlock.construction_point"
+                    },
+                    {
+                        "transform":  {
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "110",
+                        "name":  "Construction anchor",
+                        "id":  "1101",
+                        "role":  "grimlock.construction_anchor"
+                    },
+                    {
+                        "transform":  {
+                                          "rotation":  [
+                                                           0,
+                                                           0.34827434473373375,
+                                                           0,
+                                                           0.93739265028070728
+                                                       ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "1101",
+                        "name":  "Construction point",
+                        "id":  "1102",
+                        "role":  "grimlock.construction_point"
+                    },
+                    {
+                        "transform":  {
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "111",
+                        "name":  "Construction anchor",
+                        "id":  "1111",
+                        "role":  "grimlock.construction_anchor"
+                    },
+                    {
+                        "transform":  {
+                                          "rotation":  [
+                                                           0,
+                                                           -0.9848333421164307,
+                                                           0,
+                                                           0.17350299206578959
+                                                       ],
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ]
+                                      },
+                        "parent":  "1111",
+                        "name":  "Construction point",
+                        "id":  "1112",
+                        "role":  "grimlock.construction_point"
                     }
                 ]
 }

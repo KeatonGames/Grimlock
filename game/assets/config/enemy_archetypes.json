@@ -24,7 +24,8 @@
                        "targeting":  "first_detected",
                        "attack_animation":  "attack-melee-right",
                        "threat_memory":  0
-                   }
+                   },
+        "kill_reward":  2
     },
     {
         "name":  "Siege",
@@ -161,6 +162,7 @@
                        "attack_animation":  "attack-melee-right",
                        "threat_memory":  0
                    },
-        "boss":  true
+        "boss":  true,
+        "kill_reward":  2
     }
 ]

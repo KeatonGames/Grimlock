@@ -51,6 +51,8 @@ private:
     void towerInfo();
     void result();
     void placementOverlay(const Camera& camera);
+    void updateTowerPreview();
+    void clearTowerPreview();
     void updateSelectionMarker();
     void clearSelectionMarker();
     void updateHeroPathPreview(const std::optional<Ray>& ray);
@@ -69,6 +71,10 @@ private:
     std::optional<glm::vec2> commandCursor_;
     std::optional<ObjectId> hoveredObject_;
     std::optional<InstanceId> selectionMarker_;
+    std::optional<InstanceId> towerPreview_, towerDefenderPreview_;
+    std::string towerPreviewType_;
+    glm::vec3 towerDefenderFoot_{0};
+    float towerDefenderScale_ = 1;
     BuildZoneMarkers buildZoneMarkers_;
     std::optional<glm::dvec3> orderPosition_;
     HeroId orderHero_ = 0, previewHero_ = 0;

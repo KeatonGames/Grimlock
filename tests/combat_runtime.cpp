@@ -22,6 +22,52 @@ EnemyId spawn(EnemySystem& enemies, const NavMesh& mesh, double x, double z = 0)
     return enemies.enemies().back().id;
 }
 
+void checkTowerVisuals(Engine& engine, TowerSystem& towers, EnemySystem& enemies, const NavMesh& mesh) {
+    for (const auto* type : {"basic", "wide"}) {
+        const auto& configured = towers.definition(type);
+        auto tower = configured.instance();
+        tower.position = {-5, tower.halfExtent.y, -5};
+        const auto root = towers.create(engine, tower);
+        const auto children = engine.scene()->children(root);
+        require(children.size() == 1, "Tower must own exactly one visual defender");
+        const auto child = children[0];
+        require(engine.scene()->object(child).model == configured.operatorModel &&
+                    engine.scene()->object(child).role == "grimlock.tower_operator" &&
+                    !engine.scene()->animation(child).model().skins.empty(),
+                "Tower defender lost its hero model, equipment or skeleton");
+        const auto revision = towers.revision();
+        const auto resting = engine.scene()->object(child).local;
+        towers.synchronize(engine);
+        require(engine.scene()->children(root).size() == 1 && towers.revision() == revision,
+                "Tower visual synchronization duplicated its defender or rebuilt collision");
+        towers.updateOperator(engine, root, glm::dvec3{-3, 0, -4}, true, 0);
+        const auto& playback = engine.scene()->animation(child);
+        require(!playback.looping() && playback.model().animations[playback.clip()].name == configured.operatorAttack,
+                "Tower did not play its actual hero attack clip");
+        towers.updateOperator(engine, root, {}, false, 0);
+        const auto returned = engine.scene()->object(child).local;
+        require(glm::length(returned.position - resting.position) < 1e-5F &&
+                    std::abs(glm::dot(returned.rotation, resting.rotation)) > 0.9999F,
+                "Tower defender did not return to its authored position and facing after losing its target");
+        require(playback.looping() && playback.model().animations[playback.clip()].name == configured.operatorIdle,
+                "Tower defender did not return to idle");
+        require(towers.remove(engine, root) && !engine.scene()->contains(child),
+                "Destroyed tower retained its visual defender");
+    }
+    const auto id = spawn(enemies, mesh, 2);
+    ProjectileSystem projectiles{engine};
+    projectiles.spawn({0, 2, 0}, id, towers.definition("wide"));
+    require(projectiles.projectiles().size() == 1 && projectiles.projectiles()[0].damageType == DamageType::magic &&
+                projectiles.projectiles()[0].visualScale == 0.16F,
+            "Mage tower did not use its configured magic fireball");
+    const auto& mage = towers.definition("wide");
+    require(mage.projectileModel == "towers/projectiles/fireball_purple.glb" &&
+                engine.modelInfo(engine.loadModel(engine.assetRoot() / mage.projectileModel)).primitives == 2,
+            "Purple fireball lost its luminous core or flame tongues");
+    projectiles.clear();
+    enemies.clear();
+}
+
 void checkProjectiles(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, const TowerDefinition& small) {
     const auto id = spawn(enemies, mesh, 2);
     const auto handle = *enemies.find(id)->instance;
@@ -277,6 +323,7 @@ int main() {
         EnemyDefinition definition;
         definition.speed = 0;
         EnemySystem enemies{engine, definition};
+        checkTowerVisuals(engine, towers, enemies, mesh);
         checkProjectiles(engine, enemies, mesh, small);
         checkTowers(engine, enemies, mesh, towers);
         checkFrameRates(engine, mesh, towers);

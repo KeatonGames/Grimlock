@@ -1,6 +1,6 @@
 # Tower placement
 
-Placement uses required build zones, data-driven Small/Large tower types and a
+Placement uses required build zones, data-driven Archer/Mage tower types and a
 preparation-only placement gate. See [build zones and placement](build_zones.md)
 for current controls, persistence and checks.
 
@@ -8,17 +8,46 @@ Both types now attack during level Battles. See [tower combat](combat.md) for
 statistics, projectiles, enemy health/death and gameplay range indicators.
 The existing `basic`/`wide` type IDs and physical footprints remain compatible.
 
+The Archer Tower uses the supplied wooden siege tower with blue flags and an animated Ranger on its balcony.
+The Mage Tower uses the supplied round stone tower with an animated Mage on its battlements. Both defenders
+reuse the equipped hero GLBs and their actual idle/attack clips, face their current targets, and are visual
+children (`grimlock.tower_operator`) rather than additional playable heroes or collision bodies. Level 1 remains
+tower-only. Saving, duplicating, loading and removing a tower preserves or removes its defender with it.
+All tower defenders return to their authored mount position, tower-facing orientation and looping idle clip
+when their target is lost or the wave ends. This behavior is shared by future tower types with configured defenders.
+
+Tower structures use enlarged models with 1.4 m defenders and matching platform offsets/projectile origins.
+The Ranger stands at the center of the wooden balcony, with his feet aligned to its actual deck surface.
+Game selection preserves the models' natural colors; the blue model tint
+is disabled while inspection, upgrades and other selection feedback remain active. Editor highlighting is unchanged.
+
+`tools/prepare_tower_visuals.ps1` derives grounded GLBs while retaining the original embedded textures/materials.
+Legacy cube towers migrate to the configured models without moving their gameplay anchors. Physical footprints,
+health, prices, upgrade values, damage amounts and cadence remain unchanged. Projectile origins match the raised
+defenders. Archer Towers fire the existing white arrows; Mage Towers use magic damage and a pulsing, spinning
+purple fireball with a luminous core and flame tongues. Mage heroes share that fireball model.
+
+Debug Game and Editor builds pass. Thirteen affected CTest checks were verified, including Level 1's full
+playthrough and terrain traversal, animated defenders/projectiles, economy, placement, save/load, Editor controls,
+and undead damage rules. Logs: `out/tower_models_check_tests.log` and `out/tower_models_fixture_tests.log`.
+
 Open `assets/scenes/debug.json` in Editor mode, or load First Watch through the Level menu. Other terrain scenes need build zones created first. Use **Navigation > Towers > Place Tower**, then move the mouse over the terrain. Left-click places a tower; placement remains active for additional towers. Escape or **Cancel Placement** exits. Mouse pan, orbit and zoom remain available. Placement owns selection clicks and temporarily takes priority over walkability painting.
 
-The transparent box snaps to a build zone's designated construction point and facing. Each zone supports one tower; occupied zones reject construction. Footprint/support/overlap checks run immediately, and full route checks run before committing. Green means preliminary checks pass; red explains rejection. See [unique construction zones](build_zones.md) for occupancy, Editor controls, persistence, and legacy migration.
+In Game, the selected tower and its animated defender preview at the build zone's designated point and facing.
+These are temporary render instances, with a green tint for valid placement and red for invalid placement;
+cancelling or leaving placement removes them without adding scene objects or spending gold. A bright gold range
+boundary with a dark outline and a lightly shaded interior makes coverage visible; invalid previews use red.
+The Editor retains its authoring footprint overlay. Each zone supports one tower; occupied zones reject
+construction. Footprint/support/overlap checks run immediately, and full route checks run before committing.
+See [unique construction zones](build_zones.md) for occupancy, Editor controls, persistence, and legacy migration.
 
 After cancelling placement, select a tower normally in the viewport or hierarchy. Delete it using the existing editor command/confirmation, or **Navigation > Towers > Remove Selected Tower**. Saving a scene preserves its towers; loading restores their obstacles. Renaming towers does not change their identity.
 
 ## Data and ownership
 
 - `entities/tower.hpp` contains scene ID, position, rotation, model reference and physical half-extents. `systems/tower_system.{hpp,cpp}` handles scene synchronization, shared placeholder creation, footprint checks, terrain ray intersection and spawn-area route queries.
-- Towers are ordinary selectable scene objects using the existing `towers/structures/primitives/cube.glb` resource. Engine shares their model/material/GPU resources. A translucent preview is drawn through the existing Editor world-projection overlay, without creating preview scene objects or Vulkan resources. Like other debug overlays, it does not use depth occlusion.
-- The initial placeholder is 0.9 × 1.5 × 0.9 world units. Its physical footprint is defined in Game and remains independent of model bounds and editor visual scale. Rotation produces conservative world-space box bounds. Placement creates upright towers; existing scene transform controls remain available afterward.
+- Towers are ordinary selectable scene objects using `towers/structures/archer_tower.glb` and `mage_tower.glb`. Engine shares their model/material/GPU resources. A translucent preview is drawn through the existing Editor world-projection overlay, without creating preview scene objects or Vulkan resources. Like other debug overlays, it does not use depth occlusion.
+- The initial placeholder is 0.9 Ã— 1.5 Ã— 0.9 world units. Its physical footprint is defined in Game and remains independent of model bounds and editor visual scale. Rotation produces conservative world-space box bounds. Placement creates upright towers; existing scene transform controls remain available afterward.
 - Scene objects have an optional, generic `role` string, preserved by loading, saving and duplication. Game recognizes `grimlock.tower`; Engine and Editor do not interpret tower roles. Existing scenes omit the field and continue loading unchanged.
 - Scene owns placed models. TowerSystem keeps ID-based snapshots, not owning pointers to scene objects or separate GPU resources. Deletion, hiding, transform changes and scene replacement update the snapshots. Runtime enemies remain independent of authored tower objects.
 

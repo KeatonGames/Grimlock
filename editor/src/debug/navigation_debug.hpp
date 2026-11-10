@@ -61,6 +61,7 @@ private:
     void towerMenu(Engine& engine);
     void buildZoneMenu(Engine& engine);
     void combatDebug(Engine& engine);
+    void movementDebug(Engine& engine);
     void constructionControls(Engine& engine);
     void levelMenu(Engine& engine);
     void levelDefinitionMenu(Engine& engine);
@@ -77,9 +78,12 @@ private:
     std::string error_;
     bool showNavMesh_ = false;
     bool showCombat_ = false;
+    bool showCollisions_ = false, showGeometry_ = false, showConnections_ = false;
+    bool showPaths_ = false, showStuck_ = false;
     bool showPerformance_ = false;
     double updateMilliseconds_ = 0;
     std::vector<editor::DebugLine> combatLines_;
+    std::vector<HeroDefinition> debugHeroDefinitions_;
     bool placingTower_ = false, showPreview_ = false, sceneChanged_ = false;
     bool gameplayPlacement_ = false;
     const Scene* placementScene_ = nullptr;

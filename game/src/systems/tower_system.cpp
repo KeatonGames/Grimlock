@@ -69,12 +69,13 @@ void TowerSystem::clear() noexcept {
     scratchTowers_.clear();
     props_.clear();
     models_.clear();
+    operators_.clear();
     catalogLoaded_ = false;
     ++revision_;
 }
 
 void TowerSystem::synchronize(Engine& engine) {
-    const auto* scene = engine.scene();
+    auto* scene = engine.scene();
     if (scene != scene_) {
         clear();
         scene_ = scene;
@@ -91,13 +92,22 @@ void TowerSystem::synchronize(Engine& engine) {
     for (const auto& [id, object] : scene->objects()) {
         if (!object.model || !scene->enabledInHierarchy(id) || object.role == "grimlock.hero" ||
             object.role == "grimlock.terrain" || object.role == "grimlock.decoration" ||
-            object.role == "grimlock.obstacle") {
+            object.role == "grimlock.tower_operator" || object.role == "grimlock.obstacle") {
             continue;
         }
         const auto world = glm::dmat4{scene->worldTransform(id)};
         if (object.role == towerRole || object.role.starts_with("grimlock.tower:")) {
             const std::string_view role = object.role;
             const auto type = role == towerRole ? std::string_view{"basic"} : role.substr(15);
+            const auto& configured = definition(type);
+            if (*object.model == "towers/structures/primitives/cube.glb" && *object.model != configured.model) {
+                // Upgrade authored legacy placeholders without moving their gameplay anchors.
+                scene->setModel(id, configured.model);
+                auto transform = object.local;
+                transform.scale = configured.visualScale;
+                scene->setTransform(id, transform);
+                scene->setTint(id, configured.tint);
+            }
             if (towerCount == scratchTowers_.size()) {
                 scratchTowers_.push_back(definition(type).instance());
             }
@@ -210,6 +220,104 @@ void TowerSystem::synchronize(Engine& engine) {
     });
     if (!sameObstacles) {
         ++revision_;
+    }
+    synchronizeOperators(engine);
+}
+
+void TowerSystem::synchronizeOperators(Engine& engine) {
+    auto& scene = *engine.scene();
+    std::erase_if(operators_, [&](const auto& item) {
+        return !contains(item.first) || !scene.contains(item.second.object);
+    });
+    for (const auto& tower : towers_) {
+        const auto& configured = definition(tower.type);
+        if (configured.operatorModel.empty() || operators_.contains(tower.object)) {
+            continue;
+        }
+        ObjectId character = 0;
+        for (const auto child : scene.children(tower.object)) {
+            if (scene.object(child).role == "grimlock.tower_operator") {
+                character = child;
+                break;
+            }
+        }
+        if (!character) {
+            character = scene.createObject(configured.name + " defender", tower.object);
+        }
+        scene.setRole(character, "grimlock.tower_operator");
+        scene.setModel(character, configured.operatorModel);
+        scene.setSelectable(character, false);
+        scene.setSelectionHighlight(character, false);
+        const auto info = engine.modelInfo(engine.loadModel(engine.assetRoot() / configured.operatorModel));
+        if (info.maximum.y <= info.minimum.y ||
+            std::find(info.animationNames.begin(), info.animationNames.end(), configured.operatorIdle) ==
+                info.animationNames.end() ||
+            std::find(info.animationNames.begin(), info.animationNames.end(), configured.operatorAttack) ==
+                info.animationNames.end()) {
+            throw std::runtime_error("Tower operator model is missing its configured dimensions or animation clips.");
+        }
+        const auto center = (info.minimum + info.maximum) * 0.5F;
+        OperatorVisual visual{character,
+                              {center.x, info.minimum.y, center.z},
+                              static_cast<float>(configured.operatorHeight / (info.maximum.y - info.minimum.y))};
+        Transform transform;
+        transform.scale = glm::vec3{visual.scale};
+        transform.position = glm::vec3{configured.operatorOffset} - visual.modelFoot * visual.scale;
+        scene.setTransform(character, transform);
+        engine.prepareScene(scene);
+        scene.playAnimation(character, configured.operatorIdle);
+        operators_.emplace(tower.object, visual);
+    }
+}
+
+void TowerSystem::updateOperator(Engine& engine,
+                                 ObjectId object,
+                                 std::optional<glm::dvec3> target,
+                                 bool fire,
+                                 double delta) {
+    const auto found = operators_.find(object);
+    const auto* tower = find(entityForObject(object));
+    if (found == operators_.end() || !tower || !engine.scene()->contains(found->second.object)) {
+        return;
+    }
+    auto& visual = found->second;
+    auto& scene = *engine.scene();
+    const auto& configured = definition(tower->type);
+    if (!target) {
+        auto transform = scene.object(visual.object).local;
+        transform.rotation = glm::quat{1, 0, 0, 0};
+        transform.position = glm::vec3{configured.operatorOffset} - visual.modelFoot * visual.scale;
+        scene.setTransform(visual.object, transform);
+        if (visual.remaining > 0) {
+            scene.playAnimation(visual.object, configured.operatorIdle);
+            scene.setAnimationSpeed(visual.object, 1);
+            visual.remaining = 0;
+        }
+        return;
+    }
+    if (target) {
+        const auto localTarget =
+            glm::inverse(tower->rotation) * (*target - tower->position) - configured.operatorOffset;
+        const auto yaw = std::atan2(localTarget.x, localTarget.z);
+        auto transform = scene.object(visual.object).local;
+        transform.rotation = glm::angleAxis(static_cast<float>(yaw), glm::vec3{0, 1, 0});
+        transform.position =
+            glm::vec3{configured.operatorOffset} - transform.rotation * (visual.modelFoot * visual.scale);
+        scene.setTransform(visual.object, transform);
+    }
+    if (fire) {
+        scene.playAnimation(visual.object, configured.operatorAttack, false);
+        const auto& playback = scene.animation(visual.object);
+        const auto& clip = playback.model().animations.at(playback.clip());
+        visual.remaining = std::min(static_cast<double>(clip.end - clip.start),
+                                    0.8 / configured.statistics(progress(object).level).fireRate);
+        scene.setAnimationSpeed(visual.object, static_cast<float>((clip.end - clip.start) / visual.remaining));
+    } else if (visual.remaining > 0) {
+        visual.remaining = std::max(0.0, visual.remaining - delta);
+        if (visual.remaining == 0) {
+            scene.playAnimation(visual.object, configured.operatorIdle);
+            scene.setAnimationSpeed(visual.object, 1);
+        }
     }
 }
 
@@ -337,6 +445,17 @@ bool TowerSystem::applyDamage(Engine& engine, ObjectId object, float damage) {
 }
 
 void TowerSystem::updateEffects(Engine& engine, double delta) {
+    for (auto& [object, visual] : operators_) {
+        if (visual.remaining > 0 && engine.scene()->contains(visual.object) &&
+            !engine.scene()->animation(visual.object).playing()) {
+            const auto* tower = find(entityForObject(object));
+            if (tower) {
+                engine.scene()->playAnimation(visual.object, definition(tower->type).operatorIdle);
+                engine.scene()->setAnimationSpeed(visual.object, 1);
+                visual.remaining = 0;
+            }
+        }
+    }
     for (const auto& [object, entity] : objectEntities_) {
         auto& progress = *progress_.get(entity);
         if (progress.hitFlashRemaining > 0) {

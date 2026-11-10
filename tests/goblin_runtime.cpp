@@ -240,6 +240,22 @@ void waves(Engine& engine) {
     const auto& first = runtime.navigation().enemies()->enemies().front();
     require(runtime.navigation().enemies()->definition(first.type).name == "Goblin",
             "Wave spawned unrelated enemy model");
+    auto& enemies = *runtime.navigation().enemies();
+    const auto victim = first.id;
+    const auto gold = runtime.level().economy().gold();
+    require(enemies.applyDamage(victim, 1), "Goblin reward nonlethal hit failed");
+    runtime.update(engine, 0);
+    require(runtime.level().economy().gold() == gold, "Nonlethal damage awarded coins");
+    require(enemies.applyDamage(victim, 10000) && !enemies.applyDamage(victim, 10000),
+            "Goblin kill reward fixture did not resolve exactly one death");
+    runtime.update(engine, 0);
+    require(runtime.level().economy().gold() == gold + 2, "Goblin kill did not add two coins to the wallet");
+    runtime.update(engine, 0);
+    require(runtime.level().economy().gold() == gold + 2, "Goblin coins were awarded twice");
+    runtime.restart(engine);
+    require(runtime.level().economy().gold() == runtime.level().waves()->definition().startingGold &&
+                runtime.navigation().enemies()->metrics().killGold == 0,
+            "Restart retained kill coins or the payout ledger");
     runtime.unload(engine);
 }
 } // namespace

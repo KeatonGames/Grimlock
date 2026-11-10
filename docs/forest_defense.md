@@ -40,6 +40,11 @@ Occupied frames disappear and return when their towers are destroyed. Their
 current size and border thickness are preserved. `available_heroes` is empty for
 Level 1; future levels can enable any combination of Knight, Ranger and Mage.
 
+The four construction points store individual hidden facings toward their nearby enemy lanes: entrance approach,
+bridge approach, bridge exit, and the final uphill approach. These orientations live on the scene's construction
+point children and can be adjusted using **Navigation > Build Zones > Construction Facing (degrees)** in Editor.
+Both tower types and their placement previews use the same saved directions.
+
 The courtyard has low stone walls, banners and two lit braziers. Pines, low timber
 fences, rock groups, plants and flowers frame the islands while leaving tower
 footprints and routes clear. A purple scenic backdrop matches the reference's
@@ -79,26 +84,24 @@ is preserved. Unused library models are not loaded at game startup.
 
 ## Waves and economy
 
-The player starts with **120 gold** and the mausoleum has **10 health**.
+The player starts with **20 gold** and the mausoleum has **10 health**.
 
 | Wave | Composition | Fixed reward |
 | --- | --- | --- |
-| Scouts on the trail | 6 Goblins | 30 |
-| Beneath the roots | 10 Goblins | 40 |
-| The woodland raiders | 12 Goblins | 50 |
-| Hold the ascent | 12 Goblins | 70 |
+| Scouts on the trail | 6 Goblins | 0 |
+| Beneath the roots | 10 Goblins | 0 |
+| The woodland raiders | 12 Goblins | 0 |
+| Hold the ascent | 12 Goblins | 0 |
 | The Goblin Boss | 1 Goblin Boss and 4 Goblins together | 0 |
 
 The first four waves use only regular Goblins, retaining their existing group
 timing. The final wave contains exactly five enemies: the Goblin Boss and four
 Goblins, all scheduled at wave start as one swarm. The level totals 45 enemies.
-Other enemy definitions remain available to later levels. Coin effects remain
-visual; only the existing wave rewards add gold.
+Other enemy definitions remain available to later levels. Each Goblin and the Goblin Boss awards 2 coins on
+death, for 90 kill coins when all 45 enemies are defeated. Wave completion grants no gold; kill rewards reach the wallet immediately.
+Archer Towers cost 10 coins and Mage Towers cost 15 coins; upgrade costs are unchanged.
 
-A verified tower-only plan starts with a Small Tower in the entrance meadow,
-a Large Tower in the eastern meadow, and a Small Tower on the terrace. Upgrade
-the terrace tower after waves one and three, and the eastern tower after waves
-two and four. The terrace point covers the final approach without hero support.
+A tower-only plan starts with Archer Towers at the entrance and terrace. Build a third Archer Tower after wave one using kill income. Upgrade the terrace Archer after waves three and four to cover the boss on the final approach.
 
 ## Validation and captures
 

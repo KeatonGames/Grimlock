@@ -29,6 +29,8 @@ struct ProjectileComponent {
     float visualScale = 0;
     DamageType damageType = DamageType::physical;
     bool whiteArrowTrail = false;
+    bool purpleFireball = false;
+    double visualTime = 0;
 };
 
 using Projectile = ProjectileComponent;

@@ -96,6 +96,10 @@ public:
         return combatGeometry_;
     }
 
+    [[nodiscard]] const NavigationGeometry& collisionGeometry() const noexcept {
+        return geometry_;
+    }
+
     [[nodiscard]] EnemySystem* enemies() noexcept {
         return enemies_.get();
     }

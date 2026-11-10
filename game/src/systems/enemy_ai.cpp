@@ -20,9 +20,10 @@ void stop(Enemy& enemy, EnemyState state, MovementStatus movement) {
     }
 }
 
-void block(Enemy& enemy) {
+void block(Enemy& enemy, MovementBlockage cause = MovementBlockage::navigation) {
     stop(enemy, EnemyState::blocked, MovementStatus::blocked);
     enemy.retryPath = true;
+    enemy.blockage = cause;
 }
 
 } // namespace
@@ -52,6 +53,11 @@ void EnemyAi::setDestination(Enemy& enemy, std::optional<glm::dvec2> destination
     enemy.retryPath = true;
     enemy.repathDelay = 0;
     enemy.stuckTime = 0;
+    enemy.progressRemaining = std::numeric_limits<double>::max();
+    enemy.avoidanceEnemy.reset();
+    enemy.avoidanceDefender.reset();
+    enemy.recoveryAttempts = 0;
+    enemy.blockage = MovementBlockage::none;
     // Retargeting preserves velocity; clearing a destination stops immediately.
     enemy.state = destination ? EnemyState::moving : EnemyState::idle;
     if (!destination) {
@@ -86,13 +92,14 @@ void EnemyAi::prepare(Enemy& enemy, const NavMesh& navigation, double delta, boo
         enemy.retryPath = !found;
         enemy.repathDelay = enemy.retryInterval;
         enemy.stuckTime = 0;
+        enemy.progressRemaining = std::numeric_limits<double>::max();
         if (!found) {
             block(enemy);
             return;
         }
     }
     if (enemy.retryPath) {
-        block(enemy);
+        block(enemy, enemy.blockage);
         return;
     }
     const auto target = navigation.steering(enemy.position, enemy.path, &enemy.remainingDistance);
@@ -115,17 +122,29 @@ void EnemyAi::prepare(Enemy& enemy, const NavMesh& navigation, double delta, boo
         return;
     }
     enemy.state = EnemyState::moving;
+    enemy.blockage = MovementBlockage::none;
     enemy.movement = MovementStatus::idle;
     const double speed = std::min(enemy.speed, std::sqrt(2 * enemy.deceleration * enemy.remainingDistance));
     enemy.desiredVelocity = offset * (speed / distance);
 }
 
-void EnemyAi::observeMovement(Enemy& enemy, double traveled, double delta) {
-    enemy.stuckTime = enemy.speed > 0 && traveled < enemy.speed * delta * 0.02 ? enemy.stuckTime + delta : 0;
-    if (enemy.stuckTime >= enemy.stuckTimeout) {
-        block(enemy);
+void EnemyAi::observeMovement(Enemy& enemy, double delta) {
+    // Tiny contact slides and oscillation are movement, but are not progress along the route.
+    const double progressThreshold = std::min(enemy.radius * 0.25, enemy.speed * enemy.stuckTimeout * 0.25);
+    if (enemy.remainingDistance < enemy.progressRemaining - progressThreshold) {
+        enemy.progressRemaining = enemy.remainingDistance;
         enemy.stuckTime = 0;
-        enemy.repathDelay = enemy.retryInterval;
+    } else if (enemy.speed > 0 && delta > 0) {
+        enemy.stuckTime += delta;
+    }
+    if (enemy.stuckTime >= enemy.stuckTimeout) {
+        block(enemy, enemy.contactedUnit ? MovementBlockage::crowd : MovementBlockage::noProgress);
+        enemy.avoidanceEnemy.reset();
+        enemy.avoidanceDefender.reset();
+        ++enemy.recoveryAttempts;
+        enemy.stuckTime = 0;
+        // Persistent congestion backs off instead of repeatedly running a complete path query.
+        enemy.repathDelay = enemy.retryInterval * std::min(4U, enemy.recoveryAttempts);
     }
 }
 

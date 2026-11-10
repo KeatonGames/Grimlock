@@ -15,10 +15,10 @@ tower types have three explicitly authored levels:
 
 | Tower | Level | Damage | Range | Shots/sec | Cost to enter level |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Small | 1 | 25 | 3.5 | 1.5 | 30 construction |
+| Small | 1 | 25 | 3.5 | 1.5 | 10 construction |
 | Small | 2 | 36 | 3.9 | 1.7 | 25 upgrade |
 | Small | 3 | 50 | 4.3 | 2 | 40 upgrade |
-| Large | 1 | 55 | 4.2 | 1 | 60 construction |
+| Large | 1 | 55 | 4.2 | 1 | 15 construction |
 | Large | 2 | 80 | 4.7 | 1.15 | 45 upgrade |
 | Large | 3 | 110 | 5.2 | 1.3 | 65 upgrade |
 

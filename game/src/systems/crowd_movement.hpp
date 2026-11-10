@@ -1,6 +1,7 @@
 #pragma once
 
 #include "entities/enemy.hpp"
+#include "systems/movement_contact.hpp"
 
 #include <span>
 #include <vector>
@@ -56,6 +57,7 @@ struct CrowdMetrics {
 
 class CrowdMovement final {
 public:
+    void setObstacles(std::span<const MovementBody> bodies);
     void update(const NavMesh& navigation,
                 std::optional<glm::dvec2> destination,
                 std::span<Enemy> enemies,
@@ -68,10 +70,14 @@ public:
     }
 
 private:
+    [[nodiscard]] glm::dvec2 avoid(const NavMesh& navigation,
+                                   std::size_t index,
+                                   std::span<Enemy> enemies,
+                                   double maximumRadius);
     [[nodiscard]] glm::dvec2 separation(std::size_t index, std::span<const Enemy> enemies, double maximumRadius);
     [[nodiscard]] glm::dvec3 move(const NavMesh& navigation,
                                   std::size_t index,
-                                  std::span<const Enemy> enemies,
+                                  std::span<Enemy> enemies,
                                   glm::dvec2 displacement,
                                   double maximumRadius);
     void resolveOverlaps(const NavMesh& navigation, std::span<Enemy> enemies, double maximumRadius);
@@ -85,6 +91,7 @@ private:
     CrowdMetrics metrics_;
     std::uint64_t order_ = 0;
     std::optional<glm::dvec2> sharedDestination_;
+    std::vector<MovementBody> obstacles_;
 };
 
 } // namespace grimlock::game

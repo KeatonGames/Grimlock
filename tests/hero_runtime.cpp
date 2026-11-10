@@ -486,6 +486,33 @@ int main() {
                     engine.scene()->animation(heroes.find(other)->object).asset(),
                 "hero model resources were not shared");
         require(!heroes.validPosition(heroes.find(other)->position, id), "deployment overlapped another hero");
+        (void)heroes.deploy({-6, 0, -4}, id);
+        (void)heroes.deploy({-3, 0, -4}, other);
+        require(heroes.command(id, {-1, 0, -4}), "hero passing command rejected");
+        for (int frame = 0; frame < 600 && heroes.find(id)->state == HeroState::moving; ++frame) {
+            heroes.update(1.0 / 60, true);
+            require(glm::length(heroes.find(id)->position - heroes.find(other)->position) + 1e-5 >=
+                        heroes.definition().radius * 2,
+                    "moving hero overlapped a stationary hero");
+        }
+        require(heroes.find(id)->state == HeroState::reached, "hero deadlocked behind another hero");
+        (void)heroes.deploy({-4, 0, -4}, id);
+        require(heroes.command(id, {-1, 0, -4}), "congestion recovery command rejected");
+        std::array<Enemy, 8> ring;
+        for (std::size_t index = 0; index < ring.size(); ++index) {
+            const double angle = index * 2 * std::acos(-1.0) / ring.size();
+            ring[index].id = index + 1;
+            ring[index].position = {-4 + std::cos(angle) * 0.7, 0, -4 + std::sin(angle) * 0.7};
+        }
+        const auto recoveryQueries = heroes.navigation().statistics().pathQueries;
+        for (int frame = 0; frame < 600 && heroes.find(id)->state == HeroState::moving; ++frame) {
+            heroes.update(1.0 / 60, true, ring);
+        }
+        require(heroes.find(id)->state == HeroState::blocked &&
+                    heroes.navigation().statistics().pathQueries <= recoveryQueries + 3,
+                "hero congestion caused endless recovery or excessive path queries");
+        require(heroes.find(id)->blockage == MovementBlockage::crowd, "hero congestion diagnosis was lost");
+        (void)heroes.deploy({-6, 0, 4}, other);
         (void)heroes.deploy({-4, 0, -1}, id);
         require(heroes.find(id)->object == object, "reposition replaced stable hero identity");
         heroes.update(1, false);

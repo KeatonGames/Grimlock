@@ -1,5 +1,55 @@
 # NavMesh navigation
 
+## Collision and stuck-unit audit (Phase 49)
+
+The audit reproduced a permanent deadlock behind a stationary unit on open ground: radial separation only
+braked the follower, and retrying the same terrain path never supplied a route around the unit. Enemies now
+choose a cached, surface-visible passing point beside stationary blockers or oncoming traffic. Moving queues
+retain their compact spacing. Swept circle contact still prevents overlap; overlap correction stays on the
+agent's own NavMesh. Ghosts bypass these contacts and retain their terrain-only profile.
+
+Hero movement previously ignored other heroes, and enemies ignored hero bodies. Living heroes now participate
+in both movement systems using their configured physical radius and height. Self references and vertically
+separated bodies are excluded. Hero visual scale, selection markers and empty build zones do not add colliders.
+Existing enemy/hero dimensions and the 0.15 m climb / 45 degree slope limits remain unchanged.
+
+Imported solid structures previously filled their entire world AABB, and tower navigation used that same
+conservative approximation even when a tower was rotated. Solid interiors now use convex transformed X/Z
+footprints with vertical bounds. Tower triangle geometry uses its physical oriented box; imported terrain
+still uses actual world-space GLB triangles with mirrored winding correction. This frees empty corners beside
+rotated structures while keeping their interiors and cliff faces blocked. Concave solid structures remain
+conservatively filled inside their convex footprint; traversable arches/bridges must be authored as terrain or
+separate solid supports.
+
+Surface sliding can enter an adjacent polygon outside a cached path corridor. Steering now repairs that corridor
+immediately instead of leaving the unit blocked for a retry interval. Corner anticipation checks visibility
+before skipping a funnel corner. Stuck detection measures meaningful reduction in route distance rather than
+accepting tiny contact slides as progress. Enemy retries back off to at most one per four configured retry
+intervals during persistent congestion. Heroes retain their movement order while trying up to three path repairs,
+then stop safely if no progress is possible. Recovery never teleports across obstacles or increases attack reach.
+
+The Editor's **Movement Debug** submenu independently toggles unit collision cylinders/radii,
+terrain/obstacle geometry and solid bounds, walkable polygon connections, current enemy paths/destinations,
+and red stuck-unit indicators. The enemy inspector reports navigation/congestion/progress causes and retry counts.
+The existing **Show NavMesh** toggle remains independent. These overlays are absent from Game.
+
+Regression coverage includes stationary blockers, opposing traffic and hero contact at 15/60/144 FPS;
+hero-to-hero passing; rotated solid interiors and empty AABB corners; polygon connection reset; and the shipped
+Level 1 GLB terrain. All three heroes traverse both ramps and the bridge in both directions at 15/60/144 FPS.
+Groups of 36 Goblins, Skeletons and Goblin bosses traverse the same ascent at those frame rates across two full
+load/unload cycles. Existing tests cover size-limited corridors, 100/500-unit throughput, moving melee targets,
+tower placement/removal and route reopening, Ghost obstacle immunity, and repeated NavMesh rebuilds.
+
+The shipped Level 1 terrain passed these traversal checks without changing its ramps, bridge or terrain geometry.
+Routes narrower than an agent's eroded clearance remain unreachable; units stop rather than crossing solid cliffs.
+
+Debug Game and Editor build successfully. All 47 CTest cases were verified across the complete suite and focused
+reruns. The legacy First Watch playthrough now upgrades its shared approach first and moves its melee defender
+earlier to account for physical unit spacing; game definitions, stats and rewards are unchanged. Editor checkbox
+tests explicitly clear popup focus between actions while preserving the selected scene object. Build/test logs are
+in `out/phase49_final_build.log`, `out/phase49_final_tests.log`, `out/phase49_verification_tests.log` and
+`out/phase49_editor_check_tests.log`.
+
 Phase 14 uses the official [Recast Navigation 1.6.0 release](https://github.com/recastnavigation/recastnavigation/releases/tag/v1.6.0). CMake FetchContent pins its archive and SHA-256 digest. Only Recast and Detour are compiled; DetourCrowd, tile cache, upstream demos and tests are not included. Upstream sources are unchanged. The small CMake wrapper avoids the release's obsolete CMake minimum, following the project's existing dependency approach.
 
 ## Running the example

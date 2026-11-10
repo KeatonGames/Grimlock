@@ -139,8 +139,8 @@ visual playthrough was performed.
 Enemy kills emit one render-only dungeon coin from the body. It rises and rotates
 for 1.25 seconds, shrinking away at the end. Corpses finish their death animation
 before a 0.65-second dissolve removes them. These effects have no collision or
-targeting, clear on level reset, and do not award gold: existing wave rewards stay
-unchanged.
+targeting and clear on level reset. Separately, Goblins and the Goblin Boss grant 2 coins per permanent death
+through the shared kill-reward ledger. Existing wave rewards remain additional bonuses.
 
 `Goblin.Runtime` covers the imported meshes/rig, idle/walk/run/attack/death states,
 damage flash, no per-frame attack restart, ignored tactical scores, visibility,

@@ -1,3 +1,4 @@
+#include "systems/tower_system.hpp"
 #include "ui/game_hud.hpp"
 
 #include <SDL3/SDL.h>
@@ -107,6 +108,8 @@ int main(int argc, char** argv) {
         engine.setCameraNavigationEnabled(false);
         if (argc == 5 && std::string_view{argv[2]} == "--scene") {
             engine.setScene(engine.loadScene(argv[3]));
+            game::TowerSystem towers;
+            towers.synchronize(engine);
             save(engine, argv[4]);
         } else if (argc == 5 && std::string_view{argv[2]} == "--level") {
             game::LevelRuntime runtime;

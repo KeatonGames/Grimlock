@@ -24,7 +24,9 @@ and development tools. Game does not link Editor or GameDebug.
 - Scene editor with model placement, grouping, duplication/deletion, transform editing, scene saving/loading and animation controls.
 - Optional XZ navigation grid with configurable dimensions/origin/cell size, walkability painting, revision tracking and scene serialization.
 - Imported 3D terrain with elevation-aware Recast navigation, tower placement and combat; see [terrain authoring](docs/terrain.md).
+- Radius-aware unit collision, local passing and bounded stuck recovery, with optional Editor movement overlays; see [navigation](docs/navigation.md#collision-and-stuck-unit-audit-phase-49).
 - One tower per Editor-authored construction zone, with fixed construction points and facing; see [build zones](docs/build_zones.md).
+- Wooden Archer Towers and stone Mage Towers with animated hero defenders, white arrows and purple fireballs; see [tower visuals](docs/towers.md).
 - Terrain-aware targeting and swept projectile collision, with optional Editor visibility rays; see [combat and cover](docs/combat.md).
 - Data-driven Goblin, Siege and Hunter targeting policies and a four-wave elevated scenario; see [enemy archetypes](docs/enemy_archetypes.md).
 - Boss definitions reuse enemy combat/navigation and add stacked Game HUD health bars; see [boss encounters](docs/bosses.md).

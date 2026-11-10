@@ -31,6 +31,8 @@ struct Tower {
     std::filesystem::path model = "towers/structures/primitives/cube.glb";
     glm::dvec3 halfExtent{0.45, 0.75, 0.45};
     glm::dvec3 visualScale{0.45, 0.75, 0.45};
+    double firingHeight = 0; // Height above the foundation; zero retains the legacy collider-top origin.
+    glm::dvec2 firingOffset{0};
 
     [[nodiscard]] TerrainBox bounds() const;
     bool operator==(const Tower&) const = default;

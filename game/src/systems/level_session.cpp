@@ -47,6 +47,7 @@ void LevelSession::begin(Engine& engine, NavigationSession& navigation, LevelDef
     navigation.setDestinationHeight(prepared.definition().objectiveHeight);
     waves_ = std::move(prepared);
     economy_.reset(waves_->definition().startingGold);
+    collectedKillGold_ = navigation.enemies()->metrics().killGold;
     lastWaveReward_.reset();
     types_ = std::move(types);
     scene_ = engine.scene();
@@ -84,6 +85,7 @@ void LevelSession::stop(NavigationSession& navigation) {
     combat_.reset();
     waves_.reset();
     economy_.reset();
+    collectedKillGold_ = 0;
     lastWaveReward_.reset();
     types_.clear();
     scene_ = nullptr;
@@ -91,6 +93,18 @@ void LevelSession::stop(NavigationSession& navigation) {
     enemyCombat_ = {};
     navigation.setSpawnRoutes({});
     navigation.setPlacementEnabled(true);
+}
+
+void LevelSession::collectKillRewards(const EnemySystem& enemies) {
+    if (!waves_) {
+        return;
+    }
+    const auto total = enemies.metrics().killGold;
+    if (total < collectedKillGold_) {
+        collectedKillGold_ = 0;
+    }
+    economy_.earn(total - collectedKillGold_);
+    collectedKillGold_ = total;
 }
 
 void LevelSession::startWave(NavigationSession& navigation) {
@@ -116,6 +130,7 @@ void LevelSession::update(Engine& engine, NavigationSession& navigation, double 
         return;
     }
     if (waves_->phase() != LevelPhase::battle) {
+        collectKillRewards(*navigation.enemies());
         navigation.setPlacementEnabled(waves_->phase() == LevelPhase::preparation);
         navigation.synchronize(engine);
         navigation.enemies()->updateEffects(delta);
@@ -148,6 +163,7 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
     navigation.towers().updateEffects(engine, delta);
     const auto combatStart = performanceEnabled_ ? Clock::now() : Clock::time_point{};
     combat_->update(navigation.towers(), *navigation.enemies(), delta, &navigation.combatGeometry());
+    collectKillRewards(*navigation.enemies());
     if (performanceEnabled_) {
         const auto milliseconds = [](auto begin, auto end) {
             return std::chrono::duration<double, std::milli>(end - begin).count();
@@ -190,6 +206,9 @@ void LevelSession::updateBattle(Engine& engine, NavigationSession& navigation, d
         }
         enemyCombat_.stop(*navigation.enemies());
         combat_->clearProjectiles();
+        for (const auto& tower : navigation.towers().towers()) {
+            navigation.towers().updateOperator(engine, tower.object, std::nullopt, false, 0);
+        }
     }
 }
 

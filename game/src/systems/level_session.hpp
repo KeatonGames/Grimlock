@@ -29,6 +29,7 @@ public:
     void stop(NavigationSession& navigation);
     void startWave(NavigationSession& navigation);
     void update(Engine& engine, NavigationSession& navigation, double delta, HeroSystem* heroes = nullptr);
+    void collectKillRewards(const EnemySystem& enemies);
     [[nodiscard]] std::string constructionError(const NavigationSession& navigation, const Tower& tower) const;
     [[nodiscard]] ObjectId buildTower(Engine& engine, NavigationSession& navigation, const Tower& tower);
     [[nodiscard]] std::string upgradeError(const NavigationSession& navigation, ObjectId tower) const;
@@ -58,6 +59,7 @@ private:
     const Scene* scene_ = nullptr;
     std::vector<EnemyTypeId> types_;
     std::uint64_t arrivals_ = 0;
+    std::uint64_t collectedKillGold_ = 0;
     ObjectId objectiveObject_ = 0;
     EconomySystem economy_;
     std::optional<std::uint64_t> lastWaveReward_;

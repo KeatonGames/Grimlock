@@ -6,6 +6,7 @@
 
 #include <grimlock/ecs.hpp>
 #include <grimlock/engine.hpp>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -47,6 +48,27 @@ enum class MovementStatus {
     arrived,
     blocked
 };
+
+enum class MovementBlockage {
+    none,
+    navigation,
+    crowd,
+    noProgress
+};
+
+[[nodiscard]] inline const char* movementBlockageName(MovementBlockage blockage) noexcept {
+    switch (blockage) {
+    case MovementBlockage::none:
+        return "None";
+    case MovementBlockage::navigation:
+        return "Invalid or unreachable navigation";
+    case MovementBlockage::crowd:
+        return "Unit congestion";
+    case MovementBlockage::noProgress:
+        return "Insufficient route progress";
+    }
+    return "Unknown";
+}
 
 enum class EnemyState {
     idle,
@@ -92,6 +114,13 @@ struct EnemyRuntimeComponent : HealthComponent {
     NavigationPath path;
     std::optional<glm::dvec2> requestedDestination;
     double repathDelay = 0, stuckTime = 0;
+    double progressRemaining = std::numeric_limits<double>::max();
+    std::optional<EnemyId> avoidanceEnemy;
+    std::optional<std::uint64_t> avoidanceDefender;
+    glm::dvec3 avoidancePoint{0};
+    std::uint32_t recoveryAttempts = 0;
+    MovementBlockage blockage = MovementBlockage::none;
+    bool contactedUnit = false;
     bool retryPath = false;
     bool destinationAssigned = false;
 };

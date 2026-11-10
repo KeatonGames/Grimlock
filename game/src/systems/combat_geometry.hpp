@@ -57,7 +57,10 @@ private:
 }
 
 [[nodiscard]] inline glm::dvec3 firingOrigin(const Tower& tower) {
-    return tower.position + glm::dvec3{0, tower.halfExtent.y + 0.1, 0};
+    return tower.position + tower.rotation * glm::dvec3{tower.firingOffset.x,
+                                                        tower.firingHeight > 0 ? tower.firingHeight - tower.halfExtent.y
+                                                                               : tower.halfExtent.y + 0.1,
+                                                        tower.firingOffset.y};
 }
 
 } // namespace grimlock::game

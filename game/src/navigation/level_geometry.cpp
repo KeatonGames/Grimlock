@@ -124,13 +124,14 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
                     .emplace(object.model, engine.modelTriangles(engine.loadModel(engine.assetRoot() / object.model)))
                     .first;
         }
-        glm::vec3 minimum{std::numeric_limits<float>::max()}, maximum{-std::numeric_limits<float>::max()};
+        std::vector<glm::vec3> obstaclePoints;
         for (const auto& triangle : found->second) {
             std::array<glm::vec3, 3> world;
             for (std::size_t i = 0; i < 3; ++i) {
                 world[i] = object.world * glm::vec4{triangle[i], 1};
-                minimum = glm::min(minimum, world[i]);
-                maximum = glm::max(maximum, world[i]);
+                if (object.role != "grimlock.terrain") {
+                    obstaclePoints.push_back(world[i]);
+                }
             }
             // Preserve outward winding under mirrored scene transforms.
             if (glm::determinant(glm::mat3{object.world}) < 0) {
@@ -139,8 +140,9 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
             geometry.addTriangle(world[0], world[1], world[2], object.role == "grimlock.terrain");
         }
         if ((object.role == "grimlock.obstacle" || object.role == "grimlock.objective") && !found->second.empty()) {
-            // Obstacle volumes are conservative; their shells must not leave navigable interiors.
-            geometry.solidBoxes.push_back({minimum, maximum});
+            // Fill interiors using the transformed footprint. A world AABB unnecessarily
+            // blocks the empty corners beside rotated walls and structures.
+            geometry.addSolidVolume(obstaclePoints);
         }
     }
     geometry_ = std::move(geometry);
@@ -190,6 +192,31 @@ std::string LevelGeometry::supportError(const Tower& tower) const {
     const auto inverse = glm::inverse(tower.rotation);
     const double bottom = tower.position.y - tower.halfExtent.y;
     const auto bounds = tower.bounds();
+    for (const auto& volume : geometry_.solidVolumes) {
+        if (bounds.center.y + bounds.halfExtent.y <= volume.minimumHeight + 1e-5 ||
+            bounds.center.y - bounds.halfExtent.y >= volume.maximumHeight - 1e-5) {
+            continue;
+        }
+        const auto inside = [&](glm::dvec3 point) {
+            for (std::size_t i = 0; i < volume.footprint.size(); ++i) {
+                const auto a = volume.footprint[i], b = volume.footprint[(i + 1) % volume.footprint.size()];
+                if ((b.x - a.x) * (point.z - a.z) - (b.z - a.z) * (point.x - a.x) < -1e-6) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (inside(tower.position)) {
+            return "Tower overlaps an obstacle volume.";
+        }
+        for (const double x : {-tower.halfExtent.x, tower.halfExtent.x}) {
+            for (const double z : {-tower.halfExtent.z, tower.halfExtent.z}) {
+                if (inside(tower.position + tower.rotation * glm::dvec3{x, 0, z})) {
+                    return "Tower overlaps an obstacle volume.";
+                }
+            }
+        }
+    }
     for (const auto& solid : geometry_.solidBoxes) {
         const auto minimum = glm::vec3{bounds.center - bounds.halfExtent};
         const auto maximum = glm::vec3{bounds.center + bounds.halfExtent};

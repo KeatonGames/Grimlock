@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -46,6 +47,7 @@ struct EnemyDefinition {
     double stuckTimeout = 2;
     float visualHeight = 0.36F; // Independent of the physical radius and headroom.
     float maximumHealth = 100;
+    std::uint64_t killReward = 0;
     std::string movementAnimation = "walk";
     std::string idleAnimation, runAnimation, deathAnimation;
     float animationSpeed = 1;

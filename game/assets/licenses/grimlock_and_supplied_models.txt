@@ -12,3 +12,7 @@ Other pre-existing animal models retain their original supplied provenance.
 KayKit Adventurers and Character Animations: Kay Lousberg, CC0, with original
 license texts retained alongside this notice. Kenney packs retain each supplied
 license text. Full original-to-current model paths: docs/asset_migration.json.
+
+archer_tower.glb and mage_tower.glb are grounded derivatives of the supplied Kenney
+Castle siege-tower and Pirate tower-complete-small models; their original CC0 licenses apply.
+fireball_purple.glb is original Grimlock procedural geometry dedicated to CC0.

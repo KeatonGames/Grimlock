@@ -59,6 +59,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
                                 const CombatGeometry* geometry) {
     geometry_ = geometry;
     targets_.clear();
+    movementBodies_.clear();
     for (const auto& tower : towers.towers()) {
         targets_.push_back({{DefensiveTargetKind::tower, tower.entity},
                             meleeBody(tower),
@@ -68,6 +69,8 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
     if (heroes) {
         for (const auto& hero : heroes->heroes()) {
             if (hero.health > 0 && heroes->find(hero.id)) {
+                movementBodies_.push_back(
+                    {hero.position, heroes->definition(hero).radius, heroes->definition(hero).height, hero.id});
                 targets_.push_back({{DefensiveTargetKind::hero, hero.id},
                                     {hero.position, heroes->definition(hero).radius},
                                     0,
@@ -75,6 +78,7 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
             }
         }
     }
+    enemies.setMovementObstacles(movementBodies_);
     for (auto& enemy : enemies.enemies_) {
         if (!enemy.active || !enemy.alive || !enemy.navigation || (enemy.intangible && !objective_) ||
             enemy.life != Enemy::Life::living) {
@@ -253,6 +257,9 @@ void EnemyCombatSystem::prepare(EnemySystem& enemies,
         enemy.retryPath = false;
         enemy.state = EnemyState::moving;
         enemy.stuckTime = 0;
+        enemy.progressRemaining = std::numeric_limits<double>::max();
+        enemy.avoidanceEnemy.reset();
+        enemy.avoidanceDefender.reset();
     }
 }
 

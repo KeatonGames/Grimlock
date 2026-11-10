@@ -50,6 +50,7 @@ public:
     void resetUpgrades() noexcept;
     [[nodiscard]] bool applyDamage(Engine& engine, ObjectId tower, float damage);
     void updateEffects(Engine& engine, double delta);
+    void updateOperator(Engine& engine, ObjectId tower, std::optional<glm::dvec3> target, bool fire, double delta);
 
     [[nodiscard]] std::span<const TowerDefinition> definitions() const noexcept {
         return definitions_;
@@ -80,6 +81,16 @@ private:
     }
 
     void resetCombat() noexcept;
+    void synchronizeOperators(Engine& engine);
+
+    struct OperatorVisual {
+        ObjectId object = 0;
+        glm::vec3 modelFoot{0};
+        float scale = 1;
+        double remaining = 0;
+    };
+
+    std::map<ObjectId, OperatorVisual> operators_;
     const Scene* scene_ = nullptr;
     ecs::Registry registry_;
     ecs::Storage<Tower>& towers_;

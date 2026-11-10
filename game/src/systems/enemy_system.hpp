@@ -13,6 +13,7 @@ struct EnemyMetrics {
     CrowdMetrics crowd;
     std::uint64_t arrived = 0;
     std::uint64_t defeated = 0;
+    std::uint64_t killGold = 0;
 };
 
 // Owns mixed animal instances and shared type configurations. Engine must outlive this system.
@@ -29,6 +30,11 @@ public:
     [[nodiscard]] bool remove(EnemyId id) noexcept;
     void clear() noexcept;
     void update(const NavMesh& navigation, std::optional<glm::dvec2> destination, double delta);
+
+    void setMovementObstacles(std::span<const MovementBody> bodies) {
+        movement_.setObstacles(bodies);
+    }
+
     [[nodiscard]] bool applyDamage(EnemyId id,
                                    float damage,
                                    DefensiveTarget attacker = {},

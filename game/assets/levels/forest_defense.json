@@ -4,7 +4,7 @@
     "name":  "Level 01 - Forest Defense",
     "description":  "Cross the timber bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.",
     "scene":  "scenes/forest_defense.json",
-    "starting_gold":  120,
+    "starting_gold":  20,
     "hero_spawns":  [
                         [
                             -7,
@@ -50,7 +50,7 @@
     "waves":  [
                   {
                       "name":  "Scouts on the trail",
-                      "gold_reward":  30,
+                      "gold_reward":  0,
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
@@ -64,7 +64,7 @@
                   },
                   {
                       "name":  "Beneath the roots",
-                      "gold_reward":  40,
+                      "gold_reward":  0,
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
@@ -86,7 +86,7 @@
                   },
                   {
                       "name":  "The woodland raiders",
-                      "gold_reward":  50,
+                      "gold_reward":  0,
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
@@ -124,7 +124,7 @@
                   },
                   {
                       "name":  "Hold the ascent",
-                      "gold_reward":  70,
+                      "gold_reward":  0,
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",

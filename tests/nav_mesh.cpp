@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <grimlock/terrain.hpp>
 #include <iostream>
 #include <limits>
@@ -137,6 +138,38 @@ void checkRouteVisual() {
     require(visual.points().empty() && visual.dashes().empty(), "visual route retained invalid polygons after rebuild");
 }
 
+void checkCornerTraversal() {
+    NavigationGeometry geometry;
+    geometry.addBox({-6, -0.2F, -6}, {6, 0, 6}, true);
+    geometry.addBox({-1, 0, -1}, {1, 2, 1}, false);
+    NavMesh navigation;
+    require(navigation.build(geometry), navigation.status().c_str());
+    for (const double z : {-2.0, -0.8, 0.0, 0.8, 2.0}) {
+        NavigationPath path;
+        require(navigation.findPath({-4, 0, z}, {4, 0, -z}, path), "corner route missing");
+        require(!navigation.movementRoute({-4, 0, z}, path).empty(), "corner anticipation pinned a route to a wall");
+    }
+    NavigationPath corridor;
+    require(navigation.findPath({-4, 0, -0.8}, {4, 0, -0.8}, corridor), "corridor repair fixture missing");
+    const auto displaced = navigation.project({0, 0, 1.5}, 0.03);
+    require(displaced && navigation.steering(displaced->position, corridor).has_value() && corridor.valid,
+            "valid local avoidance displacement invalidated the cached corridor instead of repairing it");
+}
+
+void checkRotatedObstacle() {
+    NavigationGeometry geometry;
+    geometry.addBox({-6, -0.2F, -6}, {6, 0, 6}, true);
+    const auto transform = glm::rotate(glm::mat4{1}, glm::radians(45.0F), glm::vec3{0, 1, 0});
+    geometry.addBox({-2, 0, -0.25F}, {2, 2, 0.25F}, transform);
+    NavMesh navigation;
+    require(navigation.build(geometry), navigation.status().c_str());
+    require(!navigation.contains({0, 0, 0}), "rotated obstacle retained a buried walkable interior");
+    require(navigation.contains({1.3, 0, 1.3}), "rotated obstacle blocked the empty corner of its world AABB");
+    require(!navigation.debugConnections().empty(), "walkable polygon connections missing");
+    navigation.reset();
+    require(navigation.debugConnections().empty(), "reset retained stale polygon connections");
+}
+
 void checkConfiguration() {
     NavigationGeometry corridor;
     corridor.addBox({0, -0.2F, 0}, {10, 0, 5}, true);
@@ -227,6 +260,8 @@ int main() {
         checkQueries();
         checkObstacles();
         checkRouteVisual();
+        checkCornerTraversal();
+        checkRotatedObstacle();
         checkConfiguration();
         checkTerrainAdapter();
         std::cout << "PASS NavMesh geometry, projection, funnel paths, clearance, radius/height/slope/climb, invalid "

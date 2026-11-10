@@ -2,10 +2,18 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 namespace grimlock::game {
+
+struct MovementBody {
+    glm::dvec3 position{0};
+    double radius = 0, height = 0;
+    std::uint64_t id = 0;
+};
 
 inline double contactFraction(glm::dvec2 offset, glm::dvec2 displacement, double distance) {
     const double a = glm::dot(displacement, displacement);

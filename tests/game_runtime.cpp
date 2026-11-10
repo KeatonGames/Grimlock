@@ -84,7 +84,7 @@ void control(Engine& engine,
     tick(engine, runtime);
     for (float y = panel->InnerClipRect.Min.y + 4; y < panel->InnerClipRect.Max.y; y += 4) {
         float x = panel->DC.CursorStartPos.x + 50;
-        if (std::string_view{label} == "Large Tower") {
+        if (std::string_view{label} == "Mage Tower") {
             x = panel->DC.CursorStartPos.x + 200 * ImGui::GetStyle().FontScaleMain;
         }
         const glm::vec2 point{x, y};
@@ -186,14 +186,19 @@ int main() {
         focus.window.windowID = id;
         require(SDL_PushEvent(&focus), SDL_GetError());
         tick(engine, runtime);
-        control(engine, runtime, id, "Build Towers", "Small Tower", "basic");
+        control(engine, runtime, id, "Build Towers", "Archer Tower", "basic");
         require(runtime.placing() && runtime.navigation().towers().towers().empty() &&
                     runtime.level().economy().gold() == 200,
                 "HUD click placed a tower or charged before confirmation");
         const auto point = screen(engine, window, {-3.3F, 0, 0});
+        const auto beforePreview = engine.performance().instances;
+        const auto previewObjects = engine.scene()->objects().size();
         mouse(id, SDL_EVENT_MOUSE_MOTION, point);
         tick(engine, runtime);
         require(runtime.preview() && runtime.placementError().empty(), "game placement preview is not valid");
+        require(engine.performance().instances == beforePreview + 2 &&
+                    engine.scene()->objects().size() == previewObjects,
+                "Tower and animated defender preview did not use separate temporary render instances");
         const auto previewBeforeUi = runtime.preview();
         const auto healthCenter = ImGui::FindWindowByName("Objective Health")->Rect().GetCenter();
         const glm::vec2 uiPoint{healthCenter.x, healthCenter.y};
@@ -210,22 +215,25 @@ int main() {
                     runtime.level().economy().gold() == expectedGold &&
                     !runtime.navigation().navigation().contains({-3.3, 0, 0}),
                 "game construction or navigation update failed");
+        const auto beforeCancelPreview = engine.performance().instances;
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
         tick(engine, runtime);
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
         tick(engine, runtime);
         require(!runtime.placing(), "Escape did not cancel gameplay placement");
+        require(engine.performance().instances + 2 == beforeCancelPreview,
+                "Cancelling tower placement retained preview models");
         click(engine, runtime, id, screen(engine, window, {-3.3F, 0.75F, 0}));
         require(runtime.inspectedTower(), "gameplay tower selection failed");
-        control(engine, runtime, id, "Build Towers", "Large Tower", "wide");
+        control(engine, runtime, id, "Build Towers", "Mage Tower", "wide");
         const auto largePoint = screen(engine, window, {0.1F, 0, 0});
         mouse(id, SDL_EVENT_MOUSE_MOTION, largePoint);
         tick(engine, runtime);
-        require(runtime.preview() && runtime.placementError().empty(), "Large Tower preview invalid");
+        require(runtime.preview() && runtime.placementError().empty(), "Mage Tower preview invalid");
         click(engine, runtime, id, largePoint);
         expectedGold -= runtime.navigation().towers().definition("wide").constructionCost;
         require(runtime.navigation().towers().towers().size() == 2 && runtime.level().economy().gold() == expectedGold,
-                "Large Tower construction failed");
+                "Mage Tower construction failed");
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
         tick(engine, runtime);
         ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
@@ -260,14 +268,23 @@ int main() {
         };
         rejectUpgrade(smallTower);
         click(engine, runtime, id, screen(engine, window, {0.1F, 0.6F, 0}));
-        require(runtime.inspectedTower() && runtime.inspectedTower()->type == "wide", "Large Tower selection failed");
+        require(runtime.inspectedTower() && runtime.inspectedTower()->type == "wide", "Mage Tower selection failed");
         const auto largeTower = runtime.inspectedTower()->object;
+        require(!engine.scene()->object(largeTower).selectionHighlight,
+                "Selected Game tower retained the blue model tint");
         require(runtime.navigation().towers().progress(largeTower).level == 1, "one tower upgraded another");
         control(engine, runtime, id, "Tower Info", "Upgrade");
         expectedGold -= runtime.navigation().towers().definition("wide").statistics(2).upgradeCost;
         require(runtime.navigation().towers().progress(largeTower).level == 2 &&
                     runtime.level().economy().gold() == expectedGold,
-                "Large Tower upgrade incorrect");
+                "Mage Tower upgrade incorrect");
+        if (runtime.level().upgradeError(runtime.navigation(), largeTower).empty()) {
+            control(engine, runtime, id, "Tower Info", "Upgrade");
+            expectedGold -= runtime.navigation().towers().definition("wide").statistics(3).upgradeCost;
+            require(runtime.navigation().towers().progress(largeTower).level == 3 &&
+                        runtime.level().economy().gold() == expectedGold,
+                    "Affordable Mage Tower upgrade did not use the remaining construction savings");
+        }
         rejectUpgrade(largeTower);
         require(runtime.heroes() && runtime.heroes()->heroes().size() == 3, "Full party did not spawn");
         const auto heroId = runtime.heroes()->heroes().front().id;
@@ -308,7 +325,8 @@ int main() {
         rejectUpgrade(largeTower);
         click(engine, runtime, id, heroPoint(engine, window, *runtime.heroes()->find(heroId)));
         require(runtime.selectedHero() && engine.selectedObject() == heroObject, "hero picking/highlighting failed");
-        const auto destination = screen(engine, window, {-5, 0, -1});
+        // Use visible foreground terrain; the larger wooden roof covers the old ground pixel.
+        const auto destination = screen(engine, window, {-5, 0, 1});
         const auto cameraBeforeClick = engine.scene()->resolvedCamera();
         const auto destinationBeforeHover = runtime.selectedHero()->destination;
         const auto pathBeforeHover = runtime.selectedHero()->path.polygons;
@@ -333,7 +351,7 @@ int main() {
         }
         require(runtime.heroes()->find(heroId)->state == HeroState::reached &&
                     glm::length(glm::dvec2{runtime.heroes()->find(heroId)->position.x + 5,
-                                           runtime.heroes()->find(heroId)->position.z + 1}) < 0.15,
+                                           runtime.heroes()->find(heroId)->position.z - 1}) < 0.15,
                 "game hero failed to navigate around towers/walls");
         click(engine, runtime, id, heroPoint(engine, window, *runtime.heroes()->find(heroId)));
         require(runtime.selectedHero() && runtime.selectedHero()->id == heroId,
@@ -459,7 +477,7 @@ int main() {
         require(runtime.navigation().towers().progress(rebuiltId).level == 1, "restart retained tower upgrades");
         definition.objectiveHealth = 1;
         definition.heroSpawns.clear();
-        definition.startingGold = 20;
+        definition.startingGold = runtime.navigation().towers().definition("basic").constructionCost - 1;
         saveLevelDefinition(levelPath, definition);
         runtime.restart(engine);
         runtime.heroes()->clear(); // Explicit undefended defeat fixture.
@@ -473,7 +491,8 @@ int main() {
         tick(engine, runtime);
         control(engine, runtime, id, "Wave Controls", "Start Wave");
         finishBattle(engine, runtime);
-        require(runtime.level().waves()->phase() == LevelPhase::defeat && runtime.level().economy().gold() == 20,
+        require(runtime.level().waves()->phase() == LevelPhase::defeat &&
+                    runtime.level().economy().gold() == definition.startingGold,
                 "Game defeat or reward handling incorrect");
         for (const auto& roster :
              {std::vector<std::string>{}, {"ranger"}, {"knight", "mage"}, {"knight", "ranger", "mage"}}) {

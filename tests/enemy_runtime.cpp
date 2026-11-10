@@ -92,12 +92,11 @@ void navigationControl(Engine& engine,
     if (detail) {
         popupControl(engine, window, detail);
     }
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
+    // Checkbox submenus keep their parents open. Isolate helper actions from popup
+    // and menu-bar keyboard focus; actual checkbox interaction above still uses SDL clicks.
+    ImGui::ClosePopupsOverWindow(nullptr, false);
+    ImGui::SetWindowFocus(nullptr);
     tick(engine);
-    ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
-    tick(engine);
-    // Escape leaves keyboard focus on the menu bar; return to the viewport before reopening it.
-    click(engine, window, {700, 680});
 }
 
 void panelControl(Engine& engine, SDL_WindowID window, const char* label) {
@@ -406,10 +405,10 @@ void checkTowers(Engine& engine,
     session.selectAnimal(engine, 0);
     session.spawnArea() = {{1, 3.3}, {2.5, 4.7}, 0};
     session.setDestination(glm::dvec2{10.25, 4});
-    game::Tower propOverlap;
+    auto propOverlap = session.towers().definition("basic").instance();
     propOverlap.position = {8, 0.75, 6};
     require(!session.checkTower(engine, propOverlap).empty(), "ordinary scene model overlap accepted");
-    game::Tower cached;
+    auto cached = session.towers().definition("basic").instance();
     cached.position = {5.37, 0.75, 3.55};
     require(session.checkTower(engine, cached).empty(), "unused large animal profiles prevented chicken placement");
     game::EnemyTypeId dog = 0;
@@ -496,7 +495,7 @@ void checkTowers(Engine& engine,
             "on-demand profile rebuild did not include existing towers");
     session.selectAnimal(engine, 0);
 
-    game::Tower closing;
+    auto closing = session.towers().definition("basic").instance();
     closing.position = {5.5, 0.75, 4.55};
     const auto beforeRejected = session.navigation().revision();
     require(!session.checkTower(engine, closing).empty() && session.navigation().revision() == beforeRejected,
@@ -509,7 +508,7 @@ void checkTowers(Engine& engine,
     }
     require(rejected && session.towers().towers().size() == 1, "invalid placement created a scene object");
     require(!session.checkTower(engine, first).empty(), "tower overlap accepted");
-    game::Tower wall;
+    auto wall = session.towers().definition("basic").instance();
     wall.position = {5.5, 0.75, 1.5};
     require(!session.checkTower(engine, wall).empty(), "wall overlap accepted");
 
@@ -517,13 +516,13 @@ void checkTowers(Engine& engine,
     session.update(engine, 0);
     const auto* surface = session.enemies()->enemies()[0].navigation;
     const auto oldPathRevision = session.enemies()->enemies()[0].path.revision;
-    game::Tower second;
+    auto second = session.towers().definition("basic").instance();
     second.position = {8.2, 0.75, 2.3};
     const auto secondId = session.placeTower(engine, second);
     require(session.enemies()->enemies()[0].navigation == surface && surface->revision() != oldPathRevision,
             "installing a tower invalidated a borrowed mesh address");
     require(engine.scene()->animation(first.object).asset() == engine.scene()->animation(secondId).asset(),
-            "tower instances did not share the cube model");
+            "Archer Tower instances did not share their model");
     session.update(engine, 1.0 / 60);
     require(session.enemies()->enemies()[0].path.revision == surface->revision(), "enemy kept stale tower corridors");
     bool passed = false, reached = false;
@@ -566,7 +565,7 @@ void checkTowers(Engine& engine,
     require(session.removeTower(engine, secondId) && !session.removeTower(engine, secondId) &&
                 session.towers().towers().empty(),
             "tower removal retained stale IDs");
-    navigationControl(engine, windowId, "Towers", "Tower Type", "Large Tower");
+    navigationControl(engine, windowId, "Towers", "Tower Type", "Mage Tower");
     click(engine, windowId, {130, 11});
     popupControl(engine, windowId, "Towers");
     popupControl(engine, windowId, "Place Tower");
@@ -580,11 +579,11 @@ void checkTowers(Engine& engine,
     const auto wide = session.towers().towers().back();
     require(wide.type == "wide" && wide.halfExtent == session.towers().definition("wide").halfExtent,
             "tower selection did not use its configured footprint");
-    game::Tower basic;
+    auto basic = session.towers().definition("basic").instance();
     basic.position = {7.8, 0.75, 4.1};
     const auto basicId = session.placeTower(engine, basic);
-    require(engine.scene()->animation(wide.object).asset() == engine.scene()->animation(basicId).asset(),
-            "tower types duplicated shared model resources");
+    require(engine.scene()->animation(wide.object).asset() != engine.scene()->animation(basicId).asset(),
+            "Archer and Mage Towers did not use distinct models");
     auto editedVisual = engine.scene()->object(wide.object).local;
     editedVisual.rotation = glm::angleAxis(0.3F, glm::vec3{0, 1, 0});
     engine.scene()->setTransform(wide.object, editedVisual);
@@ -627,7 +626,7 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
                      {"Editor mixed wave", {{"Chicken", 0, 4, 2, 0, 1.5}, {"Black Rat", 1, 4, 2, 0, 2}}, 35},
                      {"Editor final wave", {{"Bunny", 1, 2, 2, 0, 0}, {"Chicken", 0, 4, 1, 4, 1}}, 50}};
     level.begin(engine, session, fixture);
-    game::Tower tower;
+    auto tower = session.towers().definition("basic").instance();
     tower.position = {-3.3, 0.75, 0};
     const auto failsWithoutSpending = [&](const game::Tower& candidate) {
         const auto gold = level.economy().gold();
@@ -647,18 +646,18 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
     ImGui::SetWindowPos("Level", {900, 35});
     ImGui::SetWindowFocus("Level");
     tick(engine);
-    panelControl(engine, window, "Small Tower");
+    panelControl(engine, window, "Archer Tower");
     panelControl(engine, window, "Build Tower");
     auto* native = SDL_GetWindowFromID(window);
     click(engine, window, screenPoint(engine, native, {-3.3, 0, 0}));
-    require(session.towers().towers().size() == 1 && level.economy().gold() == 70,
+    require(session.towers().towers().size() == 1 && level.economy().gold() == 90,
             "gameplay UI construction did not charge the configured cost");
     failsWithoutSpending(tower);
     ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, true);
     tick(engine);
     ImGui::GetIO().AddKeyEvent(ImGuiKey_Escape, false);
     tick(engine);
-    std::uint64_t expectedGold = 70;
+    std::uint64_t expectedGold = 90;
     std::uint64_t objectiveHits = 0;
     for (int wave = 0; wave < 3; ++wave) {
         require(level.waves()->phase() == game::LevelPhase::preparation, "wave skipped preparation");
@@ -710,13 +709,15 @@ void checkLevels(Engine& engine, game::NavigationDebug& debug, editor::Editor& e
             "level restart retained towers, arrivals or progress");
 
     auto poor = definition;
-    poor.startingGold = 29;
+    poor.startingGold = session.towers().definition("basic").constructionCost - 1;
     level.begin(engine, session, poor);
     failsWithoutSpending(tower);
     // The editor's authoring path remains free even while a gameplay level is active.
     const auto authored = session.placeTower(engine, tower, game::PlacementMode::authoring);
-    require(level.economy().gold() == 29 && engine.scene()->contains(authored), "editor authoring spent gameplay gold");
-    require(session.removeTower(engine, authored) && level.economy().gold() == 29, "removal refunded gold");
+    require(level.economy().gold() == poor.startingGold && engine.scene()->contains(authored),
+            "editor authoring spent gameplay gold");
+    require(session.removeTower(engine, authored) && level.economy().gold() == poor.startingGold,
+            "removal refunded gold");
 
     auto exact = definition;
     exact.startingGold = session.towers().definition("wide").constructionCost;
@@ -1013,6 +1014,17 @@ int main(int argc, char** argv) {
         navigationControl(engine, id, "Show Combat Visibility");
         tick(engine);
         require(debug.lines().size() == zoneLines, "combat debugging remained visible after disabling it");
+        for (const auto* overlay : {"Show Unit Collisions",
+                                    "Show Terrain / Obstacle Bounds",
+                                    "Show Walkable Connections",
+                                    "Show Unit Paths"}) {
+            navigationControl(engine, id, "Movement Debug", overlay);
+            tick(engine);
+            require(!debug.lines().empty() && debug.triangles().empty(), "Independent movement overlay was not drawn");
+            navigationControl(engine, id, "Movement Debug", overlay);
+            tick(engine);
+            require(debug.lines().empty(), "Movement overlay remained enabled after its toggle");
+        }
         navigationControl(engine, id, "Level", "Load Rival Watch");
         tick(engine, 3);
         require(debug.level().waves() && debug.level().waves()->definition().waves.size() == 4 &&

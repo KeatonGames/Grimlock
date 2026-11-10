@@ -1,7 +1,9 @@
 #include "navigation/navigation_geometry.hpp"
 
 #include <algorithm>
+#include <glm/geometric.hpp>
 #include <grimlock/terrain.hpp>
+#include <limits>
 
 namespace grimlock::game {
 
@@ -33,6 +35,67 @@ void NavigationGeometry::addBox(glm::vec3 minimum, glm::vec3 maximum, bool walka
     addTriangle(c, h, d, false);
     addTriangle(d, h, e, false);
     addTriangle(d, e, a, false);
+}
+
+void NavigationGeometry::addSolidVolume(std::span<const glm::vec3> points) {
+    if (points.empty()) {
+        return;
+    }
+    SolidVolume volume;
+    volume.minimumHeight = std::numeric_limits<float>::max();
+    volume.maximumHeight = -volume.minimumHeight;
+    std::vector<glm::vec3> sorted{points.begin(), points.end()};
+    for (const auto point : points) {
+        volume.minimumHeight = std::min(volume.minimumHeight, point.y);
+        volume.maximumHeight = std::max(volume.maximumHeight, point.y);
+    }
+    std::sort(sorted.begin(), sorted.end(), [](auto a, auto b) {
+        return a.x < b.x || (a.x == b.x && a.z < b.z);
+    });
+    sorted.erase(std::unique(sorted.begin(),
+                             sorted.end(),
+                             [](auto a, auto b) {
+                                 return a.x == b.x && a.z == b.z;
+                             }),
+                 sorted.end());
+    if (sorted.size() < 3) {
+        return;
+    }
+    const auto turn = [](auto a, auto b, auto c) {
+        return (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+    };
+    auto& hull = volume.footprint;
+    for (const auto point : sorted) {
+        while (hull.size() >= 2 && turn(hull[hull.size() - 2], hull.back(), point) <= 0) {
+            hull.pop_back();
+        }
+        hull.push_back(point);
+    }
+    const auto lower = hull.size();
+    for (auto it = sorted.rbegin() + 1; it != sorted.rend(); ++it) {
+        while (hull.size() > lower && turn(hull[hull.size() - 2], hull.back(), *it) <= 0) {
+            hull.pop_back();
+        }
+        hull.push_back(*it);
+    }
+    hull.pop_back();
+    if (hull.size() >= 3) {
+        solidVolumes.push_back(std::move(volume));
+    }
+}
+
+void NavigationGeometry::addBox(glm::vec3 minimum, glm::vec3 maximum, const glm::mat4& transform) {
+    NavigationGeometry local;
+    local.addBox(minimum, maximum, false);
+    std::vector<glm::vec3> points;
+    points.reserve(local.vertices.size() / 3);
+    for (std::size_t i = 0; i < local.vertices.size(); i += 3) {
+        points.push_back(transform * glm::vec4{local.vertices[i], local.vertices[i + 1], local.vertices[i + 2], 1});
+    }
+    for (std::size_t i = 0; i < points.size(); i += 3) {
+        addTriangle(points[i], points[i + 1], points[i + 2], false);
+    }
+    addSolidVolume(points);
 }
 
 NavigationGeometry navigationGeometry(std::span<const TerrainBox> boxes) {
