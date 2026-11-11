@@ -87,6 +87,11 @@ public:
     [[nodiscard]] FrameCapture captureFrame();
     void setVsync(bool enabled);
     [[nodiscard]] bool vsyncEnabled() const noexcept;
+    // Off is 1. Unsupported requested modes fall back to the highest supported lower mode.
+    void setMsaaSamples(std::uint32_t samples);
+    [[nodiscard]] std::uint32_t msaaSamples() const noexcept;
+    [[nodiscard]] std::vector<std::uint32_t> supportedMsaaSamples() const;
+    [[nodiscard]] glm::uvec2 renderingResolution() const noexcept;
 
     // Relative paths resolve beside the executable; canonical paths reuse one resource.
     [[nodiscard]] ModelId loadModel(const std::filesystem::path& path);

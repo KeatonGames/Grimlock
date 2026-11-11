@@ -133,6 +133,11 @@ void checkValidFrames(SDL_Window* window) {
     renderFrame(renderer, camera, {});
     renderFrame(renderer, camera, draws);
     std::reverse(draws.begin(), draws.end());
+    for (const auto samples : renderer.supportedMsaaSamples()) {
+        renderer.setMsaaSamples(samples);
+        renderFrame(renderer, camera, draws);
+        require(renderer.performance().msaaSamples == samples, "MSAA switch did not rebuild the scene pipelines");
+    }
     renderFrame(renderer, camera, draws);
     firstPose.world[0] = glm::translate(glm::mat4{1}, glm::vec3{0.2F, 0, -0.4F});
     renderFrame(renderer, camera, draws);
@@ -229,6 +234,12 @@ void checkGridFrames(SDL_Window* window, const std::filesystem::path& cubePath) 
     Grid grid{{8, 8, 1, {-4, 0, -4}}};
     GridDraw gridDraw{cube, grid};
     renderFrame(renderer, camera, draws, &gridDraw);
+    for (const auto samples : renderer.supportedMsaaSamples()) {
+        renderer.setMsaaSamples(samples);
+        renderFrame(renderer, camera, draws, &gridDraw);
+        require(renderer.performance().msaaSamples == samples,
+                "Unchanged editor grid retained an incompatible pipeline");
+    }
     grid.setWalkable({3, 3}, false);
     renderFrame(renderer, camera, draws, &gridDraw);
     renderFrame(renderer, camera, draws, &gridDraw); // Unchanged instances reuse the buffer.

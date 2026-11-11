@@ -6,7 +6,10 @@ namespace grimlock::renderer {
 
 class ToneMapPipeline final {
 public:
-    ToneMapPipeline(VkDevice device, VkFormat colorFormat, VkDescriptorSetLayout layout);
+    ToneMapPipeline(VkDevice device,
+                    VkFormat colorFormat,
+                    VkDescriptorSetLayout layout,
+                    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
     ~ToneMapPipeline();
     ToneMapPipeline(const ToneMapPipeline&) = delete;
     ToneMapPipeline& operator=(const ToneMapPipeline&) = delete;
@@ -23,10 +26,15 @@ public:
         return colorFormat_;
     }
 
+    [[nodiscard]] VkSampleCountFlagBits samples() const noexcept {
+        return samples_;
+    }
+
 private:
     void destroy() noexcept;
     VkDevice device_;
     VkFormat colorFormat_;
+    VkSampleCountFlagBits samples_;
     VkPipelineLayout layout_ = VK_NULL_HANDLE;
     VkPipeline pipeline_ = VK_NULL_HANDLE;
 };

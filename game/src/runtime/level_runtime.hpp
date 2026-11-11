@@ -7,7 +7,8 @@
 
 namespace grimlock::game {
 
-// Absolute source levels under assets/levels use their own asset tree instead of a staged copy.
+// Development launchers share source assets; explicit absolute levels keep their own tree.
+// Packaged builds (or an unavailable source tree) fall back to executable-relative assets.
 [[nodiscard]] std::filesystem::path assetRootForLevel(const std::filesystem::path& level);
 
 // Player runtime state. Never writes authored level/scene files.

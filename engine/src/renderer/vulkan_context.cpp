@@ -219,7 +219,17 @@ void VulkanContext::createDevice() {
     features.synchronization2 = VK_TRUE;
     constexpr const char* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
+    VkPhysicalDeviceFeatures available{};
+    vkGetPhysicalDeviceFeatures(physicalDevice_, &available);
+    VkPhysicalDeviceFeatures enabled{};
+    enabled.samplerAnisotropy = available.samplerAnisotropy;
+    if (enabled.samplerAnisotropy) {
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
+        maxAnisotropy_ = std::min(8.0F, properties.limits.maxSamplerAnisotropy);
+    }
     VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+    info.pEnabledFeatures = &enabled;
     info.pNext = &features;
     info.queueCreateInfoCount = static_cast<std::uint32_t>(queues.size());
     info.pQueueCreateInfos = queues.data();

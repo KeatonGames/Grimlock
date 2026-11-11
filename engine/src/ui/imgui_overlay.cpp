@@ -53,7 +53,7 @@ void ImGuiOverlay::initializeRenderer() {
     info.MinAllocationSize = 1024 * 1024;
     info.CheckVkResultFn = check;
     auto& pipeline = info.PipelineInfoMain;
-    pipeline.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    pipeline.MSAASamples = native_.target.samples;
     pipeline.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
     pipeline.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
     pipeline.PipelineRenderingCreateInfo.pColorAttachmentFormats = &native_.target.colorFormat;
@@ -95,11 +95,24 @@ void ImGuiOverlay::shutdown() noexcept {
 
 void ImGuiOverlay::targetChanged(const OverlayTarget& target) {
     if (native_.target.colorFormat == target.colorFormat && native_.target.images == target.images &&
-        native_.target.minimumImages == target.minimumImages) {
+        native_.target.minimumImages == target.minimumImages && native_.target.samples == target.samples) {
         return;
     }
 
     ImGui::SetCurrentContext(context_);
+    if (native_.target.colorFormat == target.colorFormat && native_.target.images == target.images &&
+        native_.target.minimumImages == target.minimumImages) {
+        // A quality-only change must not destroy font/image textures referenced by
+        // this frame's already-generated draw data. Only the graphics pipeline changes.
+        native_.target = target;
+        ImGui_ImplVulkan_PipelineInfo pipeline{};
+        pipeline.MSAASamples = target.samples;
+        pipeline.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        pipeline.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        pipeline.PipelineRenderingCreateInfo.pColorAttachmentFormats = &native_.target.colorFormat;
+        ImGui_ImplVulkan_CreateMainPipeline(&pipeline);
+        return;
+    }
     ImGui_ImplVulkan_Shutdown();
     rendererReady_ = false;
     native_.target = target;

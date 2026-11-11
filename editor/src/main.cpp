@@ -14,8 +14,9 @@ int main(int argc, char** argv) {
         for (int i = 1; i < argc; ++i) {
             const std::string_view argument{argv[i]};
             if (argument == "--help") {
-                std::cout << "Usage: GrimlockEditor [scene.json | --level level.json] [--environment folder]\nDefault: "
-                             "assets/scenes/debug.json. Paths are executable-relative.\n";
+                std::cout
+                    << "Usage: GrimlockEditor [scene.json | --level level.json] [--environment folder]\nDefault: "
+                       "assets/scenes/debug.json. Relative scene/level paths use the active asset folder's parent.\n";
                 return EXIT_SUCCESS;
             }
             if (argument == "--environment" || argument == "--level") {
@@ -40,7 +41,8 @@ int main(int argc, char** argv) {
         if (level.empty()) {
             grimlock::editor::run(scene.empty() ? std::filesystem::path{"assets/scenes/debug.json"} : scene,
                                   environment,
-                                  &debug);
+                                  &debug,
+                                  grimlock::game::assetRootForLevel({}));
         } else {
             grimlock::Engine engine{grimlock::EngineConfig{.windowTitle = "Grimlock Editor",
                                                            .environmentFolder = environment,

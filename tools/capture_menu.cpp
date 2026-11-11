@@ -111,10 +111,20 @@ int main(int argc, char** argv) {
             game::TowerSystem towers;
             towers.synchronize(engine);
             save(engine, argv[4]);
-        } else if (argc == 5 && std::string_view{argv[2]} == "--level") {
+        } else if ((argc == 5 || (argc == 6 && std::string_view{argv[5]} == "--tower")) &&
+                   std::string_view{argv[2]} == "--level") {
             game::LevelRuntime runtime;
             runtime.load(engine, argv[3]);
             game::GameHud hud{engine, runtime};
+            if (argc == 6) {
+                const auto& zone = runtime.navigation().placement().zones().front();
+                const auto tower = zone.snap(runtime.navigation().towers().definition("basic").instance());
+                const auto built = runtime.level().buildTower(engine, runtime.navigation(), tower);
+                runtime.selectObject(engine, Ray{tower.position + glm::dvec3{0, 20, 0}, {0, -1, 0}, 0, 40});
+                if (!runtime.inspectedTower() || runtime.inspectedTower()->object != built) {
+                    throw std::runtime_error("Capture could not select the constructed tower.");
+                }
+            }
             save(engine, argv[4]);
         } else if (argc == 3) {
             game::LevelRuntime runtime;

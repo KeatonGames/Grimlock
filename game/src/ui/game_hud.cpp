@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <glm/gtc/constants.hpp>
@@ -54,10 +55,10 @@ void GameHud::updateLayout() {
     layout_.scale = scale;
     layout_.gap = 14 * scale;
     layout_.top = 62 * scale;
-    layout_.dockWidth = std::min(420 * scale, size.x - 2 * layout_.gap);
-    layout_.dockHeight = (runtime_.placing() ? 190 : 124) * scale;
-    layout_.contextWidth = std::min(320 * scale, size.x - 2 * layout_.gap);
-    layout_.contextHeight = std::min(270 * scale, size.y - layout_.top - layout_.dockHeight - 4 * layout_.gap);
+    layout_.dockWidth = std::min(240 * scale, size.x - 2 * layout_.gap);
+    layout_.dockHeight = (runtime_.placing() ? 178 : 108) * scale;
+    layout_.contextWidth = std::min(360 * scale, size.x - 2 * layout_.gap);
+    layout_.contextHeight = std::min(330 * scale, size.y - layout_.top - layout_.dockHeight - 4 * layout_.gap);
     presentation::scale(scale);
 }
 
@@ -264,7 +265,7 @@ void GameHud::notifications() {
         return;
     }
     const auto* v = ImGui::GetMainViewport();
-    const float width = std::min(layout_.dockWidth, 410 * layout_.scale);
+    const float width = std::min(410 * layout_.scale, v->Size.x - 2 * layout_.gap);
     const float alpha = std::min(1.0F, notificationRemaining_) * 0.95F;
     ImGui::SetNextWindowBgAlpha(alpha);
     ImGui::SetNextWindowPos(
@@ -274,7 +275,7 @@ void GameHud::notifications() {
     if (ImGui::Begin("Battle Notice",
                      nullptr,
                      hudFlags | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoFocusOnAppearing)) {
-        ImGui::TextColored(presentation::gold, "%s", notification_.c_str());
+        ImGui::TextWrapped("%s", notification_.c_str());
     }
     ImGui::End();
     ImGui::PopStyleVar();
@@ -289,10 +290,10 @@ void GameHud::status() {
     const float scale = layout_.scale;
     const auto flags = hudFlags | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoFocusOnAppearing;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-    const float healthWidth = std::min(320 * scale, viewport->Size.x * 0.28F);
+    const float healthWidth = std::min(390 * scale, viewport->Size.x * 0.30F);
     ImGui::SetNextWindowPos({viewport->Pos.x + layout_.gap, viewport->Pos.y + layout_.gap});
     if (ImGui::Begin("Gameplay Settings", nullptr, flags)) {
-        const float gearSize = 40 * scale;
+        const float gearSize = 44 * scale;
         if (ImGui::Button("##GameplaySettings", {gearSize, gearSize})) {
             runtime_.setPaused(true);
             cancelWorldInput_ = true;
@@ -300,7 +301,8 @@ void GameHud::status() {
         const auto minimum = ImGui::GetItemRectMin();
         const ImVec2 center{minimum.x + gearSize * 0.5F, minimum.y + gearSize * 0.5F};
         auto* draw = ImGui::GetWindowDrawList();
-        const auto color = ImGui::GetColorU32(ImGuiCol_Text);
+        presentation::angularPanel(minimum, {minimum.x + gearSize, minimum.y + gearSize}, presentation::ivory, false);
+        const auto color = presentation::menuInk(presentation::forest);
         for (int point = 0; point < 32; ++point) {
             const float angle = glm::two_pi<float>() * point / 32;
             const float radius = (point % 4 == 0 || point % 4 == 3 ? 13 : 10) * scale;
@@ -318,7 +320,7 @@ void GameHud::status() {
                             ImGuiCond_Always,
                             {1, 0});
     if (ImGui::Begin("Round", nullptr, flags)) {
-        ImGui::Text("Round %zu / %zu",
+        ImGui::Text("ROUND %zu / %zu",
                     std::min(waves->wave() + 1, waves->definition().waves.size()),
                     waves->definition().waves.size());
     }
@@ -343,7 +345,7 @@ void GameHud::status() {
                             {1, 0});
     if (ImGui::Begin("Wave Controls", nullptr, flags)) {
         ImGui::BeginDisabled(waves->phase() != LevelPhase::preparation);
-        if (presentation::action("Start Wave", {std::min(160 * scale, viewport->Size.x * 0.23F), 40 * scale}, true)) {
+        if (presentation::action("Start Wave", {std::min(205 * scale, viewport->Size.x * 0.23F), 48 * scale}, true)) {
             runtime_.startWave();
         }
         ImGui::EndDisabled();
@@ -472,32 +474,23 @@ void GameHud::coinIcon(ImVec2 center, float size) {
 void GameHud::coins() {
     const auto* viewport = ImGui::GetMainViewport();
     const float scale = layout_.scale;
-    const float sideSpace = (viewport->Size.x - layout_.dockWidth) * 0.5F - layout_.gap * 2;
-    const float width = std::min(125 * scale, std::max(24.0F, sideSpace));
     ImGui::SetNextWindowPos(
         {viewport->Pos.x + viewport->Size.x - layout_.gap, viewport->Pos.y + viewport->Size.y - layout_.gap},
         ImGuiCond_Always,
         {1, 1});
-    ImGui::SetNextWindowSize({width, 78 * scale});
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {5 * scale, 5 * scale});
+    ImGui::SetNextWindowSize({145 * scale, 58 * scale});
     if (ImGui::Begin("Coins",
                      nullptr,
-                     (hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize) | ImGuiWindowFlags_NoScrollbar)) {
-        const float available = ImGui::GetContentRegionAvail().x;
-        const float iconSize = std::min(40 * scale, available);
-        const auto cursor = ImGui::GetCursorScreenPos();
-        coinIcon({cursor.x + available * 0.5F, cursor.y + iconSize * 0.5F}, iconSize * 0.82F);
-        ImGui::Dummy({available, iconSize});
-        const auto text = std::to_string(runtime_.level().economy().gold());
-        const float factor = std::min(1.0F, available / std::max(ImGui::CalcTextSize(text.c_str()).x, 1.0F));
-        ImGui::PushFont(nullptr, ImGui::GetFontSize() * factor);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                             std::max(0.0F, (available - ImGui::CalcTextSize(text.c_str()).x) * 0.5F));
-        ImGui::TextColored(presentation::gold, "%s", text.c_str());
+                     (hudFlags & ~ImGuiWindowFlags_AlwaysAutoResize) | ImGuiWindowFlags_NoBackground)) {
+        presentation::windowPanel();
+        const auto a = ImGui::GetWindowPos();
+        coinIcon({a.x + 34 * scale, a.y + 27 * scale}, 30 * scale);
+        ImGui::SetCursorPos({64 * scale, 16 * scale});
+        ImGui::PushFont(nullptr, 24 * scale);
+        ImGui::Text("%llu", static_cast<unsigned long long>(runtime_.level().economy().gold()));
         ImGui::PopFont();
     }
     ImGui::End();
-    ImGui::PopStyleVar();
 }
 
 void GameHud::construction() {
@@ -505,14 +498,13 @@ void GameHud::construction() {
     const bool preparing = waves && waves->phase() == LevelPhase::preparation;
     const auto* viewport = ImGui::GetMainViewport();
     const float scale = layout_.scale;
-    ImGui::SetNextWindowPos(
-        {viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + viewport->Size.y - layout_.gap},
-        ImGuiCond_Always,
-        {0.5F, 1});
+    ImGui::SetNextWindowPos({viewport->Pos.x + layout_.gap, viewport->Pos.y + viewport->Size.y - layout_.gap},
+                            ImGuiCond_Always,
+                            {0, 1});
     ImGui::SetNextWindowSize({layout_.dockWidth, layout_.dockHeight});
     const auto flags = hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar);
-    if (ImGui::Begin("Build Towers", nullptr, flags)) {
-        ImGui::TextDisabled("TOWERS");
+    if (ImGui::Begin("Build Towers", nullptr, flags | ImGuiWindowFlags_NoBackground)) {
+        presentation::windowPanel();
         const float cardWidth = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5F;
         std::size_t index = 0;
         for (const auto& definition : runtime_.navigation().towers().definitions()) {
@@ -568,16 +560,35 @@ void GameHud::towerInfo() {
     const auto& current = def.statistics(progress.level);
     const auto* v = ImGui::GetMainViewport();
     const float s = layout_.scale;
-    ImGui::SetNextWindowPos(
-        {v->Pos.x + v->Size.x - layout_.gap, v->Pos.y + v->Size.y - 2 * layout_.gap - layout_.dockHeight},
-        ImGuiCond_Always,
-        {1, 1});
+    ImGui::SetNextWindowPos({v->Pos.x + v->Size.x - layout_.gap,
+                             v->Pos.y + std::min(v->Size.y * 0.5F + layout_.contextHeight * 0.5F,
+                                                 v->Size.y - 2 * layout_.gap - layout_.dockHeight)},
+                            ImGuiCond_Always,
+                            {1, 1});
     ImGui::SetNextWindowSize({layout_.contextWidth, layout_.contextHeight});
     if (ImGui::Begin("Tower Info",
                      nullptr,
-                     (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar)))) {
-        presentation::heading(def.name.c_str());
-        ImGui::TextDisabled("LEVEL %zu / %zu", progress.level, def.levels.size());
+                     (hudFlags & ~(ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar)) |
+                         ImGuiWindowFlags_NoBackground)) {
+        presentation::windowPanel();
+        std::string towerTitle = def.name;
+        std::transform(towerTitle.begin(), towerTitle.end(), towerTitle.begin(), [](unsigned char c) {
+            return static_cast<char>(std::toupper(c));
+        });
+        ImGui::PushFont(nullptr, 25 * s);
+        ImGui::Text("%s", towerTitle.c_str());
+        ImGui::PopFont();
+        ImGui::Text("LV. %zu", progress.level);
+        const auto levelPosition = ImGui::GetCursorScreenPos();
+        for (std::size_t index = 0; index < def.levels.size(); ++index) {
+            const ImVec2 a{levelPosition.x + index * 23 * s, levelPosition.y};
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                a,
+                {a.x + 15 * s, a.y + 12 * s},
+                presentation::menuInk(index < progress.level ? presentation::menuGold : presentation::secondary),
+                2);
+        }
+        ImGui::Dummy({0, 20 * s});
         char health[64];
         std::snprintf(health, sizeof(health), "%.0f / %.0f", progress.health, progress.maximumHealth);
         presentation::meter(progress.health / progress.maximumHealth, {-1, 16 * s}, health);
@@ -595,7 +606,8 @@ void GameHud::towerInfo() {
             ImGui::TextDisabled("Fire rate %+.1f / second", next.fireRate - current.fireRate);
             const auto error = runtime_.level().upgradeError(runtime_.navigation(), object);
             ImGui::BeginDisabled(!error.empty());
-            if (presentation::action("Upgrade", {-1, 34 * s}, true)) {
+            const auto upgradeLabel = "UPGRADE    " + std::to_string(next.upgradeCost) + "###Upgrade";
+            if (presentation::action(upgradeLabel.c_str(), {-1, 52 * s}, true)) {
                 try {
                     runtime_.level().upgradeTower(engine_, runtime_.navigation(), object);
                     upgradedTower_ = object;

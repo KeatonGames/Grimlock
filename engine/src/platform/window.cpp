@@ -14,7 +14,10 @@ Window::Window(const char* title, const int width, const int height) {
         throw std::runtime_error(std::string{"SDL_Init failed: "} + SDL_GetError());
     }
 
-    window_ = SDL_CreateWindow(title, width, height, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+    window_ = SDL_CreateWindow(title,
+                               width,
+                               height,
+                               SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 
     if (window_ == nullptr) {
         const std::string error = SDL_GetError();

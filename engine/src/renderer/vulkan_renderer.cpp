@@ -8,6 +8,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -46,6 +47,8 @@ VulkanRenderer::VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube
     : window_(window), context_(window) {
     try {
         depthFormat_ = DepthTarget::chooseFormat(context_.physicalDevice());
+        detectSampleCounts();
+        setMsaaSamples(4);
         createCommandPool();
         deformation_.emplace(context_);
         createCameraResources(environment);
@@ -74,13 +77,14 @@ void VulkanRenderer::attachOverlay(RenderOverlay& overlay) {
     checkVk(vkDeviceWaitIdle(context_.device()), "vkDeviceWaitIdle(overlay attach)");
 
     try {
-        overlay.initialize({window_,
-                            context_.instance(),
-                            context_.physicalDevice(),
-                            context_.device(),
-                            context_.graphicsQueue(),
-                            context_.graphicsFamily(),
-                            {swapchainFormat_, minimumImages_, static_cast<std::uint32_t>(swapchainImages_.size())}});
+        overlay.initialize(
+            {window_,
+             context_.instance(),
+             context_.physicalDevice(),
+             context_.device(),
+             context_.graphicsQueue(),
+             context_.graphicsFamily(),
+             {swapchainFormat_, minimumImages_, static_cast<std::uint32_t>(swapchainImages_.size()), samples_}});
         overlay_ = &overlay;
     } catch (...) {
         overlay.shutdown();
@@ -201,6 +205,7 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     if (framebufferResized_ && !recreateSwapchain()) {
         return false;
     }
+    performance_.msaaSamples = pipelineSamples_;
 
     for (const auto& draw : draws) {
         if (draw.model >= models_.size() || !models_[draw.model]) {
@@ -399,6 +404,68 @@ void VulkanRenderer::requestSwapchainRecreation() noexcept {
     }
 }
 
+void VulkanRenderer::detectSampleCounts() {
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(context_.physicalDevice(), &properties);
+    supportedSamples_ = properties.limits.framebufferColorSampleCounts & properties.limits.framebufferDepthSampleCounts;
+    const auto imageSamples = [&](VkFormat format, VkImageUsageFlags usage) {
+        VkImageFormatProperties image{};
+        checkVk(vkGetPhysicalDeviceImageFormatProperties(context_.physicalDevice(),
+                                                         format,
+                                                         VK_IMAGE_TYPE_2D,
+                                                         VK_IMAGE_TILING_OPTIMAL,
+                                                         usage,
+                                                         0,
+                                                         &image),
+                "vkGetPhysicalDeviceImageFormatProperties(MSAA)");
+        return image.sampleCounts;
+    };
+    supportedSamples_ &= imageSamples(VK_FORMAT_R16G16B16A16_SFLOAT,
+                                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+    supportedPresentationFormat_ = swapchainFormat_ == VK_FORMAT_UNDEFINED
+                                       ? chooseSurfaceFormat(context_.swapchainSupport().formats).format
+                                       : swapchainFormat_;
+    supportedSamples_ &= imageSamples(supportedPresentationFormat_,
+                                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
+    supportedSamples_ &= imageSamples(depthFormat_, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    supportedSamples_ &= VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT | VK_SAMPLE_COUNT_8_BIT;
+    std::clog << "Rendering quality GPU: " << properties.deviceName << "; supported samples:";
+    for (const auto count : supportedMsaaSamples()) {
+        std::clog << ' ' << count;
+    }
+    std::clog << "; anisotropy=" << context_.maxAnisotropy() << "x\n";
+    if (!(supportedSamples_ & VK_SAMPLE_COUNT_1_BIT)) {
+        throw std::runtime_error("The HDR/depth formats do not support single-sample rendering.");
+    }
+}
+
+std::vector<std::uint32_t> VulkanRenderer::supportedMsaaSamples() const {
+    std::vector<std::uint32_t> result;
+    for (const auto count : {1U, 2U, 4U, 8U}) {
+        if (supportedSamples_ & count) {
+            result.push_back(count);
+        }
+    }
+    return result;
+}
+
+void VulkanRenderer::setMsaaSamples(std::uint32_t requested) {
+    if (requested != 1 && requested != 2 && requested != 4 && requested != 8) {
+        throw std::invalid_argument("MSAA must be Off (1), 2, 4 or 8 samples.");
+    }
+    auto selected = VK_SAMPLE_COUNT_1_BIT;
+    for (const auto count : supportedMsaaSamples()) {
+        if (count <= requested) {
+            selected = static_cast<VkSampleCountFlagBits>(count);
+        }
+    }
+    if (samples_ != selected) {
+        samples_ = selected;
+        // Quality changes invalidate attachments even when the pixel extent is unchanged.
+        framebufferResized_ = true;
+    }
+}
+
 void VulkanRenderer::createCommandPool() {
     VkCommandPoolCreateInfo info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     info.queueFamilyIndex = context_.graphicsFamily();
@@ -525,13 +592,37 @@ bool VulkanRenderer::createSwapchainResources() {
         return false;
     }
 
+    if (supportedPresentationFormat_ != swapchainFormat_) {
+        detectSampleCounts();
+        setMsaaSamples(static_cast<std::uint32_t>(samples_));
+    }
     createImageViews();
-    depth_.emplace(context_, swapchainExtent_, depthFormat_);
+    depth_.emplace(context_, swapchainExtent_, depthFormat_, samples_);
     constexpr auto hdrFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
     hdrColor_.emplace(context_,
                       swapchainExtent_,
                       hdrFormat,
                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+    if (samples_ != VK_SAMPLE_COUNT_1_BIT) {
+        msaaColor_.emplace(context_,
+                           swapchainExtent_,
+                           hdrFormat,
+                           VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                           samples_);
+    }
+    if (samples_ != VK_SAMPLE_COUNT_1_BIT) {
+        compositionColor_.emplace(context_,
+                                  swapchainExtent_,
+                                  swapchainFormat_,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                                  samples_);
+    }
+    if (pipelineSamples_ != samples_) {
+        pipeline_.reset();
+        gridPipeline_.reset();
+        invalidateGrid();
+        pipelineSamples_ = samples_;
+    }
     const VkDescriptorImageInfo image{environmentSampler_, hdrColor_->view(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
     write.dstSet = toneMapSet_;
@@ -547,12 +638,15 @@ bool VulkanRenderer::createSwapchainResources() {
                           depthFormat_,
                           cameraLayout_,
                           materialLayout_,
-                          deformation_->layout());
+                          deformation_->layout(),
+                          false,
+                          samples_);
     }
 
-    if (!toneMapPipeline_ || toneMapPipeline_->colorFormat() != swapchainFormat_) {
+    if (!toneMapPipeline_ || toneMapPipeline_->colorFormat() != swapchainFormat_ ||
+        toneMapPipeline_->samples() != samples_) {
         toneMapPipeline_.reset();
-        toneMapPipeline_.emplace(context_.device(), swapchainFormat_, toneMapLayout_);
+        toneMapPipeline_.emplace(context_.device(), swapchainFormat_, toneMapLayout_, samples_);
     }
 
     allocateCommandBuffers();
@@ -566,7 +660,7 @@ bool VulkanRenderer::createSwapchainResources() {
 
     if (overlay_) {
         overlay_->targetChanged(
-            {swapchainFormat_, minimumImages_, static_cast<std::uint32_t>(swapchainImages_.size())});
+            {swapchainFormat_, minimumImages_, static_cast<std::uint32_t>(swapchainImages_.size()), samples_});
     }
 
     return true;
@@ -822,7 +916,8 @@ void VulkanRenderer::updateGrid(const GridDraw* grid) {
                               cameraLayout_,
                               materialLayout_,
                               deformation_->layout(),
-                              true);
+                              true,
+                              samples_);
     }
 
     updateGridInstances(grid->grid, gridInstances_);
@@ -896,7 +991,7 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
         vkCmdWriteTimestamp2(command, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, timestamps_, 0);
     }
 
-    std::array<VkImageMemoryBarrier2, 2> barriers{};
+    std::array<VkImageMemoryBarrier2, 3> barriers{};
     auto& color = barriers[0];
     color.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     color.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -928,17 +1023,28 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     depthBarrier.subresourceRange = color.subresourceRange;
     depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
+    if (msaaColor_) {
+        barriers[2] = color;
+        barriers[2].image = msaaColor_->image();
+    }
+
     VkDependencyInfo dependency{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-    dependency.imageMemoryBarrierCount = static_cast<std::uint32_t>(barriers.size());
+    dependency.imageMemoryBarrierCount = msaaColor_ ? 3 : 2;
     dependency.pImageMemoryBarriers = barriers.data();
     vkCmdPipelineBarrier2(command, &dependency);
 
     VkRenderingAttachmentInfo attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    attachment.imageView = hdrColor_->view();
+    attachment.imageView = msaaColor_ ? msaaColor_->view() : hdrColor_->view();
     attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachment.clearValue.color = {{0.025F, 0.055F, 0.105F, 1.0F}};
+    if (msaaColor_) {
+        attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
+        attachment.resolveImageView = hdrColor_->view();
+        attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    }
 
     VkRenderingAttachmentInfo depthAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     depthAttachment.imageView = depth_->view();
@@ -998,12 +1104,20 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
     acquired.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     acquired.srcAccessMask = VK_ACCESS_2_NONE;
     acquired.image = swapchainImages_.at(imageIndex);
-    const std::array transitions{sampled, acquired};
-    dependency.imageMemoryBarrierCount = static_cast<std::uint32_t>(transitions.size());
+    VkImageMemoryBarrier2 composition = color;
+    if (compositionColor_) {
+        composition.image = compositionColor_->image();
+    }
+    const std::array transitions{sampled, acquired, composition};
+    dependency.imageMemoryBarrierCount = compositionColor_ ? 3 : 2;
     dependency.pImageMemoryBarriers = transitions.data();
     vkCmdPipelineBarrier2(command, &dependency);
 
-    attachment.imageView = swapchainImageViews_.at(imageIndex);
+    attachment.imageView = compositionColor_ ? compositionColor_->view() : swapchainImageViews_.at(imageIndex);
+    attachment.resolveMode = compositionColor_ ? VK_RESOLVE_MODE_AVERAGE_BIT : VK_RESOLVE_MODE_NONE;
+    attachment.resolveImageView = compositionColor_ ? swapchainImageViews_.at(imageIndex) : VK_NULL_HANDLE;
+    attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment.storeOp = compositionColor_ ? VK_ATTACHMENT_STORE_OP_DONT_CARE : VK_ATTACHMENT_STORE_OP_STORE;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     rendering.pDepthAttachment = nullptr;
     vkCmdBeginRendering(command, &rendering);
@@ -1180,6 +1294,8 @@ void VulkanRenderer::destroySwapchainResources() noexcept {
 
     depth_.reset();
     hdrColor_.reset();
+    msaaColor_.reset();
+    compositionColor_.reset();
 
     for (const auto view : swapchainImageViews_) {
         vkDestroyImageView(device, view, nullptr);

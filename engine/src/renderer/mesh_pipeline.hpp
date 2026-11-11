@@ -36,7 +36,8 @@ public:
                  VkDescriptorSetLayout cameraLayout,
                  VkDescriptorSetLayout materialLayout,
                  VkDescriptorSetLayout deformationLayout,
-                 bool gridInstances = false);
+                 bool gridInstances = false,
+                 VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
     ~MeshPipeline();
 
     MeshPipeline(const MeshPipeline&) = delete;

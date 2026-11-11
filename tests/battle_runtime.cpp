@@ -378,8 +378,8 @@ void archetypeWaves(Engine& engine) {
     }
     require(grunt && siege && hunter && elevated, "mixed archetypes did not traverse elevated scenario");
     const auto& metrics = runtime.navigation().enemies()->metrics();
-    require(metrics.arrived + metrics.defeated == 40 && runtime.level().economy().gold() == 285,
-            "archetype waves lost enemies or paid incorrect fixed rewards");
+    require(metrics.arrived + metrics.defeated == 40 && runtime.level().economy().gold() == 285 + metrics.killGold,
+            "archetype waves lost enemies or paid incorrect wave/kill rewards");
     runtime.restart(engine);
     require(runtime.level().economy().gold() == 150 && runtime.level().waves()->phase() == LevelPhase::preparation,
             "archetype scenario restart failed");

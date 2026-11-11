@@ -6,7 +6,10 @@ namespace grimlock::renderer {
 
 class DepthTarget final {
 public:
-    DepthTarget(const VulkanContext& context, VkExtent2D extent, VkFormat format);
+    DepthTarget(const VulkanContext& context,
+                VkExtent2D extent,
+                VkFormat format,
+                VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
     ~DepthTarget();
     DepthTarget(const DepthTarget&) = delete;
     DepthTarget& operator=(const DepthTarget&) = delete;

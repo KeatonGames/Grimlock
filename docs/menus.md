@@ -13,7 +13,7 @@ or double-click. Future valid files are discovered normally, without locked leve
 Previews use `assets/previews/<level filename stem>.png`.
 
 **OPTIONS** applies real SDL windowed/borderless fullscreen, windowed resolution,
-Vulkan VSync, UI scale and world-health-bar preferences. Fullscreen uses the desktop
+Vulkan VSync, supported MSAA modes (Off/2x/4x/8x), UI scale and world-health-bar preferences. Fullscreen uses the desktop
 resolution. **APPLY** saves `options.json` beside the existing SDL user progression
 file; failures remain visible. There is no audio system, so no volume control is
 shown. Mouse and keyboard navigation use the existing ImGui infrastructure. Escape
@@ -21,9 +21,7 @@ returns to the previous menu or opens/closes Pause after canceling gameplay tool
 Pause offers Resume, Restart Level, Options and Main Menu. Returning to Main Menu
 unloads gameplay safely. Quit requests normal application shutdown.
 
-The reusable menu theme uses the specified forest, sage, gold, ivory, stone and
-muted-red palette, roughly 200 ms hover easing and screen fade-in. The combat HUD
-keeps its existing presentation. Menu colors and screenshots are decoded for the
+The main menu and gameplay HUD share an angular dark-purple, cream and gold theme: clipped corners, offset shadows, bold uppercase action labels and gold primary buttons. The main menu uses the current Forest Defense preview under a purple gradient. Menu colors and screenshots are decoded for the
 sRGB color attachment to avoid washed-out output. Images are cached as UI textures;
 the menu does not render a live environment or require the Editor.
 

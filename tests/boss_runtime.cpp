@@ -209,7 +209,9 @@ void hudAndWaves(Engine& engine) {
         require(runtime.level().waves()->phase() == (wave ? LevelPhase::victory : LevelPhase::preparation),
                 "boss wave failed to resolve");
     }
-    require(sawBoss && elevated && runtime.level().economy().gold() == 230, "boss wave integration/reward failed");
+    require(sawBoss && elevated &&
+                runtime.level().economy().gold() == 230 + runtime.navigation().enemies()->metrics().killGold,
+            "boss wave integration/reward failed");
     render();
     require(!panel->Active, "ended encounter retained boss HUD");
 

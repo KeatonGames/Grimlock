@@ -18,6 +18,10 @@ public:
     void render(VkCommandBuffer command) override;
     void targetChanged(const OverlayTarget& target) override;
 
+    [[nodiscard]] std::uint32_t msaaSamples() const noexcept {
+        return native_.target.samples;
+    }
+
 protected:
     virtual void configureUi() = 0;
 

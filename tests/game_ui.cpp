@@ -250,8 +250,8 @@ int main(int argc, char**) {
         runtime.attachProgress(unavailable);
         tick(engine, runtime, 2);
         const auto* shop = ImGui::FindWindowByName("Build Towers");
-        require(std::abs(shop->Pos.x + shop->Size.x * 0.5F - ImGui::GetMainViewport()->GetCenter().x) < 1,
-                "Tower shop is not centered");
+        require(std::abs(shop->Pos.x - ImGui::GetMainViewport()->Pos.x - 14 * ImGui::GetStyle().FontScaleMain) < 1,
+                "Tower shop is not anchored at the bottom left");
         require(!ImGui::FindWindowByName("Hero Info") && !ImGui::FindWindowByName("Game Status"),
                 "Removed hero/status information remained in the HUD");
         for (const auto* name : {"Round", "Objective Health", "Wave Controls"}) {

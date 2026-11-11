@@ -39,9 +39,11 @@ void GameHud::initializeMenu() {
     presentation::menuColorSpace(native_.target.colorFormat == VK_FORMAT_B8G8R8A8_SRGB ||
                                  native_.target.colorFormat == VK_FORMAT_R8G8B8A8_SRGB);
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    msaaSamples_ = engine_.msaaSamples();
     const auto fontPath = engine_.assetRoot() / "ui/karla.ttf";
     if (std::filesystem::exists(fontPath)) {
         menuFont_ = ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 20);
+        ImGui::GetIO().FontDefault = menuFont_;
     }
     if (char* folder = optionsPath_.empty() ? SDL_GetPrefPath("KeatonGames", "Grimlock") : nullptr) {
         optionsPath_ = std::filesystem::path{folder} / "options.json";
@@ -56,6 +58,10 @@ void GameHud::initializeMenu() {
         resolution_ = std::clamp(json.value("resolution", 1), 0, 3);
         fullscreen_ = json.value("fullscreen", false);
         vsync_ = json.value("vsync", true);
+        msaaSamples_ = json.value("msaa_samples", 4U);
+        if (msaaSamples_ != 1 && msaaSamples_ != 2 && msaaSamples_ != 4 && msaaSamples_ != 8) {
+            msaaSamples_ = 4;
+        }
         uiScale_ = std::clamp(json.value("ui_scale", 1.0F), 0.85F, 1.25F);
         worldHealthBars_ = json.value("health_bars", true);
         applyOptions();
@@ -159,21 +165,21 @@ void GameHud::menuBackground(bool darkened) {
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
     const auto a = viewport->Pos;
     const ImVec2 b{a.x + viewport->Size.x, a.y + viewport->Size.y};
-    imageCover(draw, menuImage(engine_.assetRoot() / "ui/menu_background.png"), a, b);
+    imageCover(draw, menuImage(engine_.assetRoot() / "previews/forest_defense.png"), a, b);
     if (darkened) {
-        draw->AddRectFilled(a, b, presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 170 / 255.0F}));
+        draw->AddRectFilled(a, b, presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 170 / 255.0F}));
     } else {
         draw->AddRectFilledMultiColor(a,
                                       b,
-                                      presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 248 / 255.0F}),
-                                      presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 0}),
-                                      presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 30 / 255.0F}),
-                                      presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 248 / 255.0F}));
+                                      presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 248 / 255.0F}),
+                                      presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 0}),
+                                      presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 30 / 255.0F}),
+                                      presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 248 / 255.0F}));
     }
     // A short fade-in hides abrupt screen changes without keeping a live menu scene.
     draw->AddRectFilled(a,
                         b,
-                        presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, (1 - entrance_) * 120 / 255.0F}));
+                        presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, (1 - entrance_) * 120 / 255.0F}));
 }
 
 void GameHud::menu() {
@@ -197,11 +203,15 @@ void GameHud::menu() {
     ImGui::BeginDisabled(settingsOpen_);
     if (!selecting) {
         const float width = std::min(410 * s, v->Size.x - 48 * s);
-        ImGui::SetNextWindowPos({v->Pos.x + v->Size.x * 0.055F, v->Pos.y + v->Size.y * 0.13F});
+        ImGui::SetNextWindowPos({v->Pos.x + v->Size.x * 0.065F, v->Pos.y + v->Size.y * 0.13F});
         ImGui::SetNextWindowSize({width, v->Size.y * 0.82F});
         if (ImGui::Begin("Main Menu", nullptr, menuFlags | ImGuiWindowFlags_NoBackground)) {
             ImGui::PushFont(menuFont_, std::min(58.0F, width / (5.8F * s)));
             ImGui::TextColored(presentation::menuColor(presentation::ivory), "GRIMLOCK");
+            const auto titlePosition = ImGui::GetItemRectMin();
+            ImGui::GetWindowDrawList()->AddText({titlePosition.x + 1.2F, titlePosition.y},
+                                                presentation::menuInk(presentation::ivory),
+                                                "GRIMLOCK");
             ImGui::PopFont();
             const auto p = ImGui::GetCursorScreenPos();
             ImGui::GetWindowDrawList()->AddLine(p,
@@ -210,7 +220,7 @@ void GameHud::menu() {
                                                 1);
             ImGui::Dummy({0, 12 * s});
             ImGui::PushFont(menuFont_, 15);
-            ImGui::TextWrapped("A Tactical Tower Defense Adventure");
+            ImGui::TextWrapped("HOLD THE LINE. DEFEND THE MAUSOLEUM.");
             ImGui::PopFont();
             ImGui::Dummy({0, std::clamp(v->Size.y * 0.07F, 12.0F, 50.0F)});
             const float button = std::min(54 * s, v->Size.y * 0.09F);
@@ -406,7 +416,7 @@ void GameHud::pauseMenu() {
     ImGui::GetBackgroundDrawList()->AddRectFilled(
         viewport->Pos,
         {viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y},
-        presentation::menuInk({23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 0.72F}));
+        presentation::menuInk({35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 0.72F}));
     if (settingsOpen_) {
         settings();
         ImGui::PopFont();
@@ -447,6 +457,7 @@ void GameHud::saveOptions() {
         if (!(output << nlohmann::json{{"fullscreen", fullscreen_},
                                        {"resolution", resolution_},
                                        {"vsync", vsync_},
+                                       {"msaa_samples", msaaSamples_},
                                        {"ui_scale", uiScale_},
                                        {"health_bars", worldHealthBars_}}
                             .dump(2))) {
@@ -465,6 +476,8 @@ void GameHud::applyOptions() {
     optionsError_.clear();
     try {
         engine_.setVsync(vsync_);
+        engine_.setMsaaSamples(msaaSamples_);
+        msaaSamples_ = engine_.msaaSamples();
         if (!SDL_SetWindowFullscreen(native_.window, fullscreen_)) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -500,6 +513,19 @@ void GameHud::settings() {
         ImGui::Combo("Resolution", &resolution_, resolutionNames, 4);
         ImGui::EndDisabled();
         ImGui::Checkbox("VSync", &vsync_);
+        const auto supported = engine_.supportedMsaaSamples();
+        const auto sampleLabel = [](std::uint32_t count) {
+            return count == 1 ? std::string{"Off"} : std::to_string(count) + "x";
+        };
+        ImGui::SetNextItemWidth(-150 * s);
+        if (ImGui::BeginCombo("MSAA", sampleLabel(msaaSamples_).c_str())) {
+            for (const auto count : supported) {
+                if (ImGui::Selectable(sampleLabel(count).c_str(), count == msaaSamples_)) {
+                    msaaSamples_ = count;
+                }
+            }
+            ImGui::EndCombo();
+        }
         ImGui::SetNextItemWidth(-100 * s);
         ImGui::SliderFloat("UI Scale", &uiScale_, 0.85F, 1.25F, "%.2fx");
         ImGui::Checkbox("World health bars", &worldHealthBars_);

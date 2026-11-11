@@ -4,13 +4,13 @@
 #include <imgui.h>
 
 namespace grimlock::game::presentation {
-inline constexpr ImVec4 forest{23 / 255.0F, 43 / 255.0F, 38 / 255.0F, 1};
-inline constexpr ImVec4 panel{36 / 255.0F, 59 / 255.0F, 50 / 255.0F, 0.96F};
-inline constexpr ImVec4 secondary{53 / 255.0F, 79 / 255.0F, 64 / 255.0F, 1};
-inline constexpr ImVec4 sage{141 / 255.0F, 175 / 255.0F, 120 / 255.0F, 1};
-inline constexpr ImVec4 hoverGreen{169 / 255.0F, 201 / 255.0F, 148 / 255.0F, 1};
-inline constexpr ImVec4 menuGold{217 / 255.0F, 181 / 255.0F, 109 / 255.0F, 1};
-inline constexpr ImVec4 ivory{243 / 255.0F, 235 / 255.0F, 215 / 255.0F, 1};
+inline constexpr ImVec4 forest{35 / 255.0F, 30 / 255.0F, 48 / 255.0F, 1};
+inline constexpr ImVec4 panel{42 / 255.0F, 36 / 255.0F, 55 / 255.0F, 0.98F};
+inline constexpr ImVec4 secondary{64 / 255.0F, 55 / 255.0F, 76 / 255.0F, 1};
+inline constexpr ImVec4 sage{243 / 255.0F, 216 / 255.0F, 160 / 255.0F, 1};
+inline constexpr ImVec4 hoverGreen{255 / 255.0F, 232 / 255.0F, 185 / 255.0F, 1};
+inline constexpr ImVec4 menuGold{255 / 255.0F, 199 / 255.0F, 65 / 255.0F, 1};
+inline constexpr ImVec4 ivory{249 / 255.0F, 226 / 255.0F, 181 / 255.0F, 1};
 inline constexpr ImVec4 secondaryText{183 / 255.0F, 198 / 255.0F, 178 / 255.0F, 1};
 inline constexpr ImVec4 stone{89 / 255.0F, 102 / 255.0F, 90 / 255.0F, 1};
 inline constexpr ImVec4 danger{184 / 255.0F, 108 / 255.0F, 96 / 255.0F, 1};
@@ -30,6 +30,8 @@ private:
 };
 
 bool menuAction(const char* label, ImVec2 size, bool primary = false, bool dangerous = false);
+void angularPanel(ImVec2 minimum, ImVec2 maximum, ImVec4 fill, bool border = true);
+void windowPanel();
 void menuHeading(const char* title, const char* subtitle);
 void menuShade(float opacity);
 inline constexpr ImVec4 gold{0.88F, 0.73F, 0.42F, 1};

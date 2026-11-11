@@ -166,7 +166,8 @@ void Texture::create(const VulkanContext& context,
                      const std::uint32_t levels,
                      const std::uint32_t layers,
                      const VkFormat format,
-                     const VkImageUsageFlags usage) {
+                     const VkImageUsageFlags usage,
+                     const VkSampleCountFlagBits samples) {
     diagnostics::StartupSpan profile{"GPU.image.create"};
 
     VkPhysicalDeviceProperties properties{};
@@ -209,7 +210,7 @@ void Texture::create(const VulkanContext& context,
     info.extent = {width, height, 1};
     info.mipLevels = levels;
     info.arrayLayers = layers;
-    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.samples = samples;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
     info.usage = usage;
     info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -236,10 +237,11 @@ void Texture::create(const VulkanContext& context,
 Texture::Texture(const VulkanContext& context,
                  const VkExtent2D extent,
                  const VkFormat format,
-                 const VkImageUsageFlags usage)
+                 const VkImageUsageFlags usage,
+                 const VkSampleCountFlagBits samples)
     : device_(context.device()) {
     try {
-        create(context, extent.width, extent.height, 1, 1, format, usage);
+        create(context, extent.width, extent.height, 1, 1, format, usage, samples);
     } catch (...) {
         destroy();
         throw;

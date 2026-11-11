@@ -26,7 +26,11 @@ public:
             bool cube);
 
     // Render target, owned by the same image/memory/view RAII as sampled textures.
-    Texture(const VulkanContext& context, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage);
+    Texture(const VulkanContext& context,
+            VkExtent2D extent,
+            VkFormat format,
+            VkImageUsageFlags usage,
+            VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
     ~Texture();
     Texture(Texture&& other) noexcept;
     Texture& operator=(Texture&& other) noexcept;
@@ -56,7 +60,8 @@ private:
                 std::uint32_t levels,
                 std::uint32_t layers,
                 VkFormat format,
-                VkImageUsageFlags usage);
+                VkImageUsageFlags usage,
+                VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
     void destroy() noexcept;
     VkDevice device_ = VK_NULL_HANDLE;
     VkImage image_ = VK_NULL_HANDLE;

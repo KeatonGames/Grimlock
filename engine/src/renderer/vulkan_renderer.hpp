@@ -63,6 +63,16 @@ public:
     void requestCapture();
     [[nodiscard]] FrameCapture takeCapture();
     void setVsync(bool enabled);
+    void setMsaaSamples(std::uint32_t samples);
+    [[nodiscard]] std::vector<std::uint32_t> supportedMsaaSamples() const;
+
+    [[nodiscard]] std::uint32_t msaaSamples() const noexcept {
+        return samples_;
+    }
+
+    [[nodiscard]] glm::uvec2 renderingResolution() const noexcept {
+        return {swapchainExtent_.width, swapchainExtent_.height};
+    }
 
     [[nodiscard]] bool vsyncEnabled() const noexcept {
         return vsync_;
@@ -78,6 +88,7 @@ public:
 
 private:
     void createCommandPool();
+    void detectSampleCounts();
     void createCameraResources(const assets::EnvironmentCube* environment);
     void createMaterialResources();
     void createSynchronization();
@@ -160,6 +171,12 @@ private:
     std::optional<MeshPipeline> gridPipeline_;
     std::optional<ToneMapPipeline> toneMapPipeline_;
     std::optional<Texture> hdrColor_;
+    std::optional<Texture> msaaColor_;
+    std::optional<Texture> compositionColor_;
+    VkFormat supportedPresentationFormat_ = VK_FORMAT_UNDEFINED;
+    VkSampleCountFlags supportedSamples_ = VK_SAMPLE_COUNT_1_BIT;
+    VkSampleCountFlagBits samples_ = VK_SAMPLE_COUNT_1_BIT;
+    VkSampleCountFlagBits pipelineSamples_ = VK_SAMPLE_COUNT_1_BIT;
 
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
     VkFormat swapchainFormat_ = VK_FORMAT_UNDEFINED;

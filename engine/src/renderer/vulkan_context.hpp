@@ -57,6 +57,10 @@ public:
 
     [[nodiscard]] SwapchainSupport swapchainSupport() const;
 
+    [[nodiscard]] float maxAnisotropy() const noexcept {
+        return maxAnisotropy_;
+    }
+
 private:
     struct QueueFamilies {
         std::optional<std::uint32_t> graphics;
@@ -82,6 +86,7 @@ private:
     VkQueue graphicsQueue_ = VK_NULL_HANDLE;
     VkQueue presentQueue_ = VK_NULL_HANDLE;
     QueueFamilies families_;
+    float maxAnisotropy_ = 1;
 };
 
 } // namespace grimlock::renderer

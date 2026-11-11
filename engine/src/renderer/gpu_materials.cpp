@@ -77,6 +77,12 @@ GpuMaterials::GpuMaterials(const VulkanContext& context,
             info.minFilter = sampler.min == assets::TextureFilter::linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
             info.mipmapMode = sampler.mip == assets::MipmapFilter::linear ? VK_SAMPLER_MIPMAP_MODE_LINEAR
                                                                           : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+            // Preserve intentional nearest/pixel-art samplers and non-mipmapped materials.
+            if (context.maxAnisotropy() > 1 && info.minFilter == VK_FILTER_LINEAR &&
+                info.magFilter == VK_FILTER_LINEAR && sampler.mip != assets::MipmapFilter::none) {
+                info.anisotropyEnable = VK_TRUE;
+                info.maxAnisotropy = context.maxAnisotropy();
+            }
             info.addressModeU = wrap(sampler.wrapU);
             info.addressModeV = wrap(sampler.wrapV);
             info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;

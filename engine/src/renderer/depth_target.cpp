@@ -22,7 +22,10 @@ VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device) {
     throw std::runtime_error("No supported depth attachment format (D32_SFLOAT or D16_UNORM).");
 }
 
-DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, const VkFormat format)
+DepthTarget::DepthTarget(const VulkanContext& context,
+                         const VkExtent2D extent,
+                         const VkFormat format,
+                         const VkSampleCountFlagBits samples)
     : device_(context.device()) {
     try {
         VkImageCreateInfo image{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -31,7 +34,7 @@ DepthTarget::DepthTarget(const VulkanContext& context, const VkExtent2D extent, 
         image.extent = {extent.width, extent.height, 1};
         image.mipLevels = 1;
         image.arrayLayers = 1;
-        image.samples = VK_SAMPLE_COUNT_1_BIT;
+        image.samples = samples;
         image.tiling = VK_IMAGE_TILING_OPTIMAL;
         image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;

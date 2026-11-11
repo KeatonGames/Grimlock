@@ -123,6 +123,7 @@ private:
     ImFont* menuFont_ = nullptr;
     std::filesystem::path optionsPath_;
     int resolution_ = 1;
+    std::uint32_t msaaSamples_ = 4;
     bool fullscreen_ = false, vsync_ = true;
     std::string optionsError_;
 };

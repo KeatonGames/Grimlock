@@ -9,6 +9,7 @@ class GridDebug;
 // Optional launcher; Game code never needs editor implementation types.
 void run(const std::filesystem::path& scene = {},
          const std::filesystem::path& environment = {},
-         GridDebug* gridDebug = nullptr);
+         GridDebug* gridDebug = nullptr,
+         const std::filesystem::path& assetRoot = "assets");
 
 } // namespace grimlock::editor

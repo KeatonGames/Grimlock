@@ -19,7 +19,8 @@ MeshPipeline::MeshPipeline(const VkDevice device,
                            const VkDescriptorSetLayout cameraLayout,
                            const VkDescriptorSetLayout materialLayout,
                            const VkDescriptorSetLayout deformationLayout,
-                           const bool gridInstances)
+                           const bool gridInstances,
+                           const VkSampleCountFlagBits samples)
     : device_(device) {
     try {
         diagnostics::StartupSpan profile{"pipeline.mesh"};
@@ -86,7 +87,7 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         rasterization.lineWidth = 1.0F;
 
         VkPipelineMultisampleStateCreateInfo multisampling{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-        multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        multisampling.rasterizationSamples = samples;
 
         VkPipelineDepthStencilStateCreateInfo depthStencil{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
         depthStencil.depthTestEnable = VK_TRUE;

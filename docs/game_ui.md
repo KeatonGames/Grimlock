@@ -2,22 +2,22 @@
 
 Game uses its own HUD and input routing without Editor dependencies.
 
-Main menu, level cards, persistent display options and Pause share the forest
+Main menu, level cards, persistent display options and Pause share the angular purple, cream and gold
 theme described in [Game menus](menus.md). The playable catalog contains only
 Forest Defense; former demos are Editor/test fixtures outside it.
 
 ## Main layout
 
-- Top left: round number.
-- Top center: objective health bar.
+- Top left: cream gear button for Pause/Settings.
+- Top center: round number beside the cream objective health bar.
 - Top right: Start Wave, enabled during Preparation.
-- Bottom center: towers-only shop, with prices and tower cards.
+- Bottom left: compact bow and mage-hat tower cards, with prices.
 - Bottom right: coin model and current gold balance.
 
 The three top widgets have transparent backgrounds; the old status rectangle is
 removed. The shop has no hero roster, deployment controls, hero information or wave
 controls. Tower placement feedback remains inside the shop. Selecting a tower opens
-its upgrade/details panel above the shop. Boss encounters retain their health bars
+its cream-edged upgrade/details panel on the right. Boss encounters retain their health bars
 below the top row; transient wave notices and result screens keep their existing
 behavior.
 
@@ -39,12 +39,11 @@ Level and level selection.
 ## Layout and validation
 
 Gold appears at the bottom right beside the tower shop, with a rotating projection
-of the actual dungeon coin mesh above the current balance. Enemy coin effects are
-visual feedback only; gold still comes from the existing wave rewards.
+of the actual dungeon coin mesh beside the current balance. Goblins award two coins immediately on death; Level 1 starts with 20 coins and has no wave bonuses.
 
-The shop stays horizontally centered as the window and UI scale change. Top widgets
+The shop stays anchored at the bottom left as the window and UI scale change. Top widgets
 remain anchored to their respective corners/center, without a full-width panel.
-Tower details have a separate area above the shop and can scroll when space is
+Tower details have a separate area on the right and can scroll when space is
 limited. Noninteractive wave notices remain transparent to world input.
 
 Runtime checks cover automatic party placement, independent movement during
@@ -54,7 +53,6 @@ purchase/upgrade, pause/settings/restart, level switching and responsive bounds 
 `out/simple_hud_*.log`.
 
 
-Debug Game and Editor builds pass. Across the full 45-check run and focused reruns,
-44 checks pass; the known Cleave-dependent Level.Playable small-tower strategy
-failure remains. Marker lifecycle, input, layout, forest, level-menu and gameplay
-stress checks pass on the final implementation.
+The shared presentation uses clipped corners, offset dark shadows, cream borders, warm gold primary buttons and dark purple panels. The renderer-capture tool accepts `--tower` after a `--level` output path to inspect the selected-tower layout.
+
+The graphics MSAA option applies to the final HUD composition too, including range/build circles, projected coin triangles and panel silhouettes. Game and Editor overlays use the same selected sample count; text remains at native resolution.

@@ -1,8 +1,10 @@
 #include "ui/game_style.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <string>
 #include <string_view>
 
 namespace grimlock::game::presentation {
@@ -89,42 +91,68 @@ void menuShade(float opacity) {
         menuInk(color));
 }
 
+void angularPanel(ImVec2 a, ImVec2 b, ImVec4 fill, bool border) {
+    auto* draw = ImGui::GetWindowDrawList();
+    const float cut = std::min(22.0F * ImGui::GetStyle().FontScaleMain, (b.y - a.y) * 0.25F);
+    const ImVec2 points[]{{a.x + cut, a.y},
+                          {b.x, a.y},
+                          {b.x, b.y - cut},
+                          {b.x - cut, b.y},
+                          {a.x, b.y},
+                          {a.x, a.y + cut}};
+    ImVec2 shadow[6];
+    for (int i = 0; i < 6; ++i) {
+        shadow[i] = {points[i].x + 7, points[i].y + 9};
+    }
+    draw->AddConvexPolyFilled(shadow, 6, menuInk({0.065F, 0.05F, 0.10F, 0.75F}));
+    draw->AddConvexPolyFilled(points, 6, menuInk(fill));
+    if (border) {
+        draw->AddPolyline(points, 6, menuInk(ivory), ImDrawFlags_Closed, 2.0F);
+    }
+}
+
+void windowPanel() {
+    const auto a = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
+    angularPanel({a.x + 2, a.y + 2}, {a.x + size.x - 9, a.y + size.y - 10}, panel);
+}
+
 bool menuAction(const char* label, ImVec2 size, bool primary, bool dangerous) {
     const std::string_view caption{label};
     const auto separator = caption.find("###");
     const char* identity = separator == std::string_view::npos ? label : label + separator + 3;
     const auto visible = caption.substr(0, separator);
-    const auto id = ImGui::GetID(identity);
-    auto* storage = ImGui::GetStateStorage();
-    const float hover = storage->GetFloat(id ^ 0x48A0U);
-    const auto destination = dangerous ? danger : sage;
-    ImVec4 fill;
-    for (int i = 0; i < 4; ++i) {
-        (&fill.x)[i] = (&panel.x)[i] + ((&destination.x)[i] - (&panel.x)[i]) * hover;
-    }
-    ImGui::PushStyleColor(ImGuiCol_Button, menuColor(fill));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, menuColor(fill));
-    ImGui::PushStyleColor(ImGuiCol_ButtonActive, menuColor(dangerous ? danger : hoverGreen));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4{0, 0, 0, 0});
+    ImGui::PushStyleColor(ImGuiCol_Button, {0, 0, 0, 0});
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0, 0, 0, 0});
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0, 0, 0, 0});
+    ImGui::PushStyleColor(ImGuiCol_Text, {0, 0, 0, 0});
     const bool pressed = ImGui::Button(identity, size);
     ImGui::PopStyleColor(4);
-    const bool active = ImGui::IsItemHovered() || ImGui::IsItemFocused();
-    storage->SetFloat(id ^ 0x48A0U,
-                      hover + ((active ? 1.0F : 0.0F) - hover) * (1 - std::exp(-12 * ImGui::GetIO().DeltaTime)));
-    auto border = menuGold;
-    border.w = (primary ? 0.85F : 0.38F) + hover * 0.15F;
-    auto* draw = ImGui::GetWindowDrawList();
+    const bool hovered = ImGui::IsItemHovered() || ImGui::IsItemFocused();
+    auto fill = dangerous ? danger : primary ? menuGold : ivory;
+    if (hovered) {
+        fill = dangerous ? red : primary ? ImVec4{1, 0.84F, 0.36F, 1} : hoverGreen;
+    }
+    fill.w *= ImGui::GetStyle().Alpha;
     const auto a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-    const auto textSize = ImGui::CalcTextSize(visible.data(), visible.data() + visible.size());
-    const float pressedOffset = ImGui::IsItemActive() ? 1.0F : 0.0F;
-    draw->AddText({(a.x + b.x - textSize.x) * 0.5F, (a.y + b.y - textSize.y) * 0.5F + pressedOffset},
-                  menuInk(hover > 0.55F && !dangerous ? forest : ivory),
-                  visible.data(),
-                  visible.data() + visible.size());
-    draw->AddRect(a, b, menuInk(border), 4.0F);
-    if (primary || active) {
-        const float y = (a.y + b.y) * 0.5F;
-        draw->AddTriangleFilled({a.x + 14, y - 4}, {a.x + 14, y + 4}, {a.x + 20, y}, menuInk(menuGold));
+    angularPanel(a, b, fill, false);
+    std::string text{visible};
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) {
+        return static_cast<char>(std::toupper(c));
+    });
+    auto* font = ImGui::GetFont();
+    float fontSize = std::min(25 * ImGui::GetStyle().FontScaleMain, (b.y - a.y) * 0.46F);
+    const auto measured = font->CalcTextSizeA(fontSize, 10000, 0, text.c_str());
+    fontSize *= std::min(1.0F, (b.x - a.x - 34) / std::max(measured.x, 1.0F));
+    const auto textSize = font->CalcTextSizeA(fontSize, 10000, 0, text.c_str());
+    const ImVec2 textPosition{(a.x + b.x - textSize.x) * 0.5F, (a.y + b.y - textSize.y) * 0.5F};
+    auto ink = forest;
+    ink.w *= ImGui::GetStyle().Alpha;
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddText(font, fontSize, textPosition, menuInk(ink), text.c_str());
+    draw->AddText(font, fontSize, {textPosition.x + 0.7F, textPosition.y}, menuInk(ink), text.c_str());
+    if (primary && text.starts_with("START")) {
+        const float x = a.x + 15, y = (a.y + b.y) * 0.5F;
+        draw->AddTriangleFilled({x, y - 7}, {x, y + 7}, {x + 10, y}, menuInk(ink));
     }
     return pressed;
 }
@@ -136,19 +164,19 @@ void configure() {
     ImFontConfig font;
     font.SizePixels = 16;
     ImGui::GetIO().Fonts->AddFontDefaultVector(&font);
-    s.Colors[ImGuiCol_Text] = {0.89F, 0.92F, 0.91F, 1};
-    s.Colors[ImGuiCol_TextDisabled] = muted;
-    s.Colors[ImGuiCol_WindowBg] = {0.035F, 0.055F, 0.068F, 0.96F};
-    s.Colors[ImGuiCol_Border] = {0.42F, 0.51F, 0.54F, 0.25F};
-    s.Colors[ImGuiCol_FrameBg] = {0.06F, 0.095F, 0.11F, 1};
-    s.Colors[ImGuiCol_Button] = {0.09F, 0.15F, 0.17F, 1};
-    s.Colors[ImGuiCol_ButtonHovered] = {0.17F, 0.27F, 0.28F, 1};
-    s.Colors[ImGuiCol_ButtonActive] = {0.25F, 0.35F, 0.32F, 1};
-    s.Colors[ImGuiCol_Header] = {0.25F, 0.32F, 0.27F, 0.85F};
-    s.Colors[ImGuiCol_HeaderHovered] = {0.24F, 0.34F, 0.33F, 1};
-    s.Colors[ImGuiCol_HeaderActive] = {0.32F, 0.40F, 0.32F, 1};
-    s.Colors[ImGuiCol_SliderGrab] = gold;
-    s.Colors[ImGuiCol_CheckMark] = gold;
+    s.Colors[ImGuiCol_Text] = menuColor(ivory);
+    s.Colors[ImGuiCol_TextDisabled] = menuColor({0.68F, 0.63F, 0.62F, 1});
+    s.Colors[ImGuiCol_WindowBg] = menuColor(panel);
+    s.Colors[ImGuiCol_Border] = menuColor(ivory);
+    s.Colors[ImGuiCol_FrameBg] = menuColor(secondary);
+    s.Colors[ImGuiCol_Button] = menuColor(ivory);
+    s.Colors[ImGuiCol_ButtonHovered] = menuColor(menuGold);
+    s.Colors[ImGuiCol_ButtonActive] = menuColor(hoverGreen);
+    s.Colors[ImGuiCol_Header] = menuColor(secondary);
+    s.Colors[ImGuiCol_HeaderHovered] = menuColor(secondary);
+    s.Colors[ImGuiCol_HeaderActive] = menuColor(secondary);
+    s.Colors[ImGuiCol_SliderGrab] = menuColor(menuGold);
+    s.Colors[ImGuiCol_CheckMark] = menuColor(menuGold);
     s.WindowBorderSize = 1;
     s.DisabledAlpha = 0.45F;
     scale(1);
@@ -160,8 +188,8 @@ void scale(float value) {
     s.WindowPadding = {16 * value, 12 * value};
     s.FramePadding = {12 * value, 7 * value};
     s.ItemSpacing = {8 * value, 7 * value};
-    s.WindowRounding = 12 * value;
-    s.FrameRounding = 6 * value;
+    s.WindowRounding = 0;
+    s.FrameRounding = 0;
     s.ScrollbarSize = 12 * value;
 }
 
@@ -197,50 +225,61 @@ void icon(Icon kind, ImVec2 c, float size, ImU32 color) {
 }
 
 bool action(const char* label, ImVec2 size, bool primary) {
-    const auto id = ImGui::GetID(label);
-    if (primary) {
-        ImGui::PushStyleColor(ImGuiCol_Button, {0.35F, 0.29F, 0.16F, 1});
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, {0.48F, 0.40F, 0.22F, 1});
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, {0.59F, 0.48F, 0.26F, 1});
-    }
-    const bool pressed = ImGui::Button(label, size);
-    if (primary) {
-        ImGui::PopStyleColor(3);
-    }
-    auto* storage = ImGui::GetStateStorage();
-    float hover = storage->GetFloat(id ^ 0xA71U);
-    hover += ((ImGui::IsItemHovered() ? 1.0F : 0.0F) - hover) * (1 - std::exp(-14 * ImGui::GetIO().DeltaTime));
-    storage->SetFloat(id ^ 0xA71U, hover);
-    auto color = gold;
-    color.w = (0.15F + hover * 0.65F) * ImGui::GetStyle().Alpha;
-    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(),
-                                        ImGui::GetItemRectMax(),
-                                        ImGui::ColorConvertFloat4ToU32(color),
-                                        ImGui::GetStyle().FrameRounding);
-    return pressed;
+    return menuAction(label, size, primary);
 }
 
 bool towerCard(const char* label, std::uint64_t cost, bool selected, ImVec2 size) {
-    ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0.8F, 0.18F});
-    const bool pressed = action(label, size, selected);
-    ImGui::PopStyleVar();
+    const std::string identity = std::string{"###"} + label;
+    const bool pressed = action(identity.c_str(), size, selected);
     const auto p = ImGui::GetItemRectMin();
-    const float s = ImGui::GetStyle().FontScaleMain;
-    auto color = gold;
-    color.w = ImGui::GetStyle().Alpha;
-    icon(Icon::tower, {p.x + 20 * s, p.y + size.y * .52F}, 23 * s, ImGui::ColorConvertFloat4ToU32(color));
-    char price[48];
-    std::snprintf(price, sizeof(price), "%llu gold", static_cast<unsigned long long>(cost));
-    ImGui::GetWindowDrawList()->AddText({p.x + 40 * s, p.y + size.y - 23 * s},
-                                        ImGui::ColorConvertFloat4ToU32(color),
-                                        price);
+    auto* draw = ImGui::GetWindowDrawList();
+    const float scale = ImGui::GetStyle().FontScaleMain;
+    const ImVec2 c{p.x + size.x * 0.5F, p.y + 24 * scale};
+    const auto ink = menuInk(forest);
+    if (std::string_view{label}.find("Archer") != std::string_view::npos) {
+        draw->PathArcTo({c.x - 10 * scale, c.y}, 17 * scale, -1.3F, 1.3F, 20);
+        draw->PathStroke(ink, 0, 3 * scale);
+        draw->AddLine({c.x - 5 * scale, c.y - 16 * scale}, {c.x - 5 * scale, c.y + 16 * scale}, ink, 1.5F * scale);
+        draw->AddLine({c.x - 13 * scale, c.y + 12 * scale}, {c.x + 13 * scale, c.y - 12 * scale}, ink, 2 * scale);
+        draw->AddTriangleFilled({c.x + 15 * scale, c.y - 15 * scale},
+                                {c.x + 6 * scale, c.y - 12 * scale},
+                                {c.x + 13 * scale, c.y - 6 * scale},
+                                ink);
+    } else {
+        draw->AddTriangleFilled({c.x - 15 * scale, c.y + 10 * scale},
+                                {c.x + 12 * scale, c.y + 10 * scale},
+                                {c.x - 2 * scale, c.y - 17 * scale},
+                                ink);
+        draw->AddEllipseFilled({c.x, c.y + 11 * scale}, {20 * scale, 5 * scale}, ink);
+        draw->AddLine({c.x - 8 * scale, c.y + 5 * scale},
+                      {c.x + 7 * scale, c.y + 5 * scale},
+                      menuInk(menuGold),
+                      2 * scale);
+    }
+    char price[32];
+    std::snprintf(price, sizeof(price), "%llu", static_cast<unsigned long long>(cost));
+    const auto text = ImGui::CalcTextSize(price);
+    draw->AddText({p.x + (size.x - text.x) * 0.5F, p.y + size.y - 24 * scale}, ink, price);
     return pressed;
 }
 
 void meter(float fraction, ImVec2 size, const char* label, ImVec4 color) {
-    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, color);
-    ImGui::ProgressBar(std::clamp(fraction, 0.0F, 1.0F), size, label);
-    ImGui::PopStyleColor();
+    if (size.x <= 0) {
+        size.x = ImGui::GetContentRegionAvail().x;
+    }
+    const auto a = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(size);
+    const ImVec2 b{a.x + size.x, a.y + size.y};
+    angularPanel(a, b, secondary, false);
+    const float filled = std::clamp(fraction, 0.0F, 1.0F);
+    if (filled > 0) {
+        angularPanel(a,
+                     {a.x + size.x * filled, b.y},
+                     (color.x == green.x && color.y == green.y) ? ivory : color,
+                     false);
+    }
+    const auto text = ImGui::CalcTextSize(label);
+    ImGui::GetWindowDrawList()->AddText({b.x - text.x - 12, a.y + (size.y - text.y) * 0.5F}, menuInk(forest), label);
 }
 
 void backdrop(float opacity) {

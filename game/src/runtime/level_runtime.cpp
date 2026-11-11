@@ -14,8 +14,16 @@ std::filesystem::path assetRootForLevel(const std::filesystem::path& level) {
         level.parent_path().parent_path().filename() == "test_fixtures") {
         return level.parent_path().parent_path().parent_path();
     }
-    return level.is_absolute() && level.parent_path().filename() == "levels" ? level.parent_path().parent_path()
-                                                                             : std::filesystem::path{"assets"};
+    if (level.is_absolute() && level.parent_path().filename() == "levels") {
+        return level.parent_path().parent_path();
+    }
+#ifdef GRIMLOCK_SOURCE_ASSET_ROOT
+    const std::filesystem::path source{GRIMLOCK_SOURCE_ASSET_ROOT};
+    if (std::filesystem::is_directory(source / "levels") && std::filesystem::is_directory(source / "scenes")) {
+        return source;
+    }
+#endif
+    return "assets";
 }
 
 void LevelRuntime::spawnHeroesNearObjective() {

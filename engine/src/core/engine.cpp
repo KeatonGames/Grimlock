@@ -929,6 +929,22 @@ bool Engine::vsyncEnabled() const noexcept {
     return impl_->renderer.vsyncEnabled();
 }
 
+void Engine::setMsaaSamples(std::uint32_t samples) {
+    impl_->renderer.setMsaaSamples(samples);
+}
+
+std::uint32_t Engine::msaaSamples() const noexcept {
+    return impl_->renderer.msaaSamples();
+}
+
+std::vector<std::uint32_t> Engine::supportedMsaaSamples() const {
+    return impl_->renderer.supportedMsaaSamples();
+}
+
+glm::uvec2 Engine::renderingResolution() const noexcept {
+    return impl_->renderer.renderingResolution();
+}
+
 bool Engine::update(const std::function<void(double)>& gameUpdate) {
     return impl_->update(gameUpdate);
 }

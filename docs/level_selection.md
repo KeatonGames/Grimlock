@@ -18,28 +18,38 @@ of names and paths. Editor assigns IDs on save; preserve an ID for a rename, and
 assign a new one for an independent copy. Game keeps legacy ID-less levels playable
 without changing their files.
 
-By default both executables use the staged `assets` directory beside the executable,
-independent of the shell's working directory. Game discovers JSON files recursively
-under that root's `levels` directory. Saving a new Editor level there makes it
-available without restarting Game. Selection refreshes automatically every two
-seconds and has a **Refresh** button. Names and selection remain associated with
-file paths, so adding, deleting or renaming other entries does not select the wrong
-level.
+Development builds default to one shared source asset tree, `game/assets`, through
+`GRIMLOCK_USE_SOURCE_ASSETS=ON`. The Editor's **Scenes** list and Game's level
+catalog use that same root. Open `forest_defense.json` through Scenes and save
+normally: its transforms are written to `game/assets/scenes/forest_defense.json`,
+which is the scene referenced by Level 1. Rebuilding copies these edits outward
+into staged assets rather than overwriting the edits with an older copy.
 
-For development, edit the source asset tree directly rather than a staged copy that
-a build can overwrite. Point Game at that same asset root:
+If Level 1 is already running, choose **Restart Level**, or leave and reopen it,
+to reload the saved scene and level definition. There is no automatic in-battle
+scene replacement. No rebuild is needed. Scene saves and **Save Level Definition**
+retain their existing roles: the latter saves wave/economy metadata.
+
+The Editor's startup scene stays `debug.json`; this fix concerns the shared path
+used when opening and saving any scene, including Forest Defense.
+
+Use `-DGRIMLOCK_USE_SOURCE_ASSETS=OFF` for portable builds. Both launchers also
+fall back to executable-adjacent `assets` when the configured source tree is
+unavailable. Explicit absolute level paths keep their own asset tree, and Game's
+`--assets` override takes precedence. Relative scene/level paths resolve beside
+the active asset folder. The current shell working directory does not choose it.
+
+For an explicit source-tree launch:
 
 ```powershell
 $assets = Join-Path $PWD 'game/assets'
-# Editor's existing absolute-level support uses this level's asset tree.
-.\out\build\debug\Debug\GrimlockEditor.exe --level (Join-Path $assets 'test_fixtures/levels/first_watch.json')
-# Game sees new/edited levels in that tree immediately; no rebuild is needed.
+.\out\build\debug\Debug\GrimlockEditor.exe --level (Join-Path $assets 'levels/forest_defense.json')
 .\out\build\debug\Debug\Grimlock.exe --assets $assets
 ```
 
 `--assets` accepts an absolute path or an executable-relative folder. Packaged
 builds simply distribute the executable with its adjacent `assets` directory;
-there is no source-tree or Editor working-directory dependency. Existing explicit
+configure with `GRIMLOCK_USE_SOURCE_ASSETS=OFF` to guarantee there is no source-tree dependency. Existing explicit
 level launches still work, e.g. `Grimlock.exe assets/test_fixtures/levels/boss_watch.json`. An
 absolute level directly inside an asset tree's `levels` folder selects that asset
 tree, as before. For nested/external explicit paths, supply `--assets` when needed.

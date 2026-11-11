@@ -30,6 +30,10 @@ add_library(GameLogic STATIC
 target_include_directories(GameLogic PUBLIC src)
 target_link_libraries(GameLogic PUBLIC Engine PRIVATE RecastNavigation::Recast RecastNavigation::Detour nlohmann_json::nlohmann_json)
 set_target_properties(GameLogic PROPERTIES CXX_EXTENSIONS OFF)
+option(GRIMLOCK_USE_SOURCE_ASSETS "Use the shared source asset tree in development launchers" ON)
+if(GRIMLOCK_USE_SOURCE_ASSETS)
+    target_compile_definitions(GameLogic PRIVATE GRIMLOCK_SOURCE_ASSET_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets")
+endif()
 
 add_library(GameUi STATIC src/ui/game_hud.cpp src/ui/game_style.cpp src/ui/game_menu.cpp)
 target_link_libraries(GameUi PUBLIC GameLogic ImGuiSupport PRIVATE SDL3::SDL3 Vulkan::Vulkan stb_image nlohmann_json::nlohmann_json)

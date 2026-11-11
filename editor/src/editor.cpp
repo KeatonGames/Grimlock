@@ -1257,9 +1257,16 @@ void Editor::finishFrame(const Camera& camera) {
     ImGui::Render();
 }
 
-void run(const std::filesystem::path& scene, const std::filesystem::path& environment, GridDebug* gridDebug) {
-    Engine engine{EngineConfig{.windowTitle = "Grimlock Scene Editor", .environmentFolder = environment}};
-    Editor editor{engine, scene.empty() ? engine.assetRoot() / "scenes" / "demo.json" : scene, gridDebug};
+void run(const std::filesystem::path& scene,
+         const std::filesystem::path& environment,
+         GridDebug* gridDebug,
+         const std::filesystem::path& assetRoot) {
+    Engine engine{
+        EngineConfig{.windowTitle = "Grimlock Scene Editor", .environmentFolder = environment, .assetRoot = assetRoot}};
+    const auto initial = scene.empty()         ? engine.assetRoot() / "scenes" / "demo.json"
+                         : scene.is_absolute() ? scene
+                                               : engine.assetRoot().parent_path() / scene;
+    Editor editor{engine, initial, gridDebug};
 
     std::function<void(double)> update;
     if (gridDebug) {

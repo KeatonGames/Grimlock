@@ -235,6 +235,12 @@ int main() {
         control(engine, runtime, window, "Settings", "VSync");
         control(engine, runtime, window, "Settings", "APPLY");
         require(engine.vsyncEnabled(), "VSync did not restore");
+        control(engine, runtime, window, "Settings", "MSAA");
+        key(engine, runtime, window, SDLK_END, SDL_SCANCODE_END);
+        key(engine, runtime, window, SDLK_RETURN, SDL_SCANCODE_RETURN);
+        control(engine, runtime, window, "Settings", "APPLY");
+        const auto savedMsaa = engine.msaaSamples();
+        require(savedMsaa == engine.supportedMsaaSamples().back(), "MSAA option did not apply the supported mode");
         control(engine, runtime, window, "Settings", "Back");
         control(engine, runtime, window, "Main Menu", "Choose Level");
         capture(engine, root.parent_path() / "phase48_levels.png");
@@ -341,7 +347,8 @@ int main() {
         {
             GameHud reopenedHud{engine, runtime, true, {}, optionsPath};
             tick(engine, runtime, 2);
-            require(engine.vsyncEnabled(), "Saved display preferences did not reload");
+            require(engine.vsyncEnabled() && engine.msaaSamples() == savedMsaa,
+                    "Saved display/MSAA preferences did not reload");
             control(engine, runtime, window, "Main Menu", "Choose Level");
             for (int frame = 0; frame < 20; ++frame) {
                 tick(engine, runtime, 1);

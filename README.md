@@ -117,9 +117,9 @@ cmake --build --preset release --parallel 4
 Targets `Game` and `Editor` produce `Grimlock` and `GrimlockEditor`. Build either with
 `cmake --build --preset debug --target Game` or `--target Editor`. Editor defaults
 to ON; configure with `-DGRIMLOCK_BUILD_EDITOR=OFF` for a Game-only build. The HUD
-still works in that build. Both applications use the same staged asset directory.
+still works in that build. Development launchers share `game/assets` directly, so Editor scene saves are read by Game without rebuilding. Use `-DGRIMLOCK_USE_SOURCE_ASSETS=OFF` for a portable build that reads staged assets instead.
 
-CMake compiles shaders automatically and synchronizes assets beside each executable, pruning obsolete staged files. GLB files must contain actual model data, not Git LFS pointer text.
+CMake compiles shaders automatically and synchronizes a separate asset copy beside each executable for tests and packaging, pruning obsolete staged files. GLB files must contain actual model data, not Git LFS pointer text.
 
 Game discovers all valid JSON levels under its active `assets/levels` directory.
 Use `--assets <folder>` to play directly from an authored asset tree; see
@@ -169,3 +169,4 @@ see [hero types](docs/hero_types.md).
 See [gameplay controls](docs/gameplay_controls.md) for selection, orders, cancellation,
 and interaction priorities. Camera controls remain right-drag pan, middle-drag orbit, and wheel zoom.
 
+Rendering quality: [MSAA, high-DPI rendering, filtering and validation](docs/rendering_quality.md).

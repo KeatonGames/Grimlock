@@ -7,8 +7,11 @@
 
 namespace grimlock::renderer {
 
-ToneMapPipeline::ToneMapPipeline(const VkDevice device, const VkFormat colorFormat, const VkDescriptorSetLayout layout)
-    : device_(device), colorFormat_(colorFormat) {
+ToneMapPipeline::ToneMapPipeline(const VkDevice device,
+                                 const VkFormat colorFormat,
+                                 const VkDescriptorSetLayout layout,
+                                 const VkSampleCountFlagBits sampleCount)
+    : device_(device), colorFormat_(colorFormat), samples_(sampleCount) {
     try {
         diagnostics::StartupSpan profile{"pipeline.tonemap"};
         const ShaderModule shader{device_, "shaders/tone_map.spv"};
@@ -42,7 +45,7 @@ ToneMapPipeline::ToneMapPipeline(const VkDevice device, const VkFormat colorForm
         raster.lineWidth = 1;
 
         VkPipelineMultisampleStateCreateInfo samples{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-        samples.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        samples.rasterizationSamples = samples_;
         VkPipelineColorBlendAttachmentState attachment{};
         attachment.colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

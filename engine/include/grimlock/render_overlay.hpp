@@ -14,6 +14,7 @@ struct Camera;
 struct OverlayTarget {
     VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     std::uint32_t minimumImages = 2, images = 0;
+    VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 };
 
 struct OverlayContext {

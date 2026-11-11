@@ -13,7 +13,8 @@ int main(int argc, char** argv) {
             if (argument == "--help") {
                 std::cout
                     << "Usage: Grimlock [level.json] [--assets folder] [--environment folder]\nDefault: main menu. "
-                       "Paths are executable-relative.\nFor authoring, run GrimlockEditor.\n";
+                       "Relative level paths use the active asset folder's parent.\nFor authoring, run "
+                       "GrimlockEditor.\n";
                 return EXIT_SUCCESS;
             }
             if (argument == "--environment" || argument == "--assets") {

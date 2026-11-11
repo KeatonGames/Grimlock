@@ -91,7 +91,8 @@ void runtimeChecks(Engine& engine) {
     engine.scene()->setModel(blocker, "towers/structures/primitives/cube.glb");
     engine.scene()->setRole(blocker, "grimlock.obstacle");
     Transform transform;
-    transform.position = {-1, 1, 0};
+    // Place cover on the actual shot segment, including the tower defender's mount offset.
+    transform.position = glm::vec3{(firingOrigin(tower) + combatAim(*enemies.find(near))) * 0.5};
     transform.scale = {0.015F, 1, 0.1F};
     engine.scene()->setTransform(blocker, transform);
     world.synchronize(engine, towers.towers());
