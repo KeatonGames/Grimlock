@@ -39,7 +39,6 @@ GameHud::GameHud(Engine& engine,
 GameHud::~GameHud() {
     clearTowerPreview();
     clearSelectionMarker();
-    buildZoneMarkers_.clear();
     engine_.detachOverlay();
 }
 
@@ -159,7 +158,6 @@ OverlayInput GameHud::frame() {
 void GameHud::clearFeedback() {
     clearTowerPreview();
     clearSelectionMarker();
-    buildZoneMarkers_.clear();
     hoveredObject_.reset();
     orderPosition_.reset();
     orderHero_ = previewHero_ = 0;
@@ -680,7 +678,6 @@ void GameHud::finishFrame(const Camera& camera) {
                                       runtime_.level().waves()->phase() == LevelPhase::defeat))) {
         clearSelectionMarker();
         clearTowerPreview();
-        buildZoneMarkers_.clear();
         ImGui::Render();
         return;
     }
@@ -747,7 +744,6 @@ void GameHud::finishFrame(const Camera& camera) {
     }
     updateSelectionMarker();
     updateTowerPreview();
-    buildZoneMarkers_.synchronize(engine_, runtime_.navigation().placement().zones());
     updateHeroPathPreview(ray);
     placementOverlay(camera);
     heroMovementOverlay(camera);
@@ -1136,17 +1132,12 @@ void GameHud::placementOverlay(const Camera& camera) {
             }
         }
     }
-    const auto* rangeTower = runtime_.preview() ? &*runtime_.preview() : runtime_.inspectedTower();
-    if (rangeTower) {
-        const auto& towers = runtime_.navigation().towers();
-        const auto level = runtime_.preview() ? 1 : towers.progress(rangeTower->object).level;
-        const auto range = towers.definition(rangeTower->type).statistics(level).attackRange;
-        const bool flashing = upgradedTower_ == rangeTower->object && upgradeFlashRemaining_ > 0;
-        const bool valid = !runtime_.preview() || runtime_.placementError().empty();
-        const auto color = valid ? IM_COL32(255, 218, 70, 245) : IM_COL32(255, 85, 65, 245);
-        const auto fill = valid ? IM_COL32(255, 218, 70, flashing ? 36 : 18) : IM_COL32(255, 85, 65, 18);
-        const auto center = rangeTower->position - glm::dvec3{0, rangeTower->halfExtent.y - 0.025, 0};
-        constexpr int segments = 80;
+    const auto groundCircle = [&](glm::dvec3 center, double range, ImU32 color, ImU32 fill) {
+        // Adjacent filled sectors share edges. Antialiasing each sector separately
+        // adds translucent fringes along those internal edges and exposes the tessellation.
+        const auto drawFlags = draw->Flags;
+        draw->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+        constexpr int segments = 160;
         for (int index = 0; index < segments; ++index) {
             const double a = glm::two_pi<double>() * index / segments;
             const double b = glm::two_pi<double>() * (index + 1) / segments;
@@ -1163,6 +1154,29 @@ void GameHud::placementOverlay(const Camera& camera) {
             band(range + 0.045, range - 0.16, IM_COL32(24, 22, 14, 220));
             band(range, range - 0.11, color);
         }
+        draw->Flags = drawFlags;
+    };
+    for (const auto& zone : runtime_.navigation().placement().zones()) {
+        if (!zone.occupants.empty()) {
+            continue;
+        }
+        const bool placing = runtime_.placing();
+        groundCircle(zone.constructionPosition() + glm::dvec3{0, 0.035, 0},
+                     1,
+                     IM_COL32(255, 218, 70, placing ? 245 : 205),
+                     IM_COL32(255, 218, 70, placing ? 24 : 12));
+    }
+    const auto* rangeTower = runtime_.preview() ? &*runtime_.preview() : runtime_.inspectedTower();
+    if (rangeTower) {
+        const auto& towers = runtime_.navigation().towers();
+        const auto level = runtime_.preview() ? 1 : towers.progress(rangeTower->object).level;
+        const auto range = towers.definition(rangeTower->type).statistics(level).attackRange;
+        const bool flashing = upgradedTower_ == rangeTower->object && upgradeFlashRemaining_ > 0;
+        const bool valid = !runtime_.preview() || runtime_.placementError().empty();
+        const auto color = valid ? IM_COL32(255, 218, 70, 245) : IM_COL32(255, 85, 65, 245);
+        const auto fill = valid ? IM_COL32(255, 218, 70, flashing ? 36 : 18) : IM_COL32(255, 85, 65, 18);
+        const auto center = rangeTower->position - glm::dvec3{0, rangeTower->halfExtent.y - 0.025, 0};
+        groundCircle(center, range, color, fill);
     }
 }
 

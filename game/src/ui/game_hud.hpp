@@ -3,7 +3,6 @@
 #include "input/ground_command.hpp"
 #include "runtime/level_catalog.hpp"
 #include "runtime/level_runtime.hpp"
-#include "systems/build_zone_markers.hpp"
 #include "ui/hero_route_visual.hpp"
 
 #include <grimlock/imgui_overlay.hpp>
@@ -75,7 +74,6 @@ private:
     std::string towerPreviewType_;
     glm::vec3 towerDefenderFoot_{0};
     float towerDefenderScale_ = 1;
-    BuildZoneMarkers buildZoneMarkers_;
     std::optional<glm::dvec3> orderPosition_;
     HeroId orderHero_ = 0, previewHero_ = 0;
     NavigationPath hoverPath_;

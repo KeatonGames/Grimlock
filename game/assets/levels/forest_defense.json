@@ -57,8 +57,8 @@
                                          "count":  6,
                                          "spawn":  "Woodland entrance",
                                          "start":  0,
-                                         "batch_size":  2,
-                                         "interval":  4
+                                         "batch_size":  1,
+                                         "interval":  0.6
                                      }
                                  ]
                   },
@@ -68,19 +68,11 @@
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
-                                         "count":  6,
+                                         "count":  10,
                                          "spawn":  "Woodland entrance",
                                          "start":  0,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  4,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  6,
-                                         "batch_size":  2,
-                                         "interval":  3
+                                         "batch_size":  1,
+                                         "interval":  0.6
                                      }
                                  ]
                   },
@@ -90,35 +82,11 @@
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
-                                         "count":  6,
+                                         "count":  12,
                                          "spawn":  "Woodland entrance",
                                          "start":  0,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  6,
-                                         "batch_size":  2,
-                                         "interval":  3
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  9,
-                                         "batch_size":  2,
-                                         "interval":  3
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  13,
                                          "batch_size":  1,
-                                         "interval":  5
+                                         "interval":  0.6
                                      }
                                  ]
                   },
@@ -128,43 +96,11 @@
                       "groups":  [
                                      {
                                          "enemy":  "Goblin",
-                                         "count":  4,
+                                         "count":  12,
                                          "spawn":  "Woodland entrance",
                                          "start":  0,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  4,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  5,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  9,
-                                         "batch_size":  2,
-                                         "interval":  4
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  2,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  12,
                                          "batch_size":  1,
-                                         "interval":  5
+                                         "interval":  0.6
                                      }
                                  ]
                   },
@@ -178,15 +114,15 @@
                                          "spawn":  "Goblin boss entrance",
                                          "start":  0,
                                          "batch_size":  1,
-                                         "interval":  0
+                                         "interval":  0.6
                                      },
                                      {
                                          "enemy":  "Goblin",
                                          "count":  4,
                                          "spawn":  "Woodland entrance",
-                                         "start":  0,
-                                         "batch_size":  4,
-                                         "interval":  0
+                                         "start":  0.6,
+                                         "batch_size":  1,
+                                         "interval":  0.6
                                      }
                                  ]
                   }

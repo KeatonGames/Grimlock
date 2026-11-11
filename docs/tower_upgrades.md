@@ -15,20 +15,20 @@ tower types have three explicitly authored levels:
 
 | Tower | Level | Damage | Range | Shots/sec | Cost to enter level |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Small | 1 | 25 | 3.5 | 1.5 | 10 construction |
-| Small | 2 | 36 | 3.9 | 1.7 | 25 upgrade |
-| Small | 3 | 50 | 4.3 | 2 | 40 upgrade |
-| Large | 1 | 55 | 4.2 | 1 | 15 construction |
-| Large | 2 | 80 | 4.7 | 1.15 | 45 upgrade |
-| Large | 3 | 110 | 5.2 | 1.3 | 65 upgrade |
+| Small | 1 | 25 | 7 | 1.5 | 10 construction |
+| Small | 2 | 36 | 7.8 | 1.7 | 25 upgrade |
+| Small | 3 | 50 | 8.6 | 2 | 40 upgrade |
+| Large | 1 | 55 | 5.46 | 1 | 15 construction |
+| Large | 2 | 80 | 6.11 | 1.15 | 45 upgrade |
+| Large | 3 | 110 | 6.76 | 1.3 | 65 upgrade |
 
 For example, Small Tower's array is:
 
 ```json
 "levels": [
-  {"damage":25, "attack_range":3.5, "fire_rate":1.5, "upgrade_cost":0},
-  {"damage":36, "attack_range":3.9, "fire_rate":1.7, "upgrade_cost":25},
-  {"damage":50, "attack_range":4.3, "fire_rate":2, "upgrade_cost":40}
+  {"damage":25, "attack_range":7, "fire_rate":1.5, "upgrade_cost":0},
+  {"damage":36, "attack_range":7.8, "fire_rate":1.7, "upgrade_cost":25},
+  {"damage":50, "attack_range":8.6, "fire_rate":2, "upgrade_cost":40}
 ]
 ```
 

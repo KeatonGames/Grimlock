@@ -8,19 +8,19 @@
         "levels":  [
                        {
                            "damage":  25,
-                           "attack_range":  3.5,
+                           "attack_range":  7,
                            "fire_rate":  1.5,
                            "upgrade_cost":  0
                        },
                        {
                            "damage":  36,
-                           "attack_range":  3.9,
+                           "attack_range":  7.8,
                            "fire_rate":  1.7,
                            "upgrade_cost":  25
                        },
                        {
                            "damage":  50,
-                           "attack_range":  4.3,
+                           "attack_range":  8.6,
                            "fire_rate":  2,
                            "upgrade_cost":  40
                        }
@@ -73,19 +73,19 @@
         "levels":  [
                        {
                            "damage":  55,
-                           "attack_range":  4.2,
+                           "attack_range":  5.46,
                            "fire_rate":  1,
                            "upgrade_cost":  0
                        },
                        {
                            "damage":  80,
-                           "attack_range":  4.7,
+                           "attack_range":  6.11,
                            "fire_rate":  1.15,
                            "upgrade_cost":  45
                        },
                        {
                            "damage":  110,
-                           "attack_range":  5.2,
+                           "attack_range":  6.76,
                            "fire_rate":  1.3,
                            "upgrade_cost":  65
                        }

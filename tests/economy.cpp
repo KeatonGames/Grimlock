@@ -64,9 +64,9 @@ void configuration(const std::filesystem::path& assets, const std::filesystem::p
     for (std::size_t level = 1; level <= 3; ++level) {
         const auto& small = towers[0].statistics(level);
         const auto& large = towers[1].statistics(level);
-        require(large.damage > small.damage && large.attackRange > small.attackRange &&
+        require(large.damage > small.damage && small.attackRange > large.attackRange &&
                     large.damage * large.fireRate > small.damage * small.fireRate,
-                "Large Tower must remain stronger at equivalent levels");
+                "Mage Tower must retain higher damage while Archer Tower has longer range");
     }
     require(level.startingGold == 90 && level.objectiveHealth == 10 && level.waves.size() == 5 &&
                 level.waves[0].goldReward == 25 && level.waves[1].goldReward == 35 && level.waves[2].goldReward == 45 &&

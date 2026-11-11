@@ -109,14 +109,15 @@ void terrain(Engine& engine) {
     const auto& waves = runtime.level().waves()->definition().waves;
     for (std::size_t wave = 0; wave < 4; ++wave) {
         for (const auto& group : waves[wave].groups) {
-            require(group.enemy == "Goblin", "Introductory waves contain a non-Goblin enemy");
+            require(group.enemy == "Goblin" && group.batchSize == 1 && group.interval == 0.6,
+                    "Introductory Goblins must spawn individually at 0.6-second intervals");
         }
     }
     const auto& finale = waves.back().groups;
     require(finale.size() == 2 && finale[0].enemy == "Goblin Boss" && finale[0].count == 1 &&
                 finale[0].batchSize == 1 && finale[0].start == 0 && finale[1].enemy == "Goblin" &&
-                finale[1].count == 4 && finale[1].batchSize == 4 && finale[1].start == 0,
-            "Final swarm must contain exactly one Goblin boss and four Goblins together");
+                finale[1].count == 4 && finale[1].batchSize == 1 && finale[1].start == 0.6 && finale[1].interval == 0.6,
+            "Final wave must introduce the boss followed by four individual Goblins");
     const auto catalog = discoverLevels(engine.assetRoot());
     require(std::any_of(catalog.levels.begin(),
                         catalog.levels.end(),
@@ -285,7 +286,9 @@ void play(Engine& engine, bool defended) {
         while (session.waves()->phase() == LevelPhase::battle && time < 180) {
             const auto arrivals = navigation.enemies()->metrics().arrived;
             const bool trackingBoss = boss && navigation.enemies()->find(*boss);
+            const auto pending = session.waves()->pending();
             runtime.update(engine, 1.0 / 30);
+            require(pending - session.waves()->pending() <= 1, "Forest spawned multiple enemies together");
             if (trackingBoss && !navigation.enemies()->find(*boss)) {
                 bossDefeated = navigation.enemies()->metrics().arrived == arrivals;
             }

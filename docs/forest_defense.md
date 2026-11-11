@@ -63,6 +63,7 @@ plank gaps from disconnecting navigation for large enemies. The ground beneath
 and beside the bridge remains a real gap rather than an invisible terrain plane.
 
 The mausoleum uses the existing Graveyard Kit's `crypt-large` and matching roof.
+The entrance faces the incoming route; its warm glow sits inside the actual doorway. A low stone foundation supports the raised sill.
 Its roof and arched doorway are children of the objective, so they follow its
 collapse and reset. The building's foot remains close enough to the terrace for
 existing melee contact checks. Enemies stop at its perimeter and repeatedly attack;
@@ -73,7 +74,7 @@ and brazier flame shapes. They are scenery with no gameplay or animation system
 changes. Regenerate them with `tools/prepare_level_one_details.ps1`.
 
 `tools/author_level_one.ps1` reproduces the authored scene and its spawn/objective
-coordinates while retaining the level's existing wave data. Running it overwrites
+coordinates while retaining the level's existing wave data. Boundary trees, rocks, flowers and fences are positioned within their supporting island surfaces, with separation from adjacent scenery and the approach. Running it overwrites
 scene edits, so normal authoring should use Editor. No generation tool runs when
 the game starts. All scene models remain discoverable in Editor's model picker.
 
@@ -92,11 +93,9 @@ The player starts with **20 gold** and the mausoleum has **10 health**.
 | Beneath the roots | 10 Goblins | 0 |
 | The woodland raiders | 12 Goblins | 0 |
 | Hold the ascent | 12 Goblins | 0 |
-| The Goblin Boss | 1 Goblin Boss and 4 Goblins together | 0 |
+| The Goblin Boss | 1 Goblin Boss followed by 4 Goblins | 0 |
 
-The first four waves use only regular Goblins, retaining their existing group
-timing. The final wave contains exactly five enemies: the Goblin Boss and four
-Goblins, all scheduled at wave start as one swarm. The level totals 45 enemies.
+The first four waves use only regular Goblins, entering individually at 0.6-second intervals. The final wave starts with the Goblin Boss, followed by four Goblins at the same 0.6-second spacing. The level totals 45 enemies.
 Other enemy definitions remain available to later levels. Each Goblin and the Goblin Boss awards 2 coins on
 death, for 90 kill coins when all 45 enemies are defeated. Wave completion grants no gold; kill rewards reach the wallet immediately.
 Archer Towers cost 10 coins and Mage Towers cost 15 coins; upgrade costs are unchanged.
@@ -109,7 +108,7 @@ A tower-only plan starts with Archer Towers at the entrance and terrace. Build a
 points, both ascents, bridge clearance for the boss, the real ravine,
 the absence of heroes, elevated tower placement and cost, downhill projectile hits, and
 scene/Editor round-tripping. It also plays defended and undefended strategies
-through all five waves and checks rewards, Goblin-only spawning, the exact final swarm, boss health bars,
+through all five waves and checks rewards, Goblin-only spawning, the individually spaced final wave, boss health bars,
 restart and resource cleanup. `Undead.Runtime` checks repeated mausoleum attacks,
 defeat, building collapse and restart for all enemy archetypes. Objective pursuit
 is never rejected because the building's center lies beyond a defender pursuit

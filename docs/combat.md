@@ -22,8 +22,8 @@ levels retain their original combat statistics and targeting behavior.
 
 | Type ID | Display name | Cost | Damage/hit | Range | Shots/sec | Projectile speed | Projectile radius |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `basic` | Archer Tower | 10 | 25 | 3.5 | 1.5 | 9 | 0.06 |
-| `wide` | Mage Tower | 15 | 55 | 4.2 | 1 | 12 | 0.10 |
+| `basic` | Archer Tower | 10 | 25 | 7 | 1.5 | 9 | 0.06 |
+| `wide` | Mage Tower | 15 | 55 | 5.46 | 1 | 12 | 0.10 |
 
 Each type stores `construction_cost`, `projectile_speed`, `projectile_radius`, and
 RGBA `projectile_tint`. Its ordered `levels` entries hold `damage`, `attack_range`,

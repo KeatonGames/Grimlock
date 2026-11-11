@@ -149,7 +149,7 @@ void checkTowers(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, Towe
     auto small = towers.definition("basic").instance();
     small.position = {0, small.halfExtent.y, 0};
     const auto tower = towers.create(engine, small);
-    const auto distant = spawn(enemies, mesh, 6);
+    const auto distant = spawn(enemies, mesh, 9);
     const auto farther = spawn(enemies, mesh, 3);
     const auto nearest = spawn(enemies, mesh, 1.5);
     CombatSystem combat{engine};
@@ -162,13 +162,16 @@ void checkTowers(Engine& engine, EnemySystem& enemies, const NavMesh& mesh, Towe
     combat.update(towers, enemies, 0.01);
     require(towers.attacks()[0].target == farther, "tower did not reacquire a valid target");
     const glm::dvec2 goal{8, 0};
-    enemies.setSpeed(3);
+    enemies.setSpeed(12);
     require(enemies.setDestination(farther, goal), "moving target destination failed");
-    for (int frame = 0; frame < 30; ++frame) {
+    for (int frame = 0; frame < 600 && enemies.find(farther) &&
+                        enemies.find(farther)->position.x <= towers.definition("basic").statistics().attackRange + 0.1;
+         ++frame) {
         enemies.update(mesh, std::nullopt, 1.0 / 60);
     }
     combat.update(towers, enemies, 0.01);
-    require(!towers.attacks()[0].target && enemies.find(farther) && enemies.find(farther)->position.x > 3.5,
+    require(!towers.attacks()[0].target && enemies.find(farther) &&
+                enemies.find(farther)->position.x > towers.definition("basic").statistics().attackRange,
             "tower kept tracking an enemy after it left attack range");
     enemies.setSpeed(0);
     require(enemies.remove(farther), "second target removal failed");
@@ -315,7 +318,7 @@ int main() {
         const auto& small = towers.definition("basic");
         const auto& large = towers.definition("wide");
         require(large.statistics().damage > small.statistics().damage &&
-                    large.statistics().attackRange > small.statistics().attackRange &&
+                    small.statistics().attackRange > large.statistics().attackRange &&
                     large.statistics().damage * large.statistics().fireRate >
                         small.statistics().damage * small.statistics().fireRate &&
                     large.constructionCost > small.constructionCost,

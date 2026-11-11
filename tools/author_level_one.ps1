@@ -104,12 +104,15 @@ $null = Add-Object 'Red portal interior' 'environment/graveyard/portal_glow_red.
 $null = Add-Object 'Enemy entrance banner' 'environment/castle/flag.glb' @(-12.7,0,-5.4) @(
     1.5,1.5,1.5) 90 -parent '3' -tint @(2,0.2,0.3,1)
 
+# The raised sill sits on a visible foundation rather than hovering above the terrace.
+$null = Add-Object 'Mausoleum stone foundation' 'towers/structures/primitives/cube.glb' @(8.5,2.06,14.2) @(
+    1.68,0.06,1.81) 0 -parent '4' -tint @(0.55,0.53,0.7,1)
 $null = Add-Object 'Defense objective - mausoleum' 'environment/graveyard/crypt-large.glb' @(8.5,2.12,14.2) @(
-    1.8,2,1.5) 0 'grimlock.objective' '4' '105'
+    1.8,2,1.5) 180 'grimlock.objective' '4' '105'
 $null = Add-Object 'Mausoleum pitched roof' 'environment/graveyard/crypt-large-roof.glb' @(0,1,0) @(
     1,1,1) 0 -parent '105'
-$null = Add-Object 'Warm mausoleum doorway' 'environment/graveyard/door_glow_warm.glb' @(0,0,-1.21) @(
-    0.5,0.5,1) 0 -parent '105'
+$null = Add-Object 'Warm mausoleum doorway' 'environment/graveyard/door_glow_warm.glb' @(0,0,1.21) @(
+    0.5,0.5,1) 180 -parent '105'
 # Low steps lead from the playable terrace to the raised door sill.
 for ($step = 0; $step -lt 3; ++$step) {
     $null = Add-Object 'Mausoleum entrance step' 'towers/structures/primitives/cube.glb' @(8.5,(2.025+$step*0.04),(11.7+$step*0.28)) @(
@@ -135,12 +138,12 @@ foreach ($x in @(6.1,10.9)) {
 }
 
 # Frame the silhouettes, leaving routes and all four construction footprints clear.
-foreach ($p in @(@(-12,0,-6.4),@(-11,1,6),@(-9,1,7.2),@(-3.6,1,7),@(1,2,13.5),
-                  @(11.7,2,13.2),@(10,0,1),@(10.5,0,-3.2))) {
+foreach ($p in @(@(-12,0,-6.4),@(-11,1,6),@(-8.5,1,6.6),@(-3.8,1,7.1),@(3.4,2,14.8),
+                  @(11.5,2,11.2),@(9.3,0,-0.3),@(9.8,0,-3.2))) {
     Add-Prop 'Woodland pine' 'tree-pine' $p 1.5
 }
-foreach ($p in @(@(-11.2,0,-0.6),@(-9.7,1,7.4),@(-3,1,5.8),@(-1.7,0,-6.8),
-                  @(3.6,0,-4.5),@(10.8,0,1.5),@(2.5,2,12.6))) {
+foreach ($p in @(@(-11.2,0,-0.6),@(-6.8,1,7),@(-3,1,5.8),@(-3.4,0,-6.5),
+                  @(4.3,0,-3.7),@(9.4,0,2),@(3.4,2,12.4))) {
     Add-Prop 'Rounded boundary rocks' 'rocks' $p 2.3
 }
 Add-Fence @(-9.5,0,-7.2) 0 3.3
@@ -148,13 +151,13 @@ Add-Fence @(-6.1,0,-7.2) 0 3.3
 Add-Fence @(-9,1,2.7) 0 3.2
 Add-Fence @(-4.4,1,4.3) 90 2
 Add-Fence @(7.8,0,-4.6) 0 3
-Add-Fence @(9.9,0,2.2) 90 2.4
-Add-Fence @(9.6,2,8.9) 0 3
+Add-Fence @(10.6,0,1.2) 90 2.4
+Add-Fence @(11,2,9.6) 0 3
 Add-Prop 'Supply crate' 'crate' @(-8,0,-5.6) 1.7 10
 Add-Prop 'Stacked supply crate' 'crate' @(-8.7,0,-4.9) 1.4 -12
 Add-Prop 'Supply barrel' 'barrel' @(-7.2,0,-5.2) 1.5
-foreach ($p in @(@(-13,0,-3),@(-10,0,-7),@(-3,0,-6),@(-4,1,6.8),@(-10.3,1,3.5),
-                  @(4,0,-4),@(10.6,0,-1),@(5.5,0,2),@(3.6,2,13.1),@(11.8,2,9.8))) {
+foreach ($p in @(@(-13,0,-1.4),@(-10,0,-5.8),@(-5,0,-6.3),@(-5,1,6.8),@(-10.5,1,4.2),
+                  @(5.4,0,-3.5),@(7.8,0,1.6),@(5.5,0,2),@(5,2,15.5),@(4,2,10))) {
     Add-Prop 'Woodland flowers' 'flowers' $p 1.2
     Add-Prop 'Grass clump' 'plant' @(($p[0]+0.6),$p[1],($p[2]-0.4)) 1.3 25
 }

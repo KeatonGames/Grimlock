@@ -147,41 +147,18 @@ int main(int argc, char**) {
         auto* window = windows[0];
         const auto id = SDL_GetWindowID(window);
         SDL_free(windows);
-        const auto frameModel =
-            engine.loadModel(engine.assetRoot() / "towers/structures/tower_defense/construction-zone.glb");
-        const auto frameInfo = engine.modelInfo(frameModel);
-        require(frameInfo.maximum.y - frameInfo.minimum.y <= 0.051F,
-                "Construction frame is an upright ribbon instead of matching the low selection corners");
-        const auto frameTriangles = engine.modelTriangles(frameModel);
-        const auto covered = [&](glm::vec2 point) {
-            return std::any_of(frameTriangles.begin(), frameTriangles.end(), [&](const auto& triangle) {
-                if (glm::cross(triangle[1] - triangle[0], triangle[2] - triangle[0]).y <= 1e-5F ||
-                    triangle[0].y < 0.049F || triangle[1].y < 0.049F || triangle[2].y < 0.049F) {
-                    return false;
-                }
-                const auto side = [&](glm::vec3 a, glm::vec3 b) {
-                    return (b.x - a.x) * (point.y - a.z) - (b.z - a.z) * (point.x - a.x);
-                };
-                const float a = side(triangle[0], triangle[1]), b = side(triangle[1], triangle[2]),
-                            c = side(triangle[2], triangle[0]);
-                return (a >= -1e-5F && b >= -1e-5F && c >= -1e-5F) || (a <= 1e-5F && b <= 1e-5F && c <= 1e-5F);
-            });
-        };
-        require(covered({0.48F, 0}) && covered({-0.48F, 0}) && covered({0, 0.48F}) && covered({0, -0.48F}) &&
-                    !covered({0, 0}),
-                "Construction frame is not a complete square with an open center");
         const auto availableZoneInstances = engine.performance().instances;
         const auto buildPoint = runtime.navigation().placement().zones().front();
         const auto tower = buildPoint.snap(runtime.navigation().towers().definition("basic").instance());
         const auto built = runtime.level().buildTower(engine, runtime.navigation(), tower);
         tick(engine, runtime);
-        require(engine.performance().instances + 1 == availableZoneInstances,
-                "Constructing a tower did not remove its available-zone frame");
+        require(engine.performance().instances == availableZoneInstances,
+                "Constructing a tower added unexpected marker geometry");
         require(runtime.navigation().towers().applyDamage(engine, built, 10000),
                 "Build-zone marker death fixture failed");
         tick(engine, runtime);
         require(engine.performance().instances == availableZoneInstances,
-                "Destroying a tower did not restore its build-zone frame");
+                "Destroying a tower left unexpected marker geometry");
         runtime.restart(engine);
         tick(engine, runtime);
         auto* waveControls = ImGui::FindWindowByName("Gameplay Settings");

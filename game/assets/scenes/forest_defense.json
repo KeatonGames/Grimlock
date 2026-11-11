@@ -1450,6 +1450,66 @@
                                  ]
                     },
                     {
+                        "id":  "1081",
+                        "name":  "Construction anchor",
+                        "parent":  "108",
+                        "role":  "grimlock.construction_anchor",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1082",
+                        "name":  "Construction point",
+                        "parent":  "1081",
+                        "role":  "grimlock.construction_point",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.079871394401728329,
+                                                           0,
+                                                           0.99680517673029945
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
                         "id":  "109",
                         "name":  "Raised western garden construction point",
                         "role":  "grimlock.build_zone",
@@ -1469,6 +1529,66 @@
                                                            0,
                                                            0,
                                                            1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1091",
+                        "name":  "Construction anchor",
+                        "parent":  "109",
+                        "role":  "grimlock.construction_anchor",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1092",
+                        "name":  "Construction point",
+                        "parent":  "1091",
+                        "role":  "grimlock.construction_point",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.93664441549701882,
+                                                           0,
+                                                           0.35028165655404775
                                                        ]
                                       },
                         "tint":  [
@@ -1508,6 +1628,66 @@
                                  ]
                     },
                     {
+                        "id":  "1101",
+                        "name":  "Construction anchor",
+                        "parent":  "110",
+                        "role":  "grimlock.construction_anchor",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1102",
+                        "name":  "Construction point",
+                        "parent":  "1101",
+                        "role":  "grimlock.construction_point",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0.34827434473373375,
+                                                           0,
+                                                           0.93739265028070728
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
                         "id":  "111",
                         "name":  "Mausoleum terrace construction point",
                         "role":  "grimlock.build_zone",
@@ -1527,6 +1707,66 @@
                                                            0,
                                                            0,
                                                            1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1111",
+                        "name":  "Construction anchor",
+                        "parent":  "111",
+                        "role":  "grimlock.construction_anchor",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        0.76923076923076916,
+                                                        1,
+                                                        0.76923076923076916
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "1112",
+                        "name":  "Construction point",
+                        "parent":  "1111",
+                        "role":  "grimlock.construction_point",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.98483334211643059,
+                                                           0,
+                                                           0.17350299206578979
                                                        ]
                                       },
                         "tint":  [
@@ -2064,6 +2304,37 @@
                                  ]
                     },
                     {
+                        "id":  "256",
+                        "name":  "Mausoleum stone foundation",
+                        "parent":  "4",
+                        "model":  "towers/structures/primitives/cube.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -8.5,
+                                                           2.06,
+                                                           14.2
+                                                       ],
+                                          "scale":  [
+                                                        1.68,
+                                                        0.06,
+                                                        1.81
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     0.55,
+                                     0.53,
+                                     0.7,
+                                     1
+                                 ]
+                    },
+                    {
                         "id":  "105",
                         "name":  "Defense objective - mausoleum",
                         "parent":  "4",
@@ -2082,9 +2353,9 @@
                                                     ],
                                           "rotation":  [
                                                            0,
+                                                           -1,
                                                            0,
-                                                           0,
-                                                           1
+                                                           6.1230317691118863E-17
                                                        ]
                                       },
                         "tint":  [
@@ -2095,7 +2366,7 @@
                                  ]
                     },
                     {
-                        "id":  "256",
+                        "id":  "257",
                         "name":  "Mausoleum pitched roof",
                         "parent":  "105",
                         "model":  "environment/graveyard/crypt-large-roof.glb",
@@ -2126,7 +2397,7 @@
                                  ]
                     },
                     {
-                        "id":  "257",
+                        "id":  "258",
                         "name":  "Warm mausoleum doorway",
                         "parent":  "105",
                         "model":  "environment/graveyard/door_glow_warm.glb",
@@ -2135,7 +2406,7 @@
                                           "position":  [
                                                            0,
                                                            0,
-                                                           -1.21
+                                                           1.21
                                                        ],
                                           "scale":  [
                                                         0.5,
@@ -2144,9 +2415,9 @@
                                                     ],
                                           "rotation":  [
                                                            0,
+                                                           -1,
                                                            0,
-                                                           0,
-                                                           1
+                                                           6.1230317691118863E-17
                                                        ]
                                       },
                         "tint":  [
@@ -2157,7 +2428,7 @@
                                  ]
                     },
                     {
-                        "id":  "258",
+                        "id":  "259",
                         "name":  "Mausoleum entrance step",
                         "parent":  "4",
                         "model":  "towers/structures/primitives/cube.glb",
@@ -2188,7 +2459,7 @@
                                  ]
                     },
                     {
-                        "id":  "259",
+                        "id":  "260",
                         "name":  "Mausoleum entrance step",
                         "parent":  "4",
                         "model":  "towers/structures/primitives/cube.glb",
@@ -2219,7 +2490,7 @@
                                  ]
                     },
                     {
-                        "id":  "260",
+                        "id":  "261",
                         "name":  "Mausoleum entrance step",
                         "parent":  "4",
                         "model":  "towers/structures/primitives/cube.glb",
@@ -2250,37 +2521,6 @@
                                  ]
                     },
                     {
-                        "id":  "261",
-                        "name":  "Courtyard rear stone wall",
-                        "parent":  "4",
-                        "model":  "environment/graveyard/stone-wall.glb",
-                        "role":  "grimlock.obstacle",
-                        "transform":  {
-                                          "position":  [
-                                                           -3.6,
-                                                           2,
-                                                           16.4
-                                                       ],
-                                          "scale":  [
-                                                        2,
-                                                        1.1,
-                                                        1.5
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           0,
-                                                           0,
-                                                           1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
                         "id":  "262",
                         "name":  "Courtyard rear stone wall",
                         "parent":  "4",
@@ -2288,7 +2528,7 @@
                         "role":  "grimlock.obstacle",
                         "transform":  {
                                           "position":  [
-                                                           -5.6,
+                                                           -3.6,
                                                            2,
                                                            16.4
                                                        ],
@@ -2319,7 +2559,7 @@
                         "role":  "grimlock.obstacle",
                         "transform":  {
                                           "position":  [
-                                                           -7.6,
+                                                           -5.6,
                                                            2,
                                                            16.4
                                                        ],
@@ -2350,7 +2590,7 @@
                         "role":  "grimlock.obstacle",
                         "transform":  {
                                           "position":  [
-                                                           -9.6,
+                                                           -7.6,
                                                            2,
                                                            16.4
                                                        ],
@@ -2381,7 +2621,7 @@
                         "role":  "grimlock.obstacle",
                         "transform":  {
                                           "position":  [
-                                                           -11.6,
+                                                           -9.6,
                                                            2,
                                                            16.4
                                                        ],
@@ -2406,6 +2646,37 @@
                     },
                     {
                         "id":  "266",
+                        "name":  "Courtyard rear stone wall",
+                        "parent":  "4",
+                        "model":  "environment/graveyard/stone-wall.glb",
+                        "role":  "grimlock.obstacle",
+                        "transform":  {
+                                          "position":  [
+                                                           -11.6,
+                                                           2,
+                                                           16.4
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        1.1,
+                                                        1.5
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "267",
                         "name":  "Courtyard east stone wall",
                         "parent":  "4",
                         "model":  "environment/graveyard/stone-wall.glb",
@@ -2436,7 +2707,7 @@
                                  ]
                     },
                     {
-                        "id":  "267",
+                        "id":  "268",
                         "name":  "Courtyard east stone wall",
                         "parent":  "4",
                         "model":  "environment/graveyard/stone-wall.glb",
@@ -2467,7 +2738,7 @@
                                  ]
                     },
                     {
-                        "id":  "268",
+                        "id":  "269",
                         "name":  "Mausoleum royal banner",
                         "parent":  "4",
                         "model":  "environment/castle/flag.glb",
@@ -2498,7 +2769,7 @@
                                  ]
                     },
                     {
-                        "id":  "269",
+                        "id":  "270",
                         "name":  "Brazier stone plinth",
                         "parent":  "4",
                         "model":  "towers/structures/primitives/cube.glb",
@@ -2529,7 +2800,7 @@
                                  ]
                     },
                     {
-                        "id":  "270",
+                        "id":  "271",
                         "name":  "Brazier fire basket",
                         "parent":  "4",
                         "model":  "environment/graveyard/fire-basket.glb",
@@ -2544,37 +2815,6 @@
                                                         1.7,
                                                         1.7,
                                                         1.7
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           0,
-                                                           0,
-                                                           1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "271",
-                        "name":  "Golden brazier flame",
-                        "parent":  "4",
-                        "model":  "environment/graveyard/brazier_flame.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           -6.1,
-                                                           2.85,
-                                                           12.2
-                                                       ],
-                                          "scale":  [
-                                                        1,
-                                                        1,
-                                                        1
                                                     ],
                                           "rotation":  [
                                                            0,
@@ -2592,6 +2832,37 @@
                     },
                     {
                         "id":  "272",
+                        "name":  "Golden brazier flame",
+                        "parent":  "4",
+                        "model":  "environment/graveyard/brazier_flame.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -6.1,
+                                                           2.85,
+                                                           12.2
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "273",
                         "name":  "Mausoleum royal banner",
                         "parent":  "4",
                         "model":  "environment/castle/flag.glb",
@@ -2622,7 +2893,7 @@
                                  ]
                     },
                     {
-                        "id":  "273",
+                        "id":  "274",
                         "name":  "Brazier stone plinth",
                         "parent":  "4",
                         "model":  "towers/structures/primitives/cube.glb",
@@ -2653,7 +2924,7 @@
                                  ]
                     },
                     {
-                        "id":  "274",
+                        "id":  "275",
                         "name":  "Brazier fire basket",
                         "parent":  "4",
                         "model":  "environment/graveyard/fire-basket.glb",
@@ -2684,7 +2955,7 @@
                                  ]
                     },
                     {
-                        "id":  "275",
+                        "id":  "276",
                         "name":  "Golden brazier flame",
                         "parent":  "4",
                         "model":  "environment/graveyard/brazier_flame.glb",
@@ -2715,7 +2986,7 @@
                                  ]
                     },
                     {
-                        "id":  "276",
+                        "id":  "277",
                         "name":  "Woodland pine",
                         "parent":  "3",
                         "model":  "environment/platformer/tree-pine.glb",
@@ -2746,7 +3017,7 @@
                                  ]
                     },
                     {
-                        "id":  "277",
+                        "id":  "278",
                         "name":  "Woodland pine",
                         "parent":  "3",
                         "model":  "environment/platformer/tree-pine.glb",
@@ -2777,37 +3048,6 @@
                                  ]
                     },
                     {
-                        "id":  "278",
-                        "name":  "Woodland pine",
-                        "parent":  "3",
-                        "model":  "environment/platformer/tree-pine.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           9,
-                                                           1,
-                                                           7.2
-                                                       ],
-                                          "scale":  [
-                                                        1.5,
-                                                        1.5,
-                                                        1.5
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           0,
-                                                           0,
-                                                           1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
                         "id":  "279",
                         "name":  "Woodland pine",
                         "parent":  "3",
@@ -2815,9 +3055,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           3.6,
+                                                           8.5,
                                                            1,
-                                                           7
+                                                           6.6
                                                        ],
                                           "scale":  [
                                                         1.5,
@@ -2846,9 +3086,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -1,
-                                                           2,
-                                                           13.5
+                                                           3.8,
+                                                           1,
+                                                           7.1
                                                        ],
                                           "scale":  [
                                                         1.5,
@@ -2877,9 +3117,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -11.7,
+                                                           -3.4,
                                                            2,
-                                                           13.2
+                                                           14.8
                                                        ],
                                           "scale":  [
                                                         1.5,
@@ -2908,9 +3148,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -10,
-                                                           0,
-                                                           1
+                                                           -11.5,
+                                                           2,
+                                                           11.2
                                                        ],
                                           "scale":  [
                                                         1.5,
@@ -2939,7 +3179,38 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -10.5,
+                                                           -9.3,
+                                                           0,
+                                                           -0.3
+                                                       ],
+                                          "scale":  [
+                                                        1.5,
+                                                        1.5,
+                                                        1.5
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "284",
+                        "name":  "Woodland pine",
+                        "parent":  "3",
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -9.8,
                                                            0,
                                                            -3.2
                                                        ],
@@ -2963,7 +3234,7 @@
                                  ]
                     },
                     {
-                        "id":  "284",
+                        "id":  "285",
                         "name":  "Rounded boundary rocks",
                         "parent":  "3",
                         "model":  "environment/platformer/rocks.glb",
@@ -2994,16 +3265,16 @@
                                  ]
                     },
                     {
-                        "id":  "285",
+                        "id":  "286",
                         "name":  "Rounded boundary rocks",
                         "parent":  "3",
                         "model":  "environment/platformer/rocks.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           9.7,
+                                                           6.8,
                                                            1,
-                                                           7.4
+                                                           7
                                                        ],
                                           "scale":  [
                                                         2.3,
@@ -3025,7 +3296,7 @@
                                  ]
                     },
                     {
-                        "id":  "286",
+                        "id":  "287",
                         "name":  "Rounded boundary rocks",
                         "parent":  "3",
                         "model":  "environment/platformer/rocks.glb",
@@ -3056,37 +3327,6 @@
                                  ]
                     },
                     {
-                        "id":  "287",
-                        "name":  "Rounded boundary rocks",
-                        "parent":  "3",
-                        "model":  "environment/platformer/rocks.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           1.7,
-                                                           0,
-                                                           -6.8
-                                                       ],
-                                          "scale":  [
-                                                        2.3,
-                                                        2.3,
-                                                        2.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           0,
-                                                           0,
-                                                           1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
                         "id":  "288",
                         "name":  "Rounded boundary rocks",
                         "parent":  "3",
@@ -3094,9 +3334,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -3.6,
+                                                           3.4,
                                                            0,
-                                                           -4.5
+                                                           -6.5
                                                        ],
                                           "scale":  [
                                                         2.3,
@@ -3125,9 +3365,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -10.8,
+                                                           -4.3,
                                                            0,
-                                                           1.5
+                                                           -3.7
                                                        ],
                                           "scale":  [
                                                         2.3,
@@ -3156,9 +3396,9 @@
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -2.5,
-                                                           2,
-                                                           12.6
+                                                           -9.4,
+                                                           0,
+                                                           2
                                                        ],
                                           "scale":  [
                                                         2.3,
@@ -3181,6 +3421,37 @@
                     },
                     {
                         "id":  "291",
+                        "name":  "Rounded boundary rocks",
+                        "parent":  "3",
+                        "model":  "environment/platformer/rocks.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -3.4,
+                                                           2,
+                                                           12.4
+                                                       ],
+                                          "scale":  [
+                                                        2.3,
+                                                        2.3,
+                                                        2.3
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "292",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
@@ -3211,7 +3482,7 @@
                                  ]
                     },
                     {
-                        "id":  "292",
+                        "id":  "293",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
@@ -3242,7 +3513,7 @@
                                  ]
                     },
                     {
-                        "id":  "293",
+                        "id":  "294",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
@@ -3273,7 +3544,7 @@
                                  ]
                     },
                     {
-                        "id":  "294",
+                        "id":  "295",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
@@ -3304,7 +3575,7 @@
                                  ]
                     },
                     {
-                        "id":  "295",
+                        "id":  "296",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
@@ -3335,16 +3606,16 @@
                                  ]
                     },
                     {
-                        "id":  "296",
+                        "id":  "297",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -9.9,
+                                                           -10.6,
                                                            0,
-                                                           2.2
+                                                           1.2
                                                        ],
                                           "scale":  [
                                                         2.4,
@@ -3366,16 +3637,16 @@
                                  ]
                     },
                     {
-                        "id":  "297",
+                        "id":  "298",
                         "name":  "Low timber boundary fence",
                         "parent":  "3",
                         "model":  "environment/platformer/fence-low-straight.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -9.6,
+                                                           -11,
                                                            2,
-                                                           8.9
+                                                           9.6
                                                        ],
                                           "scale":  [
                                                         3,
@@ -3397,7 +3668,7 @@
                                  ]
                     },
                     {
-                        "id":  "298",
+                        "id":  "299",
                         "name":  "Supply crate",
                         "parent":  "3",
                         "model":  "environment/platformer/crate.glb",
@@ -3428,7 +3699,7 @@
                                  ]
                     },
                     {
-                        "id":  "299",
+                        "id":  "300",
                         "name":  "Stacked supply crate",
                         "parent":  "3",
                         "model":  "environment/platformer/crate.glb",
@@ -3459,7 +3730,7 @@
                                  ]
                     },
                     {
-                        "id":  "300",
+                        "id":  "301",
                         "name":  "Supply barrel",
                         "parent":  "3",
                         "model":  "environment/platformer/barrel.glb",
@@ -3490,7 +3761,7 @@
                                  ]
                     },
                     {
-                        "id":  "301",
+                        "id":  "302",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
@@ -3499,7 +3770,7 @@
                                           "position":  [
                                                            13,
                                                            0,
-                                                           -3
+                                                           -1.4
                                                        ],
                                           "scale":  [
                                                         1.2,
@@ -3511,37 +3782,6 @@
                                                            0,
                                                            0,
                                                            1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "302",
-                        "name":  "Grass clump",
-                        "parent":  "3",
-                        "model":  "environment/platformer/plant.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           12.4,
-                                                           0,
-                                                           -3.4
-                                                       ],
-                                          "scale":  [
-                                                        1.3,
-                                                        1.3,
-                                                        1.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           -0.21643961393810288,
-                                                           0,
-                                                           0.97629600711993336
                                                        ]
                                       },
                         "tint":  [
@@ -3553,26 +3793,26 @@
                     },
                     {
                         "id":  "303",
-                        "name":  "Woodland flowers",
+                        "name":  "Grass clump",
                         "parent":  "3",
-                        "model":  "environment/platformer/flowers.glb",
+                        "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           10,
+                                                           12.4,
                                                            0,
-                                                           -7
+                                                           -1.7999999999999998
                                                        ],
                                           "scale":  [
-                                                        1.2,
-                                                        1.2,
-                                                        1.2
+                                                        1.3,
+                                                        1.3,
+                                                        1.3
                                                     ],
                                           "rotation":  [
                                                            0,
+                                                           -0.21643961393810288,
                                                            0,
-                                                           0,
-                                                           1
+                                                           0.97629600711993336
                                                        ]
                                       },
                         "tint":  [
@@ -3584,46 +3824,15 @@
                     },
                     {
                         "id":  "304",
-                        "name":  "Grass clump",
-                        "parent":  "3",
-                        "model":  "environment/platformer/plant.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           9.4,
-                                                           0,
-                                                           -7.4
-                                                       ],
-                                          "scale":  [
-                                                        1.3,
-                                                        1.3,
-                                                        1.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           -0.21643961393810288,
-                                                           0,
-                                                           0.97629600711993336
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "305",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           3,
+                                                           10,
                                                            0,
-                                                           -6
+                                                           -5.8
                                                        ],
                                           "scale":  [
                                                         1.2,
@@ -3645,16 +3854,16 @@
                                  ]
                     },
                     {
-                        "id":  "306",
+                        "id":  "305",
                         "name":  "Grass clump",
                         "parent":  "3",
                         "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           2.4,
+                                                           9.4,
                                                            0,
-                                                           -6.4
+                                                           -6.2
                                                        ],
                                           "scale":  [
                                                         1.3,
@@ -3676,14 +3885,76 @@
                                  ]
                     },
                     {
-                        "id":  "307",
+                        "id":  "306",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           4,
+                                                           5,
+                                                           0,
+                                                           -6.3
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "307",
+                        "name":  "Grass clump",
+                        "parent":  "3",
+                        "model":  "environment/platformer/plant.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           4.4,
+                                                           0,
+                                                           -6.7
+                                                       ],
+                                          "scale":  [
+                                                        1.3,
+                                                        1.3,
+                                                        1.3
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.21643961393810288,
+                                                           0,
+                                                           0.97629600711993336
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "308",
+                        "name":  "Woodland flowers",
+                        "parent":  "3",
+                        "model":  "environment/platformer/flowers.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           5,
                                                            1,
                                                            6.8
                                                        ],
@@ -3707,14 +3978,14 @@
                                  ]
                     },
                     {
-                        "id":  "308",
+                        "id":  "309",
                         "name":  "Grass clump",
                         "parent":  "3",
                         "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           3.4,
+                                                           4.4,
                                                            1,
                                                            6.3999999999999995
                                                        ],
@@ -3738,16 +4009,16 @@
                                  ]
                     },
                     {
-                        "id":  "309",
+                        "id":  "310",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           10.3,
+                                                           10.5,
                                                            1,
-                                                           3.5
+                                                           4.2
                                                        ],
                                           "scale":  [
                                                         1.2,
@@ -3759,37 +4030,6 @@
                                                            0,
                                                            0,
                                                            1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "310",
-                        "name":  "Grass clump",
-                        "parent":  "3",
-                        "model":  "environment/platformer/plant.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           9.7000000000000011,
-                                                           1,
-                                                           3.1
-                                                       ],
-                                          "scale":  [
-                                                        1.3,
-                                                        1.3,
-                                                        1.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           -0.21643961393810288,
-                                                           0,
-                                                           0.97629600711993336
                                                        ]
                                       },
                         "tint":  [
@@ -3801,26 +4041,26 @@
                     },
                     {
                         "id":  "311",
-                        "name":  "Woodland flowers",
+                        "name":  "Grass clump",
                         "parent":  "3",
-                        "model":  "environment/platformer/flowers.glb",
+                        "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -4,
-                                                           0,
-                                                           -4
+                                                           9.9,
+                                                           1,
+                                                           3.8000000000000003
                                                        ],
                                           "scale":  [
-                                                        1.2,
-                                                        1.2,
-                                                        1.2
+                                                        1.3,
+                                                        1.3,
+                                                        1.3
                                                     ],
                                           "rotation":  [
                                                            0,
+                                                           -0.21643961393810288,
                                                            0,
-                                                           0,
-                                                           1
+                                                           0.97629600711993336
                                                        ]
                                       },
                         "tint":  [
@@ -3832,46 +4072,15 @@
                     },
                     {
                         "id":  "312",
-                        "name":  "Grass clump",
-                        "parent":  "3",
-                        "model":  "environment/platformer/plant.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           -4.6,
-                                                           0,
-                                                           -4.4
-                                                       ],
-                                          "scale":  [
-                                                        1.3,
-                                                        1.3,
-                                                        1.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           -0.21643961393810288,
-                                                           0,
-                                                           0.97629600711993336
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "313",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -10.6,
+                                                           -5.4,
                                                            0,
-                                                           -1
+                                                           -3.5
                                                        ],
                                           "scale":  [
                                                         1.2,
@@ -3893,16 +4102,16 @@
                                  ]
                     },
                     {
-                        "id":  "314",
+                        "id":  "313",
                         "name":  "Grass clump",
                         "parent":  "3",
                         "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -11.2,
+                                                           -6,
                                                            0,
-                                                           -1.4
+                                                           -3.9
                                                        ],
                                           "scale":  [
                                                         1.3,
@@ -3924,7 +4133,69 @@
                                  ]
                     },
                     {
+                        "id":  "314",
+                        "name":  "Woodland flowers",
+                        "parent":  "3",
+                        "model":  "environment/platformer/flowers.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -7.8,
+                                                           0,
+                                                           1.6
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
                         "id":  "315",
+                        "name":  "Grass clump",
+                        "parent":  "3",
+                        "model":  "environment/platformer/plant.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -8.4,
+                                                           0,
+                                                           1.2000000000000002
+                                                       ],
+                                          "scale":  [
+                                                        1.3,
+                                                        1.3,
+                                                        1.3
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.21643961393810288,
+                                                           0,
+                                                           0.97629600711993336
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "316",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
@@ -3955,7 +4226,7 @@
                                  ]
                     },
                     {
-                        "id":  "316",
+                        "id":  "317",
                         "name":  "Grass clump",
                         "parent":  "3",
                         "model":  "environment/platformer/plant.glb",
@@ -3986,16 +4257,16 @@
                                  ]
                     },
                     {
-                        "id":  "317",
+                        "id":  "318",
                         "name":  "Woodland flowers",
                         "parent":  "3",
                         "model":  "environment/platformer/flowers.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -3.6,
+                                                           -5,
                                                            2,
-                                                           13.1
+                                                           15.5
                                                        ],
                                           "scale":  [
                                                         1.2,
@@ -4007,37 +4278,6 @@
                                                            0,
                                                            0,
                                                            1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "318",
-                        "name":  "Grass clump",
-                        "parent":  "3",
-                        "model":  "environment/platformer/plant.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           -4.2,
-                                                           2,
-                                                           12.7
-                                                       ],
-                                          "scale":  [
-                                                        1.3,
-                                                        1.3,
-                                                        1.3
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           -0.21643961393810288,
-                                                           0,
-                                                           0.97629600711993336
                                                        ]
                                       },
                         "tint":  [
@@ -4049,46 +4289,15 @@
                     },
                     {
                         "id":  "319",
-                        "name":  "Woodland flowers",
-                        "parent":  "3",
-                        "model":  "environment/platformer/flowers.glb",
-                        "role":  "grimlock.decoration",
-                        "transform":  {
-                                          "position":  [
-                                                           -11.8,
-                                                           2,
-                                                           9.8
-                                                       ],
-                                          "scale":  [
-                                                        1.2,
-                                                        1.2,
-                                                        1.2
-                                                    ],
-                                          "rotation":  [
-                                                           0,
-                                                           0,
-                                                           0,
-                                                           1
-                                                       ]
-                                      },
-                        "tint":  [
-                                     1,
-                                     1,
-                                     1,
-                                     1
-                                 ]
-                    },
-                    {
-                        "id":  "320",
                         "name":  "Grass clump",
                         "parent":  "3",
                         "model":  "environment/platformer/plant.glb",
                         "role":  "grimlock.decoration",
                         "transform":  {
                                           "position":  [
-                                                           -12.4,
+                                                           -5.6,
                                                            2,
-                                                           9.4
+                                                           15.1
                                                        ],
                                           "scale":  [
                                                         1.3,
@@ -4110,7 +4319,69 @@
                                  ]
                     },
                     {
+                        "id":  "320",
+                        "name":  "Woodland flowers",
+                        "parent":  "3",
+                        "model":  "environment/platformer/flowers.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -4,
+                                                           2,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
                         "id":  "321",
+                        "name":  "Grass clump",
+                        "parent":  "3",
+                        "model":  "environment/platformer/plant.glb",
+                        "role":  "grimlock.decoration",
+                        "transform":  {
+                                          "position":  [
+                                                           -4.6,
+                                                           2,
+                                                           9.6
+                                                       ],
+                                          "scale":  [
+                                                        1.3,
+                                                        1.3,
+                                                        1.3
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           -0.21643961393810288,
+                                                           0,
+                                                           0.97629600711993336
+                                                       ]
+                                      },
+                        "tint":  [
+                                     1,
+                                     1,
+                                     1,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "322",
                         "name":  "Dusk purple backdrop",
                         "model":  "towers/structures/primitives/cube.glb",
                         "role":  "grimlock.decoration",
@@ -4138,154 +4409,6 @@
                                      0.018,
                                      1
                                  ]
-                    },
-                    {
-                        "transform":  {
-                                          "scale":  [
-                                                        0.76923076923076916,
-                                                        1,
-                                                        0.76923076923076916
-                                                    ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "108",
-                        "name":  "Construction anchor",
-                        "id":  "1081",
-                        "role":  "grimlock.construction_anchor"
-                    },
-                    {
-                        "transform":  {
-                                          "rotation":  [
-                                                           0,
-                                                           -0.079871394401728316,
-                                                           0,
-                                                           0.99680517673029945
-                                                       ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "1081",
-                        "name":  "Construction point",
-                        "id":  "1082",
-                        "role":  "grimlock.construction_point"
-                    },
-                    {
-                        "transform":  {
-                                          "scale":  [
-                                                        0.76923076923076916,
-                                                        1,
-                                                        0.76923076923076916
-                                                    ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "109",
-                        "name":  "Construction anchor",
-                        "id":  "1091",
-                        "role":  "grimlock.construction_anchor"
-                    },
-                    {
-                        "transform":  {
-                                          "rotation":  [
-                                                           0,
-                                                           -0.93664441549701893,
-                                                           0,
-                                                           0.35028165655404758
-                                                       ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "1091",
-                        "name":  "Construction point",
-                        "id":  "1092",
-                        "role":  "grimlock.construction_point"
-                    },
-                    {
-                        "transform":  {
-                                          "scale":  [
-                                                        0.76923076923076916,
-                                                        1,
-                                                        0.76923076923076916
-                                                    ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "110",
-                        "name":  "Construction anchor",
-                        "id":  "1101",
-                        "role":  "grimlock.construction_anchor"
-                    },
-                    {
-                        "transform":  {
-                                          "rotation":  [
-                                                           0,
-                                                           0.34827434473373375,
-                                                           0,
-                                                           0.93739265028070728
-                                                       ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "1101",
-                        "name":  "Construction point",
-                        "id":  "1102",
-                        "role":  "grimlock.construction_point"
-                    },
-                    {
-                        "transform":  {
-                                          "scale":  [
-                                                        0.76923076923076916,
-                                                        1,
-                                                        0.76923076923076916
-                                                    ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "111",
-                        "name":  "Construction anchor",
-                        "id":  "1111",
-                        "role":  "grimlock.construction_anchor"
-                    },
-                    {
-                        "transform":  {
-                                          "rotation":  [
-                                                           0,
-                                                           -0.9848333421164307,
-                                                           0,
-                                                           0.17350299206578959
-                                                       ],
-                                          "position":  [
-                                                           0,
-                                                           0,
-                                                           0
-                                                       ]
-                                      },
-                        "parent":  "1111",
-                        "name":  "Construction point",
-                        "id":  "1112",
-                        "role":  "grimlock.construction_point"
                     }
                 ]
 }

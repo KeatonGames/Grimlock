@@ -6,12 +6,9 @@ The preview snaps to its construction point and facing. Green passes preliminary
 checks; red indicates an occupied zone, invalid footprint, terrain/collision problem,
 or a route rejection. Full route validation runs on confirmation. Gold is charged
 only after successful construction. Every available construction point uses the
-same compact 2-by-2-metre orange `construction-zone.glb` frame.
-Its 11-centimetre border matches the hero selection marker's visual weight.
-It closes the character-selection corners into a low, bevelled ground frame using
-the same kit material, rather than selection-b's upright ribbon. Regenerate it with
-`tools/prepare_build_zone.ps1`. The frame
-disappears when a tower occupies the zone and returns when that tower is destroyed.
+same compact two-metre circular ground indicator in Game. It shares the tower range indicator renderer:
+a thin gold band, dark outer edge and subtle translucent fill. Available circles brighten while choosing a
+tower, disappear on construction and return when the tower is destroyed. These overlays add no model instances.
 There are no orientation triangles or variable-size rectangle overlays. Authored
 validation boundaries and construction points remain intact.
 
@@ -24,12 +21,12 @@ additional yaw. Offsets do not scale with zone dimensions when using these contr
 The default construction point is the rectangle's center, facing along its yaw.
 Each level authors this hidden facing toward its main enemy traffic lane. Placement previews and completed
 towers inherit it automatically. Both tower models use local +Z as their construction front; the Archer's
-balcony and defender are aligned to that front. Changing construction facing does not rotate the square ground
+balcony and defender are aligned to that front. Changing construction facing does not rotate the circular ground
 marker or add an orientation arrow. Defenders continue turning toward individual targets during combat.
 Set the zone's Y to the supporting terrain elevation. Elevated points use the same
 terrain support, collision, and Recast route checks as ground-level points.
 
-**Show Build Zones** displays the same uniform model frames in the Editor.
+**Show Build Zones** retains the uniform kit model frames in the Editor for authoring.
 Selected-zone controls show occupancy and report legacy conflicts. Frames
 also appear while placing towers. **Navigation > Towers > Tower Type > Place Tower**
 uses the same single-tower rules, with free authoring rather than gameplay purchases.
