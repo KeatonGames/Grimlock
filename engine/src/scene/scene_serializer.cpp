@@ -344,8 +344,9 @@ SceneLighting readLighting(const Json& j, const std::string& field) {
     if (j.contains("directional")) {
         const auto& light = j.at("directional");
         const auto f = field + ".directional";
-        fields(light, f, {"object", "direction", "color", "intensity"});
+        fields(light, f, {"object", "direction", "color", "intensity", "enabled"});
         auto& d = value.values.directional;
+        d.enabled = light.contains("enabled") ? boolean(light.at("enabled"), f + ".enabled") : true;
         value.directionalObject = reference(light, "object", f);
 
         if (light.contains("direction")) {
@@ -509,6 +510,14 @@ Json readSceneDocument(const std::filesystem::path& path) {
 }
 
 void readObjectProperties(Scene& scene, ObjectId object, const Json& record, const std::string& field) {
+    ShadowProperties shadow;
+    if (record.contains("casts_shadow")) {
+        shadow.cast = boolean(record.at("casts_shadow"), field + ".casts_shadow");
+    }
+    if (record.contains("receives_shadow")) {
+        shadow.receive = boolean(record.at("receives_shadow"), field + ".receives_shadow");
+    }
+    scene.setShadowProperties(object, shadow);
     if (record.contains("role")) {
         scene.setRole(object, string(record.at("role"), field + ".role"));
     }
@@ -583,6 +592,8 @@ Json writeObject(ObjectId id, const SceneObject& object) {
         record["role"] = object.role;
     }
 
+    record["casts_shadow"] = object.shadows.cast;
+    record["receives_shadow"] = object.shadows.receive;
     if (object.model) {
         const auto text = object.model->generic_u8string();
         record["model"] = std::string{text.begin(), text.end()};
@@ -618,7 +629,8 @@ Json writeLighting(const SceneLighting& value) {
                    {"directional",
                     {{"direction", json(directional.direction)},
                      {"color", json(directional.color)},
-                     {"intensity", directional.intensity}}},
+                     {"intensity", directional.intensity},
+                     {"enabled", directional.enabled}}},
                    {"points", Json::array()},
                    {"spots", Json::array()}};
     attach(lights["directional"], value.directionalObject);
@@ -704,7 +716,9 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
                         "enabled",
                         "tint",
                         "material_override",
-                        "animation"});
+                        "animation",
+                        "casts_shadow",
+                        "receives_shadow"});
                 const auto object = id(required(record, "id", field), field + ".id");
                 context(field + ".id", [&] {
                     scene->insertObject(object,

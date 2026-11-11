@@ -47,6 +47,7 @@ struct EnemyDefinition {
     double stuckTimeout = 2;
     float visualHeight = 0.36F; // Independent of the physical radius and headroom.
     float maximumHealth = 100;
+    bool castsShadow = true, receivesShadow = true;
     std::uint64_t killReward = 0;
     std::string movementAnimation = "walk";
     std::string idleAnimation, runAnimation, deathAnimation;

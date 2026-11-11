@@ -40,6 +40,7 @@ void GameHud::initializeMenu() {
                                  native_.target.colorFormat == VK_FORMAT_R8G8B8A8_SRGB);
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     msaaSamples_ = engine_.msaaSamples();
+    shadowQuality_ = engine_.shadowSettings().quality;
     const auto fontPath = engine_.assetRoot() / "ui/karla.ttf";
     if (std::filesystem::exists(fontPath)) {
         menuFont_ = ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 20);
@@ -58,6 +59,11 @@ void GameHud::initializeMenu() {
         resolution_ = std::clamp(json.value("resolution", 1), 0, 3);
         fullscreen_ = json.value("fullscreen", false);
         vsync_ = json.value("vsync", true);
+        const auto shadowResolution = json.value("shadow_resolution", 2048U);
+        shadowQuality_ = shadowResolution == 0      ? ShadowQuality::off
+                         : shadowResolution == 1024 ? ShadowQuality::low
+                         : shadowResolution == 4096 ? ShadowQuality::high
+                                                    : ShadowQuality::medium;
         msaaSamples_ = json.value("msaa_samples", 4U);
         if (msaaSamples_ != 1 && msaaSamples_ != 2 && msaaSamples_ != 4 && msaaSamples_ != 8) {
             msaaSamples_ = 4;
@@ -458,6 +464,7 @@ void GameHud::saveOptions() {
                                        {"resolution", resolution_},
                                        {"vsync", vsync_},
                                        {"msaa_samples", msaaSamples_},
+                                       {"shadow_resolution", static_cast<std::uint32_t>(shadowQuality_)},
                                        {"ui_scale", uiScale_},
                                        {"health_bars", worldHealthBars_}}
                             .dump(2))) {
@@ -476,6 +483,10 @@ void GameHud::applyOptions() {
     optionsError_.clear();
     try {
         engine_.setVsync(vsync_);
+        auto shadowSettings = engine_.shadowSettings();
+        shadowSettings.quality = shadowQuality_;
+        engine_.setShadowSettings(shadowSettings);
+        shadowQuality_ = engine_.shadowSettings().quality;
         engine_.setMsaaSamples(msaaSamples_);
         msaaSamples_ = engine_.msaaSamples();
         if (!SDL_SetWindowFullscreen(native_.window, fullscreen_)) {
@@ -522,6 +533,27 @@ void GameHud::settings() {
             for (const auto count : supported) {
                 if (ImGui::Selectable(sampleLabel(count).c_str(), count == msaaSamples_)) {
                     msaaSamples_ = count;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        const auto shadowLabel = [](ShadowQuality quality) {
+            switch (quality) {
+            case ShadowQuality::low:
+                return "Low (1024)";
+            case ShadowQuality::medium:
+                return "Medium (2048)";
+            case ShadowQuality::high:
+                return "High (4096)";
+            default:
+                return "Off";
+            }
+        };
+        ImGui::SetNextItemWidth(-150 * s);
+        if (ImGui::BeginCombo("Shadows", shadowLabel(shadowQuality_))) {
+            for (const auto quality : engine_.supportedShadowQualities()) {
+                if (ImGui::Selectable(shadowLabel(quality), quality == shadowQuality_)) {
+                    shadowQuality_ = quality;
                 }
             }
             ImGui::EndCombo();

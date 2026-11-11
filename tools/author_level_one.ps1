@@ -164,6 +164,16 @@ foreach ($p in @(@(-13,0,-1.4),@(-10,0,-5.8),@(-5,0,-6.3),@(-5,1,6.8),@(-10.5,1,
 $null = Add-Object 'Dusk purple backdrop' 'towers/structures/primitives/cube.glb' @(0,-3.9,4) @(
     400,0.1,400) 0 -tint @(0.008,0.005,0.018,1)
 
+$objects[$objects.Count-1].casts_shadow = $false
+$objects[$objects.Count-1].receives_shadow = $false
+
+# Emissive scenery is not a solid sunlight occluder.
+foreach ($object in $objects) {
+    if ($object.name -in @('Warm mausoleum doorway','Red portal interior','Golden brazier flame')) {
+        $object.casts_shadow = $false
+        $object.receives_shadow = $false
+    }
+}
 # Orient the entrance at screen left and the mausoleum at screen right in the authored camera.
 foreach ($object in $objects) {
     $object.transform.position[0] = -$object.transform.position[0]

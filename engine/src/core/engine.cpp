@@ -256,6 +256,7 @@ struct Engine::Impl {
                                      object.tint,
                                      object.materialOverride,
                                      &object.instance_->pose()};
+            draw.shadows = object.shadows;
             sceneDraws.push_back(draw);
         }
     }
@@ -931,6 +932,48 @@ bool Engine::vsyncEnabled() const noexcept {
 
 void Engine::setMsaaSamples(std::uint32_t samples) {
     impl_->renderer.setMsaaSamples(samples);
+}
+
+void Engine::setShadowSettings(const ShadowSettings& settings) {
+    impl_->renderer.setShadowSettings(settings);
+}
+
+ShadowSettings Engine::shadowSettings() const noexcept {
+    return impl_->renderer.shadowSettings();
+}
+
+std::vector<ShadowQuality> Engine::supportedShadowQualities() const {
+    return impl_->renderer.supportedShadowQualities();
+}
+
+ShadowDebugInfo Engine::shadowDebugInfo() const noexcept {
+    return impl_->renderer.shadowDebugInfo();
+}
+
+FrameCapture Engine::captureShadowMap() {
+    return impl_->renderer.captureShadowMap();
+}
+
+void Engine::setShadowProperties(InstanceId instance, ShadowProperties properties) {
+    impl_->draws[impl_->instanceIndex(instance)].shadows = properties;
+}
+
+DirectionalLight Engine::directionalLight() const {
+    return impl_->activeScene ? impl_->activeScene->resolvedLighting().directional : impl_->lighting.directional;
+}
+
+void Engine::setDirectionalLight(const DirectionalLight& light) {
+    if (impl_->activeScene) {
+        auto sceneLighting = impl_->activeScene->lighting();
+        sceneLighting.values.directional = light;
+        sceneLighting.directionalObject.reset();
+        impl_->activeScene->setLighting(sceneLighting);
+    } else {
+        auto lighting = impl_->lighting;
+        lighting.directional = light;
+        validateLighting(lighting);
+        impl_->lighting = lighting;
+    }
 }
 
 std::uint32_t Engine::msaaSamples() const noexcept {

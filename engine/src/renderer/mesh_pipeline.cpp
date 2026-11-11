@@ -20,11 +20,14 @@ MeshPipeline::MeshPipeline(const VkDevice device,
                            const VkDescriptorSetLayout materialLayout,
                            const VkDescriptorSetLayout deformationLayout,
                            const bool gridInstances,
-                           const VkSampleCountFlagBits samples)
+                           const VkSampleCountFlagBits samples,
+                           bool shadowPass)
     : device_(device) {
     try {
         diagnostics::StartupSpan profile{"pipeline.mesh"};
-        const ShaderModule shader{device_, gridInstances ? "shaders/grid.spv" : "shaders/mesh.spv"};
+        const ShaderModule shader{device_,
+                                  shadowPass ? (gridInstances ? "shaders/grid_shadow.spv" : "shaders/shadow.spv")
+                                             : (gridInstances ? "shaders/grid.spv" : "shaders/mesh.spv")};
 
         VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         const VkPushConstantRange pushRange{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -85,6 +88,7 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         rasterization.cullMode = VK_CULL_MODE_NONE;
         rasterization.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterization.lineWidth = 1.0F;
+        rasterization.depthBiasEnable = shadowPass;
 
         VkPipelineMultisampleStateCreateInfo multisampling{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
         multisampling.rasterizationSamples = samples;
@@ -102,15 +106,17 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         blending.attachmentCount = 1;
         blending.pAttachments = &colorAttachment;
 
-        constexpr std::array dynamicStates{VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+        constexpr std::array dynamicStates{VK_DYNAMIC_STATE_VIEWPORT,
+                                           VK_DYNAMIC_STATE_SCISSOR,
+                                           VK_DYNAMIC_STATE_DEPTH_BIAS};
 
         VkPipelineDynamicStateCreateInfo dynamic{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-        dynamic.dynamicStateCount = static_cast<std::uint32_t>(dynamicStates.size());
+        dynamic.dynamicStateCount = shadowPass ? 3 : 2;
         dynamic.pDynamicStates = dynamicStates.data();
 
         VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-        rendering.colorAttachmentCount = 1;
-        rendering.pColorAttachmentFormats = &colorFormat;
+        rendering.colorAttachmentCount = shadowPass ? 0 : 1;
+        rendering.pColorAttachmentFormats = shadowPass ? nullptr : &colorFormat;
         rendering.depthAttachmentFormat = depthFormat;
 
         VkGraphicsPipelineCreateInfo createInfo{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -123,6 +129,10 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         createInfo.pRasterizationState = &rasterization;
         createInfo.pMultisampleState = &multisampling;
         createInfo.pDepthStencilState = &depthStencil;
+        if (shadowPass) {
+            blending.attachmentCount = 0;
+            blending.pAttachments = nullptr;
+        }
         createInfo.pColorBlendState = &blending;
         createInfo.pDynamicState = &dynamic;
         createInfo.layout = layout_;
@@ -134,7 +144,7 @@ MeshPipeline::MeshPipeline(const VkDevice device,
 
             rasterization.cullMode = doubleSided ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
             rasterization.frontFace = mirrored ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
-            depthStencil.depthWriteEnable = blend ? VK_FALSE : VK_TRUE;
+            depthStencil.depthWriteEnable = !shadowPass && blend ? VK_FALSE : VK_TRUE;
 
             colorAttachment.blendEnable = blend ? VK_TRUE : VK_FALSE;
             colorAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;

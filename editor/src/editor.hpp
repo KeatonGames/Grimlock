@@ -52,6 +52,11 @@ private:
     void requestDelete(ObjectId id);
 
     void inspector();
+    void lightingControls();
+    void shadowCoverage(const Camera& camera);
+    bool showShadowCoverage_ = false;
+    std::unique_ptr<ImTextureData> shadowPreview_;
+    void releaseShadowPreview() noexcept;
     void animationControls(ObjectId id, bool reveal);
     void performance();
 

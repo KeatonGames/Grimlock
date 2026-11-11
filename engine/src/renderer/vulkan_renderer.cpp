@@ -48,6 +48,7 @@ VulkanRenderer::VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube
     try {
         depthFormat_ = DepthTarget::chooseFormat(context_.physicalDevice());
         detectSampleCounts();
+        detectShadowSupport();
         setMsaaSamples(4);
         createCommandPool();
         deformation_.emplace(context_);
@@ -152,6 +153,7 @@ std::size_t VulkanRenderer::uploadModel(const assets::ModelData& model) {
             }
 
             uploaded.meshCenters.push_back(minimum + (maximum - minimum) * 0.5F);
+            uploaded.meshRadii.push_back(glm::length(maximum - minimum) * 0.5F);
         }
 
         const auto free = std::find(models_.begin(), models_.end(), nullptr);
@@ -270,6 +272,19 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     }
     timestampPending_ = false;
 
+    updateShadowResources();
+    const auto shadowData = shadowUniforms(camera,
+                                           static_cast<float>(swapchainExtent_.width) / swapchainExtent_.height,
+                                           lighting.directional,
+                                           shadowSettings_,
+                                           shadowDepth_ ? static_cast<std::uint32_t>(shadowSettings_.quality) : 0);
+    shadowBuffer_->write(&shadowData, sizeof(shadowData));
+    shadowDebug_ = {shadowData.viewProjection,
+                    shadowDepth_ ? static_cast<std::uint32_t>(shadowSettings_.quality) : 0,
+                    0,
+                    shadowData.bias.z,
+                    shadowData.map.x > 0,
+                    shadowReadback_};
     updateGrid(grid); // The single frame in flight has finished using the instance buffer.
 
     const CameraUniforms uniforms{
@@ -484,12 +499,18 @@ void VulkanRenderer::createCameraResources(const assets::EnvironmentCube* enviro
                          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    const std::array<VkDescriptorSetLayoutBinding, 5> bindings{
+    shadowBuffer_.emplace(context_,
+                          sizeof(ShadowUniforms),
+                          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    const std::array<VkDescriptorSetLayoutBinding, 7> bindings{
         {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
          {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
          {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
          {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}}};
+         {4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+         {5, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+         {6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}}};
     VkDescriptorSetLayoutCreateInfo layout{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     layout.bindingCount = static_cast<std::uint32_t>(bindings.size());
     layout.pBindings = bindings.data();
@@ -506,7 +527,7 @@ void VulkanRenderer::createCameraResources(const assets::EnvironmentCube* enviro
             "vkCreateDescriptorSetLayout(tonemap)");
 
     const std::array<VkDescriptorPoolSize, 2> sizes{
-        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4}}};
+        {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3}, {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5}}};
     VkDescriptorPoolCreateInfo pool{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     pool.maxSets = 2;
     pool.poolSizeCount = static_cast<std::uint32_t>(sizes.size());
@@ -594,6 +615,7 @@ bool VulkanRenderer::createSwapchainResources() {
 
     if (supportedPresentationFormat_ != swapchainFormat_) {
         detectSampleCounts();
+        detectShadowSupport();
         setMsaaSamples(static_cast<std::uint32_t>(samples_));
     }
     createImageViews();
@@ -808,11 +830,12 @@ std::span<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(c
             }
 
             const glm::mat3 normal = glm::transpose(glm::inverse(linear));
-            const DrawConstants constants{transform,
-                                          glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F},
-                                          glm::vec4{normal[1], draw.selected ? 1.0F : 0.0F},
-                                          glm::vec4{normal[2], draw.dissolve},
-                                          draw.baseColor};
+            const DrawConstants constants{
+                transform,
+                glm::vec4{normal[0], determinant < 0.0F ? -1.0F : 1.0F},
+                glm::vec4{normal[1], (draw.selected ? 1.0F : 0.0F) + (draw.shadows.receive ? 0.0F : 2.0F)},
+                glm::vec4{normal[2], draw.dissolve},
+                draw.baseColor};
             const auto nodeData = deformation_->appendNode(pose.joints[node.node], pose.weights[node.node]);
             for (const auto mesh : node.meshes) {
                 const auto& material = model.materials->at(draw.materialOverride.value_or(model.meshMaterials[mesh]));
@@ -825,8 +848,15 @@ std::span<VulkanRenderer::PrimitiveDraw> VulkanRenderer::preparePrimitiveDraws(c
                 const auto& geometry = model.meshes[mesh];
                 const auto deformation =
                     deformation_->append(nodeData, geometry.morphVertexCount, geometry.morphTargetCount);
-                primitives.push_back(
-                    {&model, mesh, constants, &material, determinant < 0.0F, depth, primitives.size(), deformation});
+                primitives.push_back({&model,
+                                      mesh,
+                                      constants,
+                                      &material,
+                                      determinant < 0.0F,
+                                      depth,
+                                      primitives.size(),
+                                      deformation,
+                                      draw.shadows.cast});
             }
         }
     }
@@ -857,15 +887,35 @@ void VulkanRenderer::sortPrimitiveDraws(std::span<PrimitiveDraw> primitives) {
     });
 }
 
-void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives) {
+void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command,
+                                          std::span<const PrimitiveDraw> primitives,
+                                          bool shadow) {
     VkPipeline currentPipeline = VK_NULL_HANDLE;
-    deformation_->upload();
+    auto& passPipeline = shadow ? *shadowPipeline_ : *pipeline_;
     VkDescriptorSet currentMaterial = VK_NULL_HANDLE;
 
     for (const auto& primitive : primitives) {
+        if (shadow) {
+            if (!primitive.castsShadow) {
+                continue;
+            }
+            const auto& transform = primitive.constants.model;
+            const auto center = glm::vec3{transform * glm::vec4{primitive.model->meshCenters[primitive.mesh], 1}};
+            const float scale = std::max({glm::length(glm::vec3{transform[0]}),
+                                          glm::length(glm::vec3{transform[1]}),
+                                          glm::length(glm::vec3{transform[2]})});
+            // Conservative animation padding includes swinging weapons/limbs without CPU reskinning.
+            if (!shadowIntersects(shadowDebug_.viewProjection,
+                                  center,
+                                  primitive.model->meshRadii[primitive.mesh] * scale * 2 + 0.5F)) {
+                continue;
+            }
+            ++shadowDebug_.casterDraws;
+        }
         const auto& material = *primitive.material;
-        const auto pipeline =
-            pipeline_->handle(material.alphaMode == assets::AlphaMode::blend, material.doubleSided, primitive.mirrored);
+        const auto pipeline = passPipeline.handle(material.alphaMode == assets::AlphaMode::blend,
+                                                  material.doubleSided,
+                                                  primitive.mirrored);
         if (pipeline != currentPipeline) {
             vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
             currentPipeline = pipeline;
@@ -874,7 +924,7 @@ void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command, std::span<con
         if (material.set != currentMaterial) {
             vkCmdBindDescriptorSets(command,
                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipeline_->layout(),
+                                    passPipeline.layout(),
                                     1,
                                     1,
                                     &material.set,
@@ -884,13 +934,20 @@ void VulkanRenderer::recordPrimitiveDraws(VkCommandBuffer command, std::span<con
         }
 
         vkCmdPushConstants(command,
-                           pipeline_->layout(),
+                           passPipeline.layout(),
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                            0,
                            sizeof(primitive.constants),
                            &primitive.constants);
         const auto set = primitive.model->deformationSets[primitive.mesh];
-        vkCmdBindDescriptorSets(command, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_->layout(), 2, 1, &set, 0, nullptr);
+        vkCmdBindDescriptorSets(command,
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                passPipeline.layout(),
+                                2,
+                                1,
+                                &set,
+                                0,
+                                nullptr);
         primitive.model->meshes[primitive.mesh].draw(command, primitive.deformation);
     }
 }
@@ -936,10 +993,11 @@ void VulkanRenderer::updateGrid(const GridDraw* grid) {
     gridRevision_ = grid->grid.revision();
 }
 
-void VulkanRenderer::recordGrid(const VkCommandBuffer command, const GridDraw& grid) {
+void VulkanRenderer::recordGrid(const VkCommandBuffer command, const GridDraw& grid, bool shadow) {
     const auto& model = *models_[grid.cubeModel];
-    const auto layout = gridPipeline_->layout();
-    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, gridPipeline_->handle(false, false, false));
+    auto& passPipeline = shadow ? *shadowGridPipeline_ : *gridPipeline_;
+    const auto layout = passPipeline.layout();
+    vkCmdBindPipeline(command, VK_PIPELINE_BIND_POINT_GRAPHICS, passPipeline.handle(false, false, false));
     const VkBuffer buffer = gridBuffer_->handle();
     constexpr VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(command, 1, 1, &buffer, &offset);
@@ -990,6 +1048,10 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
         vkCmdResetQueryPool(command, timestamps_, 0, 2);
         vkCmdWriteTimestamp2(command, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, timestamps_, 0);
     }
+
+    auto primitives = preparePrimitiveDraws(camera, draws);
+    deformation_->upload();
+    recordShadows(command, grid, primitives);
 
     std::array<VkImageMemoryBarrier2, 3> barriers{};
     auto& color = barriers[0];
@@ -1081,7 +1143,6 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
         recordGrid(command, *grid);
     }
 
-    auto primitives = preparePrimitiveDraws(camera, draws);
     if (performanceEnabled_) {
         performance_.primitiveDraws = primitives.size();
     }
@@ -1315,6 +1376,11 @@ void VulkanRenderer::destroy() noexcept {
     detachOverlay();
 
     destroySwapchainResources();
+    shadowDepth_.reset();
+    shadowPipeline_.reset();
+    shadowGridPipeline_.reset();
+    shadowBuffer_.reset();
+    vkDestroySampler(device, shadowSampler_, nullptr);
     pipeline_.reset();
     gridPipeline_.reset();
     gridBuffer_.reset();

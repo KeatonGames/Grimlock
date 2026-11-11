@@ -27,7 +27,8 @@ LightingUniforms lightingUniforms(const Lighting& lighting, const std::uint32_t 
     }
 
     LightingUniforms result;
-    result.directionIntensity = {directional.direction / std::sqrt(length), directional.intensity};
+    result.directionIntensity = {directional.direction / std::sqrt(length),
+                                 directional.enabled ? directional.intensity : 0};
     result.directionalColor = {directional.color, 0};
     result.environment = {lighting.environmentIntensity,
                           lighting.environmentRotation,

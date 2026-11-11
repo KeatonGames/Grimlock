@@ -4,6 +4,7 @@
 #include "grimlock/camera.hpp"
 #include "grimlock/grid.hpp"
 #include "grimlock/lighting.hpp"
+#include "grimlock/shadows.hpp"
 #include "grimlock/transform.hpp"
 
 #include <array>
@@ -45,6 +46,7 @@ struct SceneObject {
     std::optional<ObjectId> parent;
     std::optional<std::filesystem::path> model;
     bool enabled = true;
+    ShadowProperties shadows;
     bool selectable = true;         // Runtime policy only; intentionally not serialized.
     bool selectionHighlight = true; // Independent of picking/selection; runtime visual policy only.
     glm::vec4 tint{1};
@@ -108,6 +110,7 @@ public:
     void setEnabled(ObjectId id, bool enabled);
     void setSelectable(ObjectId id, bool selectable);
     void setSelectionHighlight(ObjectId id, bool enabled);
+    void setShadowProperties(ObjectId id, ShadowProperties properties);
 
     // Including inactive/empty objects is useful for tools; mouse picking keeps the default policy.
     void selectObject(std::optional<ObjectId> id, bool includeInactive = false);

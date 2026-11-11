@@ -71,6 +71,7 @@ void ProjectileSystem::spawn(glm::dvec3 origin,
         const auto model =
             definition.model.empty() ? *model_ : engine_.loadModel(engine_.assetRoot() / definition.model);
         instance = engine_.createInstance(model, true);
+        engine_.setShadowProperties(*instance, {false, false});
         engine_.setTint(*instance, definition.tint);
         registry_.emplace<Projectile>(
             entity,

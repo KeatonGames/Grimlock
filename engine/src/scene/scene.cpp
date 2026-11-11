@@ -213,6 +213,11 @@ void Scene::setSelectionHighlight(ObjectId id, bool enabled) {
     objects_.at(id).selectionHighlight = enabled;
 }
 
+void Scene::setShadowProperties(ObjectId id, ShadowProperties properties) {
+    objects_.at(id).shadows = properties;
+    invalidate(id, false);
+}
+
 void Scene::setSelectable(ObjectId id, bool selectable) {
     objects_.at(id).selectable = selectable;
     (void)selectedObject();

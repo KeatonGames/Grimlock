@@ -134,7 +134,9 @@
                        "aggression_range":  2.6,
                        "pursuit_range":  4,
                        "attack_animation":  "attack-melee-right"
-                   }
+                   },
+        "casts_shadow":  false,
+        "receives_shadow":  false
     },
     {
         "name":  "Goblin Boss",

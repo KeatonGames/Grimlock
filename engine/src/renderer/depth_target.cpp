@@ -7,14 +7,16 @@
 
 namespace grimlock::renderer {
 
-VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device) {
+VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device, bool sampled) {
     constexpr std::array formats{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D16_UNORM};
 
     for (const auto format : formats) {
         VkFormatProperties properties{};
         vkGetPhysicalDeviceFormatProperties(device, format, &properties);
 
-        if ((properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
+        const VkFormatFeatureFlags required =
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT | (sampled ? VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT : 0);
+        if ((properties.optimalTilingFeatures & required) == required) {
             return format;
         }
     }
@@ -25,7 +27,8 @@ VkFormat DepthTarget::chooseFormat(const VkPhysicalDevice device) {
 DepthTarget::DepthTarget(const VulkanContext& context,
                          const VkExtent2D extent,
                          const VkFormat format,
-                         const VkSampleCountFlagBits samples)
+                         const VkSampleCountFlagBits samples,
+                         VkImageUsageFlags usage)
     : device_(context.device()) {
     try {
         VkImageCreateInfo image{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -36,7 +39,7 @@ DepthTarget::DepthTarget(const VulkanContext& context,
         image.arrayLayers = 1;
         image.samples = samples;
         image.tiling = VK_IMAGE_TILING_OPTIMAL;
-        image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        image.usage = usage;
         image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         checkVk(vkCreateImage(device_, &image, nullptr, &image_), "vkCreateImage(depth)");
 

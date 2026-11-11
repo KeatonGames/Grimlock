@@ -179,9 +179,25 @@ void Editor::configureUi() {
 }
 
 void Editor::releaseUi() noexcept {
+    releaseShadowPreview();
     if (gridDebug_) {
         gridDebug_->shutdown(engine_);
     }
+}
+
+void Editor::releaseShadowPreview() noexcept {
+    if (!shadowPreview_) {
+        return;
+    }
+    shadowPreview_->WantDestroyNextFrame = true;
+    shadowPreview_->UnusedFrames = 1000;
+    shadowPreview_->SetStatus(ImTextureStatus_WantDestroy);
+    if (shadowPreview_->BackendUserData) {
+        ImGui_ImplVulkan_UpdateTexture(shadowPreview_.get());
+    }
+    ImGui::UnregisterUserTexture(shadowPreview_.get());
+    ImGui::GetPlatformIO().Textures.find_erase(shadowPreview_.get());
+    shadowPreview_.reset();
 }
 
 bool Editor::requestClose() {
@@ -660,6 +676,114 @@ void Editor::hierarchy() {
     }
 }
 
+void Editor::lightingControls() {
+    if (!ImGui::CollapsingHeader("Lighting & Shadows")) {
+        return;
+    }
+    auto sun = engine_.directionalLight();
+    bool changed = ImGui::Checkbox("Sun enabled", &sun.enabled);
+    changed |= ImGui::DragFloat3("Sun direction", &sun.direction.x, 0.01F, -1, 1);
+    changed |= ImGui::ColorEdit3("Sun color", &sun.color.x);
+    changed |= ImGui::DragFloat("Sun intensity", &sun.intensity, 0.05F, 0, 20);
+    if (changed && glm::dot(sun.direction, sun.direction) > 1e-8F) {
+        attempt([&] {
+            engine_.setDirectionalLight(sun);
+            document_.markChanged();
+        });
+    }
+    auto settings = engine_.shadowSettings();
+    const auto label = [](ShadowQuality quality) {
+        switch (quality) {
+        case ShadowQuality::low:
+            return "Low (1024)";
+        case ShadowQuality::medium:
+            return "Medium (2048)";
+        case ShadowQuality::high:
+            return "High (4096)";
+        default:
+            return "Off";
+        }
+    };
+    bool shadowsChanged = false;
+    if (ImGui::BeginCombo("Shadow quality", label(settings.quality))) {
+        for (auto quality : engine_.supportedShadowQualities()) {
+            if (ImGui::Selectable(label(quality), settings.quality == quality)) {
+                settings.quality = quality;
+                shadowsChanged = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    shadowsChanged |= ImGui::SliderInt("PCF radius", &settings.pcfRadius, 0, 2);
+    shadowsChanged |= ImGui::SliderFloat("Shadow strength", &settings.strength, 0, 1);
+    shadowsChanged |= ImGui::DragFloat("Receiver depth bias", &settings.depthBias, 0.00001F, 0, 0.01F, "%.5f");
+    shadowsChanged |= ImGui::DragFloat("Normal bias", &settings.normalBias, 0.001F, 0, 1, "%.3f");
+    shadowsChanged |= ImGui::DragFloat("Raster constant bias", &settings.constantBias, 0.05F, 0, 16);
+    shadowsChanged |= ImGui::DragFloat("Raster slope bias", &settings.slopeBias, 0.05F, 0, 16);
+    shadowsChanged |= ImGui::DragFloat("Shadow coverage limit", &settings.maxDistance, 1, 8, 500);
+    if (shadowsChanged) {
+        attempt([&] {
+            engine_.setShadowSettings(settings);
+        });
+    }
+    ImGui::Checkbox("Show shadow coverage", &showShadowCoverage_);
+    const auto debug = engine_.shadowDebugInfo();
+    ImGui::Text("Shadow map: %u x %u | %u caster draws", debug.resolution, debug.resolution, debug.casterDraws);
+    ImGui::TextDisabled("%s | %.1f m radius", debug.active ? "Rendering" : "Inactive", debug.coverageRadius);
+    ImGui::BeginDisabled(!debug.active || !debug.readbackAvailable);
+    if (ImGui::Button("Capture shadow map")) {
+        attempt([&] {
+            const auto capture = engine_.captureShadowMap();
+            if (!capture.width) {
+                return;
+            }
+            // The explicit Engine capture waits for prior graphics work. Replacing
+            // the old snapshot here is safe before its Image is emitted this frame.
+            releaseShadowPreview();
+            shadowPreview_ = std::make_unique<ImTextureData>();
+            shadowPreview_->Create(ImTextureFormat_RGBA32, capture.width, capture.height);
+            std::memcpy(shadowPreview_->Pixels, capture.rgba.data(), capture.rgba.size());
+            ImGui::RegisterUserTexture(shadowPreview_.get());
+        });
+    }
+    ImGui::EndDisabled();
+    if (shadowPreview_) {
+        const float width = std::max(1.0F, ImGui::GetContentRegionAvail().x);
+        ImGui::Image(shadowPreview_->GetTexRef(), {width, width});
+        ImGui::TextDisabled("Snapshot; capture again after changes.");
+    }
+    ImGui::Separator();
+}
+
+void Editor::shadowCoverage(const Camera& camera) {
+    const auto debug = engine_.shadowDebugInfo();
+    if (!showShadowCoverage_ || !debug.active) {
+        return;
+    }
+    auto* viewport = ImGui::GetMainViewport();
+    const auto matrix = camera.projection(viewport->Size.x / viewport->Size.y) * camera.view();
+    const auto inverse = glm::inverse(debug.viewProjection);
+    std::array<glm::vec4, 8> corners;
+    for (int i = 0; i < 8; ++i) {
+        auto world = inverse * glm::vec4{(i & 1) ? 1.0F : -1.0F, (i & 2) ? 1.0F : -1.0F, (i & 4) ? 1.0F : 0.0F, 1};
+        corners[i] = matrix * (world / world.w);
+    }
+    auto* draw = ImGui::GetBackgroundDrawList(viewport);
+    for (int i = 0; i < 8; ++i) {
+        for (const int bit : {1, 2, 4}) {
+            const int next = i ^ bit;
+            if (next < i || corners[i].w <= 0 || corners[next].w <= 0) {
+                continue;
+            }
+            const auto screen = [&](glm::vec4 p) {
+                return ImVec2{viewport->Pos.x + (p.x / p.w + 1) * viewport->Size.x * 0.5F,
+                              viewport->Pos.y + (p.y / p.w + 1) * viewport->Size.y * 0.5F};
+            };
+            draw->AddLine(screen(corners[i]), screen(corners[next]), IM_COL32(255, 205, 60, 180), 1.5F);
+        }
+    }
+}
+
 void Editor::inspector() {
     auto& scene = *engine_.scene();
     const auto selected = scene.selectedObject();
@@ -671,6 +795,7 @@ void Editor::inspector() {
     }
 
     ImGui::Begin("Inspector");
+    lightingControls();
     const float height = ImGui::GetWindowHeight();
     const bool revealAnimation = selectionChanged || height < inspectorHeight_;
     inspectorHeight_ = height;
@@ -685,6 +810,15 @@ void Editor::inspector() {
 
     const auto id = *selected;
     const auto& object = scene.object(id);
+    if (object.model) {
+        auto properties = object.shadows;
+        bool changed = ImGui::Checkbox("Cast shadows", &properties.cast);
+        changed |= ImGui::Checkbox("Receive shadows", &properties.receive);
+        if (changed) {
+            scene.setShadowProperties(id, properties);
+            document_.markChanged();
+        }
+    }
     const auto key = std::to_string(id);
     ImGui::PushID(key.c_str());
     ImGui::SeparatorText("General");
@@ -1254,6 +1388,7 @@ void Editor::finishFrame(const Camera& camera) {
         }
     }
     drawDebugGeometry(camera, native_.window, gridDebug_);
+    shadowCoverage(camera);
     ImGui::Render();
 }
 

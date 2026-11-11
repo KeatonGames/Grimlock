@@ -12,6 +12,7 @@
 #include "renderer/grid_instances.hpp"
 #include "renderer/lighting.hpp"
 #include "renderer/mesh_pipeline.hpp"
+#include "renderer/shadow_camera.hpp"
 #include "renderer/tone_map_pipeline.hpp"
 #include "renderer/vulkan_context.hpp"
 
@@ -34,6 +35,7 @@ struct ModelDraw {
     const assets::ModelPose* pose = nullptr;     // Instance-owned; immutable for the duration of drawFrame.
     bool selected = false;
     float dissolve = 0;
+    ShadowProperties shadows;
 };
 
 struct GridDraw {
@@ -64,6 +66,20 @@ public:
     [[nodiscard]] FrameCapture takeCapture();
     void setVsync(bool enabled);
     void setMsaaSamples(std::uint32_t samples);
+    void setShadowSettings(const ShadowSettings& settings);
+
+    [[nodiscard]] ShadowSettings shadowSettings() const noexcept {
+        return shadowSettings_;
+    }
+
+    [[nodiscard]] std::vector<ShadowQuality> supportedShadowQualities() const;
+
+    [[nodiscard]] ShadowDebugInfo shadowDebugInfo() const noexcept {
+        return shadowDebug_;
+    }
+
+    [[nodiscard]] FrameCapture captureShadowMap();
+
     [[nodiscard]] std::vector<std::uint32_t> supportedMsaaSamples() const;
 
     [[nodiscard]] std::uint32_t msaaSamples() const noexcept {
@@ -87,8 +103,12 @@ public:
     }
 
 private:
+    struct PrimitiveDraw;
     void createCommandPool();
     void detectSampleCounts();
+    void detectShadowSupport();
+    void updateShadowResources();
+    void recordShadows(VkCommandBuffer command, const GridDraw* grid, std::span<const PrimitiveDraw> primitives);
     void createCameraResources(const assets::EnvironmentCube* environment);
     void createMaterialResources();
     void createSynchronization();
@@ -102,7 +122,7 @@ private:
                      float exposure,
                      const GridDraw* grid);
     void updateGrid(const GridDraw* grid);
-    void recordGrid(VkCommandBuffer command, const GridDraw& grid);
+    void recordGrid(VkCommandBuffer command, const GridDraw& grid, bool shadow = false);
     [[nodiscard]] bool recreateSwapchain();
     [[nodiscard]] VkSurfaceFormatKHR chooseSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats) const;
     [[nodiscard]] VkExtent2D chooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
@@ -127,6 +147,7 @@ private:
         std::vector<NodeDraw> nodes; // Static selected-scene draw cache, not baked geometry.
         std::vector<std::size_t> meshMaterials;
         std::vector<glm::vec3> meshCenters;
+        std::vector<float> meshRadii;
         std::unique_ptr<GpuMaterials> materials;
         std::vector<VkDescriptorSet> deformationSets;
         assets::ModelPose restPose;
@@ -141,12 +162,13 @@ private:
         float depth;
         std::size_t order;
         std::uint32_t deformation;
+        bool castsShadow = true;
     };
 
     [[nodiscard]] std::span<PrimitiveDraw> preparePrimitiveDraws(const Camera& camera,
                                                                  std::span<const ModelDraw> draws);
     static void sortPrimitiveDraws(std::span<PrimitiveDraw> primitives);
-    void recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives);
+    void recordPrimitiveDraws(VkCommandBuffer command, std::span<const PrimitiveDraw> primitives, bool shadow = false);
 
     std::vector<std::unique_ptr<GpuModel>> models_;
     std::vector<PrimitiveDraw> primitiveDraws_;
@@ -163,6 +185,17 @@ private:
     std::optional<Buffer> lightBuffer_;
     std::optional<Texture> irradiance_, specularEnvironment_, brdfLut_;
     VkSampler environmentSampler_ = VK_NULL_HANDLE;
+    VkSampler shadowSampler_ = VK_NULL_HANDLE;
+    std::optional<Buffer> shadowBuffer_;
+    std::optional<DepthTarget> shadowDepth_;
+    std::optional<MeshPipeline> shadowPipeline_, shadowGridPipeline_;
+    VkFormat shadowFormat_ = VK_FORMAT_UNDEFINED;
+    std::uint32_t maxShadowResolution_ = 0;
+    bool shadowResourcesDirty_ = true;
+    bool shadowInitialized_ = false;
+    bool shadowReadback_ = false;
+    ShadowSettings shadowSettings_;
+    ShadowDebugInfo shadowDebug_;
     VkDescriptorSetLayout toneMapLayout_ = VK_NULL_HANDLE;
     VkDescriptorSet toneMapSet_ = VK_NULL_HANDLE;
     VkDescriptorSetLayout materialLayout_ = VK_NULL_HANDLE;

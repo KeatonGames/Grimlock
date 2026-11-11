@@ -47,4 +47,19 @@ add_custom_command(
     COMMENT "Compiling HDR tone-mapping shaders"
     VERBATIM
 )
-add_custom_target(GrimlockShaders DEPENDS "${mesh_spirv}" "${grid_spirv}" "${tone_map_spirv}")
+set(shadow_spirv "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/shadow.spv")
+set(grid_shadow_spirv "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/grid_shadow.spv")
+foreach(kind IN ITEMS shadow grid_shadow)
+    set(extra_define)
+    if(kind STREQUAL "grid_shadow")
+        set(extra_define -DGRID_INSTANCES=1)
+    endif()
+    add_custom_command(OUTPUT "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/${kind}.spv"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders"
+        COMMAND "${SLANGC_EXECUTABLE}" "${mesh_shader}" -DSHADOW_PASS=1 ${extra_define}
+            -target spirv -profile spirv_1_5 -emit-spirv-directly
+            -fvk-use-entrypoint-name -entry vertMain -entry fragMain
+            -matrix-layout-column-major -o "${PROJECT_BINARY_DIR}/$<CONFIG>/shaders/${kind}.spv"
+        DEPENDS "${mesh_shader}" "${SLANGC_EXECUTABLE}" VERBATIM)
+endforeach()
+add_custom_target(GrimlockShaders DEPENDS "${mesh_spirv}" "${grid_spirv}" "${tone_map_spirv}" "${shadow_spirv}" "${grid_shadow_spirv}")

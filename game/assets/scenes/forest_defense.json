@@ -2270,7 +2270,9 @@
                                      1,
                                      1,
                                      1
-                                 ]
+                                 ],
+                        "casts_shadow":  false,
+                        "receives_shadow":  false
                     },
                     {
                         "id":  "255",
@@ -2425,7 +2427,9 @@
                                      1,
                                      1,
                                      1
-                                 ]
+                                 ],
+                        "casts_shadow":  false,
+                        "receives_shadow":  false
                     },
                     {
                         "id":  "259",
@@ -2859,7 +2863,9 @@
                                      1,
                                      1,
                                      1
-                                 ]
+                                 ],
+                        "casts_shadow":  false,
+                        "receives_shadow":  false
                     },
                     {
                         "id":  "273",
@@ -2983,7 +2989,9 @@
                                      1,
                                      1,
                                      1
-                                 ]
+                                 ],
+                        "casts_shadow":  false,
+                        "receives_shadow":  false
                     },
                     {
                         "id":  "277",
@@ -4408,7 +4416,9 @@
                                      0.005,
                                      0.018,
                                      1
-                                 ]
+                                 ],
+                        "casts_shadow":  false,
+                        "receives_shadow":  false
                     }
                 ]
 }

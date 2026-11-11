@@ -9,12 +9,13 @@ public:
     DepthTarget(const VulkanContext& context,
                 VkExtent2D extent,
                 VkFormat format,
-                VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+                VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+                VkImageUsageFlags usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     ~DepthTarget();
     DepthTarget(const DepthTarget&) = delete;
     DepthTarget& operator=(const DepthTarget&) = delete;
 
-    [[nodiscard]] static VkFormat chooseFormat(VkPhysicalDevice device);
+    [[nodiscard]] static VkFormat chooseFormat(VkPhysicalDevice device, bool sampled = false);
 
     [[nodiscard]] VkImage image() const noexcept {
         return image_;

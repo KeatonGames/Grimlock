@@ -89,6 +89,15 @@ public:
     [[nodiscard]] bool vsyncEnabled() const noexcept;
     // Off is 1. Unsupported requested modes fall back to the highest supported lower mode.
     void setMsaaSamples(std::uint32_t samples);
+    void setShadowSettings(const ShadowSettings& settings);
+    [[nodiscard]] ShadowSettings shadowSettings() const noexcept;
+    [[nodiscard]] std::vector<ShadowQuality> supportedShadowQualities() const;
+    [[nodiscard]] ShadowDebugInfo shadowDebugInfo() const noexcept;
+    // Explicit, synchronous tooling snapshot; empty when no active/readable map exists.
+    [[nodiscard]] FrameCapture captureShadowMap();
+    void setShadowProperties(InstanceId instance, ShadowProperties properties);
+    void setDirectionalLight(const DirectionalLight& light);
+    [[nodiscard]] DirectionalLight directionalLight() const;
     [[nodiscard]] std::uint32_t msaaSamples() const noexcept;
     [[nodiscard]] std::vector<std::uint32_t> supportedMsaaSamples() const;
     [[nodiscard]] glm::uvec2 renderingResolution() const noexcept;

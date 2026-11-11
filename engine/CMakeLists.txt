@@ -32,6 +32,8 @@ add_library(Engine STATIC
     src/renderer/texture.cpp
     src/renderer/gpu_materials.cpp
     src/renderer/lighting.cpp
+    src/renderer/shadow_camera.cpp
+    src/renderer/shadow_rendering.cpp
     src/renderer/tone_map_pipeline.cpp
     src/renderer/deformation.cpp
 )

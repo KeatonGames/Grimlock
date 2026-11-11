@@ -224,6 +224,7 @@ std::size_t EnemySystem::spawn(const NavMesh& navigation, SpawnArea area, std::s
             std::optional<InstanceId> instance;
             try {
                 instance = engine_.createInstance(*animal.model, true);
+                engine_.setShadowProperties(*instance, {definition.castsShadow, definition.receivesShadow});
                 enemy.instance = instance;
                 registry_.emplace<Enemy>(entity, std::move(enemy));
                 registry_.emplace<TeamComponent>(entity);
@@ -383,6 +384,7 @@ bool EnemySystem::applyDamage(EnemyId id, float damage, DefensiveTarget attacker
         coinModel_ = engine_.loadModel(engine_.assetRoot() / "environment/dungeon/coin.glb");
     }
     const auto coin = engine_.createInstance(*coinModel_, true);
+    engine_.setShadowProperties(coin, {false, false});
     try {
         coins_.push_back({coin, enemy.position + glm::dvec3{0, definition(enemy.type).visualHeight * 0.55, 0}});
     } catch (...) {

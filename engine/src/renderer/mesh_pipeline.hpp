@@ -37,7 +37,8 @@ public:
                  VkDescriptorSetLayout materialLayout,
                  VkDescriptorSetLayout deformationLayout,
                  bool gridInstances = false,
-                 VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+                 VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+                 bool shadowPass = false);
     ~MeshPipeline();
 
     MeshPipeline(const MeshPipeline&) = delete;

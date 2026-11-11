@@ -124,6 +124,7 @@ private:
     std::filesystem::path optionsPath_;
     int resolution_ = 1;
     std::uint32_t msaaSamples_ = 4;
+    ShadowQuality shadowQuality_ = ShadowQuality::medium;
     bool fullscreen_ = false, vsync_ = true;
     std::string optionsError_;
 };

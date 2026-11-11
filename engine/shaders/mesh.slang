@@ -32,6 +32,9 @@ struct MaterialData {
 [[vk::binding(2, 0)]] SamplerCube irradianceMap;
 [[vk::binding(3, 0)]] SamplerCube specularMap;
 [[vk::binding(4, 0)]] Sampler2D brdfMap;
+struct ShadowData { float4x4 viewProjection; float4 map; float4 bias; };
+[[vk::binding(5, 0)]] ConstantBuffer<ShadowData> shadow;
+[[vk::binding(6, 0)]] Sampler2D shadowMap;
 [[vk::push_constant]] ConstantBuffer<DrawData> draw;
 [[vk::binding(0, 1)]] Sampler2D baseColorMap;
 [[vk::binding(1, 1)]] ConstantBuffer<MaterialData> material;
@@ -109,7 +112,11 @@ VertexOutput vertMain(VertexInput input, uint instance : SV_VulkanInstanceID) {
     }
 #endif
     float4 world = mul(draw.model, float4(input.position, 1));
+#ifdef SHADOW_PASS
+    output.position = mul(shadow.viewProjection, world);
+#else
     output.position = mul(camera.projection, mul(camera.view, world));
+#endif
     output.worldPosition = world.xyz;
     output.worldNormal = draw.normalColumn0.xyz * input.normal.x
                        + draw.normalColumn1.xyz * input.normal.y
@@ -148,7 +155,7 @@ float3 environmentDirection(float3 direction) {
     return float3(c * direction.x + s * direction.z, direction.y, -s * direction.x + c * direction.z);
 }
 float3 selectionHighlight(float3 color, VertexOutput input) {
-    if (draw.normalColumn1.w < 0.5) return color;
+    if ((uint(draw.normalColumn1.w) & 1u) == 0) return color;
     // Inner silhouette rim, not an expanded hull: existing depth/alpha tests retain occlusion.
     float3 normal = safeNormalize(input.worldNormal, float3(0,1,0));
     float3 view = safeNormalize(camera.position.xyz - input.worldPosition, normal);
@@ -157,6 +164,40 @@ float3 selectionHighlight(float3 color, VertexOutput input) {
     // A bounded cyan overlay both lifts dark surfaces and contrasts with bright ones.
     return lerp(color, float3(0.08, 1.8, 2.6), strength);
 }
+float directionalVisibility(float3 position, float3 normal) {
+    if (shadow.map.x < 0.5 || (uint(draw.normalColumn1.w) & 2u) != 0) return 1;
+    float facing = saturate(dot(normal, -lights.directionIntensity.xyz));
+    float4 clip = mul(shadow.viewProjection, float4(position + normal * shadow.bias.y * (1 - facing), 1));
+    float3 p = clip.xyz / clip.w;
+    float2 uv = p.xy * 0.5 + 0.5;
+    if (any(uv < 0) || any(uv > 1) || p.z < 0 || p.z > 1) return 1;
+    float reference = p.z - shadow.bias.x * (1 + 2 * (1 - facing));
+    int radius = int(shadow.map.z);
+    float visible = 0, taps = 0;
+    for (int y = -2; y <= 2; ++y) {
+        for (int x = -2; x <= 2; ++x) {
+            if (abs(x) <= radius && abs(y) <= radius) {
+                float depth = shadowMap.SampleLevel(uv + float2(x,y) * shadow.map.y, 0).r;
+                visible += reference <= depth ? 1 : 0;
+                taps += 1;
+            }
+        }
+    }
+    float edgeFade = 1 - smoothstep(0.90, 1.0, max(abs(p.x), abs(p.y)));
+    return lerp(1.0, visible / max(taps, 1.0), shadow.map.w * edgeFade);
+}
+#ifdef SHADOW_PASS
+[shader("fragment")]
+void fragMain(VertexOutput input) {
+    float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
+    if (material.state.x > 0.5 && base.a < (material.state.x < 1.5 ? material.factors.w : 0.5)) discard;
+    if (draw.normalColumn2.w > 0) {
+        float3 cell = floor(input.worldPosition * 28);
+        float noise = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);
+        if (noise < draw.normalColumn2.w) discard;
+    }
+}
+#else
 [shader("fragment")]
 float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Target0 {
     float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
@@ -214,6 +255,7 @@ float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Targ
         lights.directionalColor.rgb * lights.directionIntensity.w, base.rgb, metallic, roughness, f0, f90) * (1 - coatFresnel);
     color += evaluateLight(coatNormal, v, -lights.directionIntensity.xyz, lights.directionalColor.rgb * lights.directionIntensity.w,
         float3(1), 1, coatRoughness, float3(1), float3(1)) * coatFresnel;
+    color *= directionalVisibility(input.worldPosition, n);
     for (uint i = 0; i < min(lights.counts.x, 8u); ++i) {
         PointLight light = lights.points[i];
         float3 delta = light.positionRange.xyz - input.worldPosition;
@@ -254,3 +296,4 @@ float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Targ
     color += emissiveMap.Sample(coordinates(input, 4)).rgb * material.emissiveRoughness.rgb * material.extensions.w * (1 - coatFresnel);
     return float4(clamp(selectionHighlight(color,input), 0, 65504), base.a); // Finite RGBA16F; tone mapping happens after blending.
 }
+#endif

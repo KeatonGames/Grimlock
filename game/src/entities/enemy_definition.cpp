@@ -166,6 +166,8 @@ std::vector<EnemyDefinition> loadAnimalDefinitions(const std::filesystem::path& 
                 }
             }
             d.maximumHealth = entry.at("maximum_health").get<float>();
+            d.castsShadow = entry.value("casts_shadow", true);
+            d.receivesShadow = entry.value("receives_shadow", true);
             if (entry.contains("kill_reward")) {
                 const auto& reward = entry.at("kill_reward");
                 if (!reward.is_number_integer() || (!reward.is_number_unsigned() && reward.get<std::int64_t>() < 0)) {

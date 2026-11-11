@@ -12,6 +12,7 @@ struct DirectionalLight {
     glm::vec3 direction{-0.4F, -0.8F, -0.5F}; // Direction light travels.
     float intensity = 3.0F;
     glm::vec3 color{1.0F}; // Linear RGB.
+    bool enabled = true;
 };
 
 struct PointLight {
