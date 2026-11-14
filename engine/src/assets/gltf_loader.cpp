@@ -250,7 +250,7 @@ void validatePrimitiveAttributes(const fastgltf::Primitive& source, const std::s
         }
 
         if (key != "POSITION" && key != "NORMAL" && key != "TANGENT" && key != "TEXCOORD_0" && key != "TEXCOORD_1" &&
-            key != "JOINTS_0" && key != "JOINTS_1" && key != "WEIGHTS_0" && key != "WEIGHTS_1") {
+            key != "JOINTS_0" && key != "JOINTS_1" && key != "WEIGHTS_0" && key != "WEIGHTS_1" && key != "COLOR_0") {
             warnings += "Vertex attribute '" + key + "' in primitive '" + name +
                         "' is preserved only in the source file and is not rendered.\n";
         }
@@ -367,6 +367,36 @@ bool readTextureCoordinates(const fastgltf::Asset& asset,
     }
 
     return normalCoordinates;
+}
+
+void readVertexColors(const fastgltf::Asset& asset, const fastgltf::Primitive& source, MeshData& mesh) {
+    const auto attribute = source.findAttribute("COLOR_0");
+    if (attribute == source.attributes.end()) {
+        return;
+    }
+    const auto& colors = asset.accessors.at(attribute->accessorIndex);
+    if ((colors.type != fastgltf::AccessorType::Vec3 && colors.type != fastgltf::AccessorType::Vec4) ||
+        colors.count != mesh.vertices.size() ||
+        (colors.componentType != fastgltf::ComponentType::Float &&
+         (!colors.normalized || (colors.componentType != fastgltf::ComponentType::UnsignedByte &&
+                                 colors.componentType != fastgltf::ComponentType::UnsignedShort)))) {
+        invalid("Invalid COLOR_0 type/count/normalization: " + mesh.name);
+    }
+    const auto assign = [&](glm::vec4 value, std::size_t index) {
+        for (int c = 0; c < 4; ++c) {
+            if (!std::isfinite(value[c]) || value[c] < 0 || value[c] > 1) {
+                invalid("Invalid vertex color: " + mesh.name);
+            }
+        }
+        mesh.vertices[index].color = value;
+    };
+    if (colors.type == fastgltf::AccessorType::Vec3) {
+        fastgltf::iterateAccessorWithIndex<glm::vec3>(asset, colors, [&](auto value, std::size_t index) {
+            assign(glm::vec4{value, 1}, index);
+        });
+    } else {
+        fastgltf::iterateAccessorWithIndex<glm::vec4>(asset, colors, assign);
+    }
 }
 
 bool readVertexTangents(const fastgltf::Asset& asset, const fastgltf::Primitive& source, MeshData& mesh) {
@@ -633,6 +663,7 @@ MeshData readPrimitive(const fastgltf::Asset& asset,
     mesh.name = name;
     mesh.material = source.materialIndex.value_or(model.materials.size() - 1);
     const bool generateNormals = readVertexGeometry(asset, source, mesh);
+    readVertexColors(asset, source, mesh);
 
     const auto& material = model.materials.at(mesh.material);
     const bool normalCoordinates = readTextureCoordinates(asset, source, material, mesh, warnings);

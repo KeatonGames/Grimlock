@@ -24,6 +24,8 @@ public:
 
 protected:
     virtual void configureUi() = 0;
+    // ImGui uploads RGBA8 UNORM. Decode authored sRGB artwork once, retaining linear alpha.
+    void prepareSrgbPixels(std::span<std::uint8_t> pixels) const;
 
     virtual void releaseUi() noexcept {
     }

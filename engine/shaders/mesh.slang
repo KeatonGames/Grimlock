@@ -65,9 +65,10 @@ struct VertexInput {
     [[vk::location(7)]] float4 weights0 : BLENDWEIGHT0;
     [[vk::location(8)]] float4 weights1 : BLENDWEIGHT1;
     [[vk::location(9)]] uint morphIndex : TEXCOORD2;
+    [[vk::location(10)]] float4 color : COLOR0;
 #ifdef GRID_INSTANCES
-    [[vk::location(10)]] float3 instancePosition : TEXCOORD3;
-    [[vk::location(11)]] float3 instanceScale : TEXCOORD4;
+    [[vk::location(11)]] float3 instancePosition : TEXCOORD3;
+    [[vk::location(12)]] float3 instanceScale : TEXCOORD4;
 #endif
 };
 struct VertexOutput {
@@ -77,6 +78,7 @@ struct VertexOutput {
     [[vk::location(2)]] float2 uv : TEXCOORD0;
     [[vk::location(3)]] float2 uv1 : TEXCOORD1;
     [[vk::location(4)]] float4 tangent : TANGENT;
+    [[vk::location(5)]] float4 color : COLOR0;
 };
 [shader("vertex")]
 VertexOutput vertMain(VertexInput input, uint instance : SV_VulkanInstanceID) {
@@ -123,6 +125,7 @@ VertexOutput vertMain(VertexInput input, uint instance : SV_VulkanInstanceID) {
                        + draw.normalColumn2.xyz * input.normal.z;
     output.tangent = float4(mul((float3x3)draw.model, input.tangent.xyz), input.tangent.w * draw.normalColumn0.w);
     output.uv = input.uv; output.uv1 = input.uv1;
+    output.color = input.color;
     return output;
 }
 float2 coordinates(VertexOutput input, uint slot) {
@@ -189,7 +192,7 @@ float directionalVisibility(float3 position, float3 normal) {
 #ifdef SHADOW_PASS
 [shader("fragment")]
 void fragMain(VertexOutput input) {
-    float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
+    float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor * input.color;
     if (material.state.x > 0.5 && base.a < (material.state.x < 1.5 ? material.factors.w : 0.5)) discard;
     if (draw.normalColumn2.w > 0) {
         float3 cell = floor(input.worldPosition * 28);
@@ -200,7 +203,7 @@ void fragMain(VertexOutput input) {
 #else
 [shader("fragment")]
 float4 fragMain(VertexOutput input, bool frontFacing : SV_IsFrontFace) : SV_Target0 {
-    float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor;
+    float4 base = baseColorMap.Sample(coordinates(input, 0)) * material.baseColor * draw.baseColor * input.color;
     if (draw.normalColumn2.w > 0) {
         float3 cell = floor(input.worldPosition * 28);
         float noise = frac(sin(dot(cell, float3(12.9898, 78.233, 37.719))) * 43758.5453);

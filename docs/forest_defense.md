@@ -1,7 +1,7 @@
 # Level 01 - Forest Defense
 
 Level 1 follows the supplied overview reference: an entrance meadow on the left,
-a wooden bridge in the center, a raised garden behind the entrance, and a broad
+an arched stone bridge in the center, a raised garden behind the entrance, and a broad
 ramp leading to the walled mausoleum on the right. The level retains its UUID,
 five waves, starting gold, rewards and objective combat rules. Level 1 has no
 available heroes and is designed for tower-only play.
@@ -57,10 +57,13 @@ The terrain uses the Kenney Platformer Kit's `block-grass-large` and
 edges connected. Ramp ends overlap the adjoining flat ground. The existing
 Recast/Detour radius, slope, step and crowd settings remain unchanged.
 
-The bridge's visible solid timber base provides the walkable geometry; the kit's
-planks, edge beams, caps and support legs provide detail. This prevents the source
-plank gaps from disconnecting navigation for large enemies. The ground beneath
-and beside the bridge remains a real gap rather than an invisible terrain plane.
+The bridge uses `environment/castle/bridge-straight.glb`, replacing the assembled
+cube base, decorative planks, posts, and edge beams. Its actual mesh provides both
+the visible bridge and walkable geometry. The model's local deck at Y=1.06 is
+aligned 1 cm below the meadow banks at world Y=0 to avoid coplanar flicker, with the span fitted to the existing
+crossing and 3.7 metres of clear deck between the parapets for crowd traversal.
+The ground beneath and beside the bridge remains a real gap rather
+than an invisible terrain plane. The authoring script reproduces this placement.
 
 The mausoleum uses the existing Graveyard Kit's `crypt-large` and matching roof.
 The entrance faces the incoming route; its warm glow sits inside the actual doorway. A low stone foundation supports the raised sill.

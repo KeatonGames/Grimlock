@@ -2,6 +2,7 @@
 
 #include "core/startup_profile.hpp"
 #include "renderer/buffer.hpp"
+#include "renderer/mipmaps.hpp"
 #include "renderer/vulkan_helpers.hpp"
 
 #include <algorithm>
@@ -17,7 +18,8 @@ namespace grimlock::renderer {
 Texture::Texture(const VulkanContext& context,
                  const VkCommandPool uploadPool,
                  const assets::ImageData& data,
-                 const TextureColorSpace colorSpace)
+                 const TextureColorSpace colorSpace,
+                 bool cpuMipmaps)
     : device_(context.device()) {
     diagnostics::StartupSpan profile{"GPU.image.upload"};
 
@@ -45,24 +47,35 @@ Texture::Texture(const VulkanContext& context,
         linearFiltering_ = (features.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT) != 0;
         constexpr auto blit = VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT |
                               VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
-        if ((features.optimalTilingFeatures & blit) == blit) {
-            mipLevels_ = std::bit_width(std::max(data.width, data.height));
-        } else if (data.width > 1 || data.height > 1) {
-            std::cerr << "Texture warning: linear blits unavailable; using one mip level for " << data.name << '\n';
-        }
+        cpuMipmaps |= (features.optimalTilingFeatures & blit) != blit;
+        mipLevels_ = std::bit_width(std::max(data.width, data.height));
 
         auto usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-        if (mipLevels_ > 1) {
+        if (mipLevels_ > 1 && !cpuMipmaps) {
             usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
 
         create(context, data.width, data.height, mipLevels_, 1, format, usage);
+        std::vector<std::uint8_t> cpuPixels;
+        std::vector<VkBufferImageCopy> copies;
+        if (cpuMipmaps) {
+            const auto levels = rgbaMipChain(data, colorSpace == TextureColorSpace::srgb);
+            for (std::uint32_t level = 0; level < levels.size(); ++level) {
+                VkBufferImageCopy copy{};
+                copy.bufferOffset = cpuPixels.size();
+                copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1};
+                copy.imageExtent = {levels[level].width, levels[level].height, 1};
+                copies.push_back(copy);
+                cpuPixels.insert(cpuPixels.end(), levels[level].pixels.begin(), levels[level].pixels.end());
+            }
+        }
+        const auto& pixels = cpuMipmaps ? cpuPixels : data.pixels;
         Buffer staging{context,
-                       data.pixels.size(),
+                       pixels.size(),
                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-        staging.write(data.pixels.data(), data.pixels.size());
+        staging.write(pixels.data(), pixels.size());
 
         submitUpload(context, uploadPool, [&](const VkCommandBuffer command) {
             const auto transition = [&](const std::uint32_t level,
@@ -100,6 +113,23 @@ Texture::Texture(const VulkanContext& context,
                        VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
                        VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
+            if (cpuMipmaps) {
+                vkCmdCopyBufferToImage(command,
+                                       staging.handle(),
+                                       image_,
+                                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                       static_cast<std::uint32_t>(copies.size()),
+                                       copies.data());
+                transition(0,
+                           mipLevels_,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                           VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT,
+                           VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                           VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                           VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                return;
+            }
             VkBufferImageCopy copy{};
             copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
             copy.imageExtent = {data.width, data.height, 1};

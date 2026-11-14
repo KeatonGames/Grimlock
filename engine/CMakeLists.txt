@@ -30,7 +30,9 @@ add_library(Engine STATIC
     src/renderer/grid_instances.cpp
     src/renderer/depth_target.cpp
     src/renderer/texture.cpp
+    src/renderer/mipmaps.cpp
     src/renderer/gpu_materials.cpp
+    src/renderer/render_settings.cpp
     src/renderer/lighting.cpp
     src/renderer/shadow_camera.cpp
     src/renderer/shadow_rendering.cpp

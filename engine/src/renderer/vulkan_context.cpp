@@ -226,7 +226,7 @@ void VulkanContext::createDevice() {
     if (enabled.samplerAnisotropy) {
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(physicalDevice_, &properties);
-        maxAnisotropy_ = std::min(8.0F, properties.limits.maxSamplerAnisotropy);
+        maxAnisotropy_ = std::min(16.0F, properties.limits.maxSamplerAnisotropy);
     }
     VkDeviceCreateInfo info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     info.pEnabledFeatures = &enabled;

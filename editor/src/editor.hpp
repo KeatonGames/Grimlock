@@ -53,6 +53,7 @@ private:
 
     void inspector();
     void lightingControls();
+    void renderingControls();
     void shadowCoverage(const Camera& camera);
     bool showShadowCoverage_ = false;
     std::unique_ptr<ImTextureData> shadowPreview_;

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <grimlock/color.hpp>
 #include <grimlock/imgui_overlay.hpp>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_vulkan.h>
@@ -15,6 +16,28 @@ void check(VkResult result) {
 }
 
 } // namespace
+
+void ImGuiOverlay::prepareSrgbPixels(std::span<std::uint8_t> pixels) const {
+    if (pixels.size() % 4 != 0) {
+        throw std::invalid_argument("UI image must contain complete RGBA pixels.");
+    }
+    if (native_.target.colorFormat != VK_FORMAT_B8G8R8A8_SRGB &&
+        native_.target.colorFormat != VK_FORMAT_R8G8B8A8_SRGB) {
+        return;
+    }
+    static const auto channels = [] {
+        std::array<std::uint8_t, 256> result{};
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            result[i] = static_cast<std::uint8_t>(std::lround(srgbToLinear(static_cast<float>(i) / 255.0F) * 255));
+        }
+        return result;
+    }();
+    for (std::size_t i = 0; i < pixels.size(); i += 4) {
+        for (std::size_t c = 0; c < 3; ++c) {
+            pixels[i + c] = channels[pixels[i + c]];
+        }
+    }
+}
 
 void ImGuiOverlay::initialize(const OverlayContext& context) {
     native_ = context;

@@ -41,6 +41,7 @@ void GameHud::initializeMenu() {
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     msaaSamples_ = engine_.msaaSamples();
     shadowQuality_ = engine_.shadowSettings().quality;
+    engine_.setRenderSettings({TextureFiltering::anisotropic, 16, ToneMapping::filmic});
     const auto fontPath = engine_.assetRoot() / "ui/karla.ttf";
     if (std::filesystem::exists(fontPath)) {
         menuFont_ = ImGui::GetIO().Fonts->AddFontFromFileTTF(fontPath.string().c_str(), 20);
@@ -95,21 +96,7 @@ ImTextureRef GameHud::menuImage(const std::filesystem::path& path) {
         if (width <= 0 || height <= 0 || width > 4096 || height > 4096) {
             throw std::runtime_error("Menu images must fit within 4096 x 4096 pixels: " + path.string());
         }
-        // The ImGui backend uploads UNORM textures; compensate only these sRGB screenshots
-        // when the final color attachment performs the sRGB encoding.
-        if (native_.target.colorFormat == VK_FORMAT_B8G8R8A8_SRGB ||
-            native_.target.colorFormat == VK_FORMAT_R8G8B8A8_SRGB) {
-            std::array<unsigned char, 256> linearChannel;
-            for (std::size_t channel = 0; channel < linearChannel.size(); ++channel) {
-                linearChannel[channel] = static_cast<unsigned char>(
-                    std::round(presentation::menuColor({channel / 255.0F, 0, 0, 1}).x * 255));
-            }
-            for (std::size_t i = 0; i < static_cast<std::size_t>(width) * height * 4; i += 4) {
-                pixels[i] = linearChannel[pixels[i]];
-                pixels[i + 1] = linearChannel[pixels[i + 1]];
-                pixels[i + 2] = linearChannel[pixels[i + 2]];
-            }
-        }
+        prepareSrgbPixels({pixels, static_cast<std::size_t>(width) * height * 4});
         auto texture = std::make_unique<ImTextureData>();
         texture->Create(ImTextureFormat_RGBA32, width, height);
         std::memcpy(texture->Pixels, pixels, static_cast<std::size_t>(width) * height * 4);

@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <grimlock/color.hpp>
 #include <string>
 #include <string_view>
 
@@ -18,12 +19,9 @@ void menuColorSpace(bool srgbTarget) {
 
 ImVec4 menuColor(ImVec4 color) {
     if (menuSrgbTarget) {
-        const auto linear = [](float value) {
-            return value <= 0.04045F ? value / 12.92F : std::pow((value + 0.055F) / 1.055F, 2.4F);
-        };
-        color.x = linear(color.x);
-        color.y = linear(color.y);
-        color.z = linear(color.z);
+        color.x = srgbToLinear(color.x);
+        color.y = srgbToLinear(color.y);
+        color.z = srgbToLinear(color.z);
     }
     return color;
 }

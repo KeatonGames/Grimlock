@@ -51,12 +51,12 @@ MeshPipeline::MeshPipeline(const VkDevice device,
         stages[1].pName = "fragMain";
 
         VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-        static_assert(sizeof(assets::Vertex) == 124);
+        static_assert(sizeof(assets::Vertex) == 140);
         const std::array<VkVertexInputBindingDescription, 2> bindings{{
             {0, sizeof(assets::Vertex), VK_VERTEX_INPUT_RATE_VERTEX},
             {1, sizeof(GridCubeInstance), VK_VERTEX_INPUT_RATE_INSTANCE},
         }};
-        const std::array<VkVertexInputAttributeDescription, 12> attributes{{
+        const std::array<VkVertexInputAttributeDescription, 13> attributes{{
             {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(assets::Vertex, position)},
             {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(assets::Vertex, normal)},
             {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(assets::Vertex, uv)},
@@ -67,12 +67,13 @@ MeshPipeline::MeshPipeline(const VkDevice device,
             {7, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(assets::Vertex, weights0)},
             {8, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(assets::Vertex, weights1)},
             {9, 0, VK_FORMAT_R32_UINT, offsetof(assets::Vertex, morphIndex)},
-            {10, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, position)},
-            {11, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, scale)},
+            {10, 0, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(assets::Vertex, color)},
+            {11, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, position)},
+            {12, 1, VK_FORMAT_R32G32B32_SFLOAT, offsetof(GridCubeInstance, scale)},
         }};
         vertexInput.vertexBindingDescriptionCount = gridInstances ? 2 : 1;
         vertexInput.pVertexBindingDescriptions = bindings.data();
-        vertexInput.vertexAttributeDescriptionCount = gridInstances ? 12 : 10;
+        vertexInput.vertexAttributeDescriptionCount = gridInstances ? 13 : 11;
         vertexInput.pVertexAttributeDescriptions = attributes.data();
 
         VkPipelineInputAssemblyStateCreateInfo assembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};

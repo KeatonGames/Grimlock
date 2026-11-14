@@ -17,7 +17,8 @@ public:
     Texture(const VulkanContext& context,
             VkCommandPool uploadPool,
             const assets::ImageData& data,
-            TextureColorSpace colorSpace = TextureColorSpace::srgb);
+            TextureColorSpace colorSpace = TextureColorSpace::srgb,
+            bool cpuMipmaps = false);
 
     // Preprocessed linear float mip/face images: mip-major, six faces for a cube.
     Texture(const VulkanContext& context,

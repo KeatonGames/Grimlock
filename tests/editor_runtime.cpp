@@ -528,11 +528,7 @@ int main(int argc, char** argv) {
             tick(engine);
             button(id, SDL_BUTTON_LEFT, false, dismiss);
             tick(engine);
-            const auto& inspectorStyle = ImGui::GetStyle();
-            const glm::vec2 nameInput{inspector->DC.CursorStartPos.x + 80,
-                                      inspector->DC.CursorStartPos.y + ImGui::GetFontSize() * 2 +
-                                          inspectorStyle.SeparatorTextPadding.y * 2 + inspectorStyle.ItemSpacing.y * 2 +
-                                          ImGui::GetFrameHeight() * 0.5F};
+            const auto nameInput = inspectorControl(engine, id, a, "##Name", 80);
 
             event = {};
             event.type = SDL_EVENT_MOUSE_MOTION;

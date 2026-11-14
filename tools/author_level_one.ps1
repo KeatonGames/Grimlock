@@ -44,7 +44,7 @@ function Add-Zone([string]$name, $position, [string]$id, $lane) {
 }
 
 $null = Add-Object 'Reference layout terrain' '' @(0,0,0) -id '1'
-$null = Add-Object 'Wooden bridge' '' @(0,0,0) -id '2'
+$null = Add-Object 'Stone bridge' '' @(0,0,0) -id '2'
 $null = Add-Object 'Woodland scenery' '' @(0,0,0) -id '3'
 $null = Add-Object 'Mausoleum courtyard' '' @(0,0,0) -id '4'
 
@@ -58,26 +58,11 @@ Add-Slope 'Western garden access slope' @(-8,0,0.5) 4 3 1
 Add-Grass 'Mausoleum terrace' @(7.5,2,13) 11 8 3.25
 Add-Slope 'Broad ascent to the mausoleum' @(7,0,6) 5.2 6 2
 
-# A solid visible timber base supports the decorative boards, including their source-mesh gaps.
-$null = Add-Object 'Solid bridge timber deck' 'towers/structures/primitives/cube.glb' @(1,-0.07,0) @(
-    3.8,0.07,1.85) 0 'grimlock.terrain' '2' -tint @(0.51,0.27,0.11,1)
-for ($board = 0; $board -lt 12; ++$board) {
-    $x = -2.3 + $board * 0.6
-    $null = Add-Object 'Bridge timber deck plank' 'environment/platformer/platform.glb' @($x,-0.045,0) @(
-        0.65,0.6,4) 0 'grimlock.decoration' '2'
-}
-foreach ($x in @(-2.3,-0.1,2.1,4.3)) {
-    foreach ($z in @(-1.85,1.85)) {
-        $null = Add-Object 'Bridge support post' 'towers/structures/primitives/cube.glb' @($x,-0.7,$z) @(
-            0.15,1,0.15) 0 -parent '2' -tint @(0.48,0.24,0.09,1)
-        $null = Add-Object 'Bridge post cap' 'towers/structures/primitives/cube.glb' @($x,0.36,$z) @(
-            0.22,0.12,0.22) 0 -parent '2' -tint @(0.85,0.51,0.2,1)
-    }
-}
-foreach ($z in @(-1.85,1.85)) {
-    $null = Add-Object 'Bridge edge beam' 'towers/structures/primitives/cube.glb' @(1,-0.01,$z) @(
-        3.5,0.12,0.1) 0 -parent '2' -tint @(0.66,0.34,0.13,1)
-}
+# The actual bridge mesh supplies its visible deck and walkable terrain geometry.
+# The local Y=1.06 deck sits 1 cm below the banks to prevent coplanar surface flicker.
+# Fit the 3.7-metre clear deck between the parapets, rather than scaling the outer walls to that width.
+$null = Add-Object 'Arched stone bridge' 'environment/castle/bridge-straight.glb' @(1,-2.66,0) @(
+    (7.6/0.93),2.5,(3.7/0.6990538239479065)) 0 'grimlock.terrain' '2'
 
 Add-Zone 'Entrance meadow construction point' @(-5.5,0,-4.6) '108' @(-5,-1.5)
 Add-Zone 'Raised western garden construction point' @(-7,1,4.6) '109' @(-3,0)
@@ -195,7 +180,7 @@ $scene = [ordered]@{
 $scene | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath (Join-Path $assetRoot 'scenes/forest_defense.json')
 $levelPath = Join-Path $assetRoot 'levels/forest_defense.json'
 $level = Get-Content -LiteralPath $levelPath -Raw | ConvertFrom-Json
-$level.description = 'Cross the timber bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.'
+$level.description = 'Cross the arched stone bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.'
 $level.objective.position = @(-8.5,10.8)
 $level.objective.height = 2
 $level.hero_spawns = ,@(-7,2,11)

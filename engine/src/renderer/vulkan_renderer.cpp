@@ -50,6 +50,7 @@ VulkanRenderer::VulkanRenderer(SDL_Window* window, const assets::EnvironmentCube
         detectSampleCounts();
         detectShadowSupport();
         setMsaaSamples(4);
+        setRenderSettings(renderSettings_);
         createCommandPool();
         deformation_.emplace(context_);
         createCameraResources(environment);
@@ -134,8 +135,12 @@ std::size_t VulkanRenderer::uploadModel(const assets::ModelData& model) {
         }
 
         uploaded.meshes.reserve(model.meshes.size());
-        uploaded.materials =
-            std::make_unique<GpuMaterials>(context_, commandPool_, materialLayout_, *whiteTexture_, model);
+        uploaded.materials = std::make_unique<GpuMaterials>(context_,
+                                                            commandPool_,
+                                                            materialLayout_,
+                                                            *whiteTexture_,
+                                                            model,
+                                                            renderSettings_);
         for (const auto& mesh : model.meshes) {
             if (mesh.material >= model.materials.size()) {
                 throw std::invalid_argument("Mesh material index is out of range.");
@@ -272,6 +277,14 @@ bool VulkanRenderer::drawFrame(const Camera& camera,
     }
     timestampPending_ = false;
 
+    if (filteringDirty_) {
+        for (const auto& model : models_) {
+            if (model) {
+                model->materials->setFiltering(context_, renderSettings_);
+            }
+        }
+        filteringDirty_ = false;
+    }
     updateShadowResources();
     const auto shadowData = shadowUniforms(camera,
                                            static_cast<float>(swapchainExtent_.width) / swapchainExtent_.height,
@@ -1191,12 +1204,18 @@ void VulkanRenderer::recordFrame(const std::uint32_t imageIndex,
                             &toneMapSet_,
                             0,
                             nullptr);
+
+    const struct {
+        float exposure;
+        std::uint32_t operation;
+    } toneSettings{exposure, static_cast<std::uint32_t>(renderSettings_.toneMapping)};
+
     vkCmdPushConstants(command,
                        toneMapPipeline_->layout(),
                        VK_SHADER_STAGE_FRAGMENT_BIT,
                        0,
-                       sizeof(exposure),
-                       &exposure);
+                       sizeof(toneSettings),
+                       &toneSettings);
     vkCmdDraw(command, 3, 1, 0, 0);
 
     if (overlay_) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grimlock/assets/model_data.hpp"
+#include "grimlock/render_settings.hpp"
 #include "renderer/buffer.hpp"
 #include "renderer/texture.hpp"
 
@@ -41,10 +42,13 @@ public:
                  VkCommandPool uploadPool,
                  VkDescriptorSetLayout layout,
                  const Texture& white,
-                 const assets::ModelData& model);
+                 const assets::ModelData& model,
+                 const RenderSettings& settings = {});
     ~GpuMaterials();
     GpuMaterials(const GpuMaterials&) = delete;
     GpuMaterials& operator=(const GpuMaterials&) = delete;
+    // Called only after the frame fence; images and uniforms remain shared and unchanged.
+    void setFiltering(const VulkanContext& context, const RenderSettings& settings);
 
     [[nodiscard]] const MaterialBinding& at(std::size_t index) const {
         return bindings_.at(index);
@@ -58,6 +62,16 @@ private:
     std::vector<VkSampler> samplers_;
     std::vector<Buffer> uniforms_;
     std::vector<MaterialBinding> bindings_;
+
+    struct TextureSlot {
+        VkDescriptorSet set;
+        std::uint32_t binding;
+        VkImageView view;
+        assets::SamplerData sampler;
+        bool linearFiltering;
+    };
+
+    std::vector<TextureSlot> slots_;
 };
 
 } // namespace grimlock::renderer

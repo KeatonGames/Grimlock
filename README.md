@@ -12,7 +12,7 @@ and development tools. Game does not link Editor or GameDebug.
 - Forest-themed Game menus with captured Platformer Kit scenery, real level previews,
   persistent display options and a single playable Forest Defense level; see [menus](docs/menus.md).
 
-- **Level 01 - Forest Defense:** a handcrafted woodland with a timber bridge, raised
+- **Level 01 - Forest Defense:** a handcrafted woodland with an arched stone bridge, raised
   garden, four construction points and a walled mausoleum. This level is tower-only;
   other levels can enable zero to three heroes in their definitions. Five fixed waves end
   with a Goblin boss and four Goblins in one final swarm. See [the level guide](docs/forest_defense.md).
@@ -170,3 +170,5 @@ See [gameplay controls](docs/gameplay_controls.md) for selection, orders, cancel
 and interaction priorities. Camera controls remain right-drag pan, middle-drag orbit, and wheel zoom.
 
 Rendering quality: [MSAA, high-DPI rendering, filtering and validation](docs/rendering_quality.md).
+Directional lighting: [soft shadows, quality settings, Engine APIs and Editor debugging](docs/shadows.md).
+Color and materials: [linear color, vertex colors, texture filtering, mipmaps and tone mapping](docs/color_material_quality.md).

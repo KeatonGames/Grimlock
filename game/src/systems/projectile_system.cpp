@@ -179,6 +179,7 @@ void ProjectileSystem::addArrowTrail(glm::dvec3 from, glm::dvec3 to) {
     const auto transform = glm::scale(projectileTransform(segment), glm::vec3{0.035F, 0.035F, distance});
     const auto instance = engine_.createInstance(*model_, true);
     try {
+        engine_.setShadowProperties(instance, {false, false});
         engine_.setTint(instance, {1, 1, 1, 1});
         engine_.setTransform(instance, transform);
         arrowTrails_.push_back({instance, transform});

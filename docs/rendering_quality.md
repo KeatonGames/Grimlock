@@ -1,5 +1,9 @@
 # Rendering quality and MSAA
 
+Directional shadows now run before the MSAA scene pass. See [directional lighting
+and shadows](shadows.md) for current quality controls and measurements; the MSAA-only
+benchmarks below predate that additional pass.
+
 The Engine prefers 4x MSAA. `Engine::supportedMsaaSamples()` reports the intersection of the GPU's color/depth framebuffer limits and the actual HDR, presentation-composition and depth image-format support, limited to Off (1), 2, 4 and 8 samples. An unsupported request falls back to the highest supported lower mode. Invalid requests are rejected. Both Game and Editor use this Engine path.
 
 The scene uses Vulkan 1.3 dynamic rendering. With MSAA enabled, a transient multisample RGBA16F color image and matching multisample depth image cover the full drawable extent. All mesh material variants (opaque, masked, blended, mirrored and double-sided), animated/deformed meshes and the instanced editor grid use that sample count. Dynamic rendering resolves color into the existing single-sample HDR image. Tone mapping and the ImGui overlay then render into a second multisample image in the presentation color format, using the same selected sample count. The combined scene/HUD is resolved into the single-sample swapchain image. This covers gameplay and Editor UI geometry, range/build circles and the projected coin mesh without reducing resolution or blurring text with a screen-space filter. Off bypasses both additional color images and resolves.

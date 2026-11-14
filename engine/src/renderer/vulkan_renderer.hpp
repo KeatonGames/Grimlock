@@ -66,6 +66,13 @@ public:
     [[nodiscard]] FrameCapture takeCapture();
     void setVsync(bool enabled);
     void setMsaaSamples(std::uint32_t samples);
+    void setRenderSettings(const RenderSettings& settings);
+
+    [[nodiscard]] RenderSettings renderSettings() const noexcept {
+        return renderSettings_;
+    }
+
+    [[nodiscard]] std::vector<std::uint32_t> supportedAnisotropy() const;
     void setShadowSettings(const ShadowSettings& settings);
 
     [[nodiscard]] ShadowSettings shadowSettings() const noexcept {
@@ -195,6 +202,8 @@ private:
     bool shadowInitialized_ = false;
     bool shadowReadback_ = false;
     ShadowSettings shadowSettings_;
+    RenderSettings renderSettings_;
+    bool filteringDirty_ = false;
     ShadowDebugInfo shadowDebug_;
     VkDescriptorSetLayout toneMapLayout_ = VK_NULL_HANDLE;
     VkDescriptorSet toneMapSet_ = VK_NULL_HANDLE;

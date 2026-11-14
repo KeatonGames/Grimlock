@@ -3,6 +3,7 @@
 #include "grimlock/lighting.hpp"
 #include "grimlock/orbit_camera.hpp"
 #include "grimlock/performance.hpp"
+#include "grimlock/render_settings.hpp"
 #include "grimlock/scene.hpp"
 #include "grimlock/transform.hpp"
 
@@ -89,6 +90,9 @@ public:
     [[nodiscard]] bool vsyncEnabled() const noexcept;
     // Off is 1. Unsupported requested modes fall back to the highest supported lower mode.
     void setMsaaSamples(std::uint32_t samples);
+    void setRenderSettings(const RenderSettings& settings);
+    [[nodiscard]] RenderSettings renderSettings() const noexcept;
+    [[nodiscard]] std::vector<std::uint32_t> supportedAnisotropy() const;
     void setShadowSettings(const ShadowSettings& settings);
     [[nodiscard]] ShadowSettings shadowSettings() const noexcept;
     [[nodiscard]] std::vector<ShadowQuality> supportedShadowQualities() const;

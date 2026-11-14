@@ -934,6 +934,18 @@ void Engine::setMsaaSamples(std::uint32_t samples) {
     impl_->renderer.setMsaaSamples(samples);
 }
 
+void Engine::setRenderSettings(const RenderSettings& settings) {
+    impl_->renderer.setRenderSettings(settings);
+}
+
+RenderSettings Engine::renderSettings() const noexcept {
+    return impl_->renderer.renderSettings();
+}
+
+std::vector<std::uint32_t> Engine::supportedAnisotropy() const {
+    return impl_->renderer.supportedAnisotropy();
+}
+
 void Engine::setShadowSettings(const ShadowSettings& settings) {
     impl_->renderer.setShadowSettings(settings);
 }

@@ -1009,43 +1009,34 @@ void GameHud::placementOverlay(const Camera& camera) {
         glm::dmat4{camera.projection(static_cast<float>(drawable.x) / drawable.y)} * glm::dmat4{camera.view()};
     auto* viewport = ImGui::GetMainViewport();
     auto* draw = ImGui::GetBackgroundDrawList(viewport);
-    const auto healthBar =
-        [&](glm::dvec3 position, float health, float maximum, double flash, bool alwaysVisible = false) {
-            if (!worldHealthBars_ || (!alwaysVisible && health >= maximum)) {
-                return;
-            }
-            const auto clip = matrix * glm::dvec4{position, 1};
-            if (clip.w <= 0 || clip.z < 0 || clip.z > clip.w) {
-                return;
-            }
-            const ImVec2 point{viewport->Pos.x + static_cast<float>((clip.x / clip.w + 1) * viewport->Size.x * 0.5),
-                               viewport->Pos.y + static_cast<float>((clip.y / clip.w + 1) * viewport->Size.y * 0.5)};
-            const float s = layout_.scale;
-            draw->AddRectFilled({point.x - 30 * s, point.y - 5 * s},
-                                {point.x + 30 * s, point.y + 5 * s},
-                                IM_COL32(8, 14, 18, 235),
-                                3 * s);
-            draw->AddRectFilled({point.x - 28 * s, point.y - 3 * s},
-                                {point.x - 28 * s + 56 * s * std::clamp(health / maximum, 0.0F, 1.0F), point.y + 3 * s},
-                                health / maximum < 0.3F ? IM_COL32(218, 100, 91, 255) : IM_COL32(102, 197, 164, 255),
-                                2 * s);
-            draw->AddRect({point.x - 30 * s, point.y - 5 * s},
-                          {point.x + 30 * s, point.y + 5 * s},
-                          IM_COL32(205, 185, 133, 130),
-                          3 * s);
-            if (flash > 0) {
-                draw->AddRect({point.x - 31 * s, point.y - 6 * s},
-                              {point.x + 31 * s, point.y + 6 * s},
-                              IM_COL32(255, 240, 210, static_cast<int>(std::clamp(flash / 0.12, 0.0, 1.0) * 190)),
-                              3 * s);
-            }
-        };
+    const auto healthBar = [&](glm::dvec3 position, float health, float maximum, bool alwaysVisible = false) {
+        if (!worldHealthBars_ || maximum <= 0 || (!alwaysVisible && health >= maximum)) {
+            return;
+        }
+        const auto clip = matrix * glm::dvec4{position, 1};
+        if (clip.w <= 0 || clip.z < 0 || clip.z > clip.w) {
+            return;
+        }
+        const ImVec2 point{viewport->Pos.x + static_cast<float>((clip.x / clip.w + 1) * viewport->Size.x * 0.5),
+                           viewport->Pos.y + static_cast<float>((clip.y / clip.w + 1) * viewport->Size.y * 0.5)};
+        const float s = layout_.scale;
+        const float fraction = std::clamp(health / maximum, 0.0F, 1.0F);
+        draw->AddRectFilled({point.x - 30 * s, point.y - 5 * s},
+                            {point.x + 30 * s, point.y + 5 * s},
+                            presentation::menuInk(presentation::forest),
+                            5 * s);
+        if (fraction > 0) {
+            draw->AddRectFilled({point.x - 28.5F * s, point.y - 3.5F * s},
+                                {point.x - 28.5F * s + 57 * s * fraction, point.y + 3.5F * s},
+                                presentation::menuInk(presentation::ivory),
+                                3.5F * s);
+        }
+    };
     for (const auto& tower : runtime_.navigation().towers().towers()) {
         const auto& progress = runtime_.navigation().towers().progress(tower.object);
         healthBar(tower.position + glm::dvec3{0, tower.halfExtent.y + 0.12, 0},
                   progress.health,
-                  progress.maximumHealth,
-                  progress.hitFlashRemaining);
+                  progress.maximumHealth);
     }
     const auto* selected = runtime_.selectedHero();
     if (const auto* enemies = runtime_.navigation().enemies()) {
@@ -1058,7 +1049,6 @@ void GameHud::placementOverlay(const Camera& camera) {
                 healthBar(enemy.position + glm::dvec3{0, barHeight, 0},
                           enemy.health,
                           enemy.maximumHealth,
-                          enemy.hitFlashRemaining,
                           enemy.life == Enemy::Life::bones);
             }
         }

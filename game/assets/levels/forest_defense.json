@@ -2,7 +2,7 @@
     "id":  "68369f21-3bfd-4d83-a5c2-c09c52922401",
     "version":  1,
     "name":  "Level 01 - Forest Defense",
-    "description":  "Cross the timber bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.",
+    "description":  "Cross the arched stone bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.",
     "scene":  "scenes/forest_defense.json",
     "starting_gold":  20,
     "hero_spawns":  [

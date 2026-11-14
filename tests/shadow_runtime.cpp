@@ -172,10 +172,14 @@ int main(int argc, char**) {
             std::cout << ' ' << static_cast<unsigned>(quality);
         }
         std::cout << '\n';
-        for (auto quality : qualities) {
+        auto measuredQualities = qualities;
+        if (argc > 1) {
+            measuredQualities.push_back(ShadowQuality::off);
+        }
+        for (auto quality : measuredQualities) {
             settings.quality = quality;
             engine.setShadowSettings(settings);
-            tick(engine, 12);
+            tick(engine, argc > 1 ? 120 : 12);
             const auto debug = engine.shadowDebugInfo();
             require(debug.resolution == static_cast<unsigned>(quality), "Shadow resolution did not apply");
             require(quality == ShadowQuality::off ? !debug.active && debug.casterDraws == 0
@@ -183,7 +187,7 @@ int main(int argc, char**) {
                     "Shadow Off did not skip work or enabled shadows have no casters");
             double gpu = 0;
             int gpuFrames = 0;
-            const int frames = argc > 1 ? 180 : 25;
+            const int frames = argc > 1 ? 360 : 25;
             const auto start = std::chrono::steady_clock::now();
             for (int i = 0; i < frames; ++i) {
                 tick(engine);

@@ -21,11 +21,13 @@ struct Vertex {
     glm::uvec4 joints0{}, joints1{};
     glm::vec4 weights0{}, weights1{};
     std::uint32_t morphIndex = 0; // Original accessor index; retained across normal/tangent seams.
+    glm::vec4 color{1};           // glTF COLOR_0 is linear, including alpha.
 
     bool operator==(const Vertex& other) const noexcept {
         return position == other.position && normal == other.normal && uv == other.uv && uv1 == other.uv1 &&
                tangent == other.tangent && joints0 == other.joints0 && joints1 == other.joints1 &&
-               weights0 == other.weights0 && weights1 == other.weights1 && morphIndex == other.morphIndex;
+               weights0 == other.weights0 && weights1 == other.weights1 && morphIndex == other.morphIndex &&
+               color == other.color;
     }
 };
 

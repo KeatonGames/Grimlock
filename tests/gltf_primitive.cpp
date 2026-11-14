@@ -50,6 +50,12 @@ Json writeFixtureBuffer(const std::filesystem::path& output) {
     attributes["TEXCOORD_1"] = accessor(std::array<float, 8>{0, 0, 2, 0, 0, 2, 0, 0}, "VEC2", 5126, 4);
     attributes["TANGENT"] =
         accessor(std::array<float, 16>{2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1, 2, 0, 0, 1}, "VEC4", 5126, 4);
+    attributes["COLOR_0"] =
+        accessor(std::array<std::uint8_t, 16>{255, 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 64, 255, 255, 255, 255},
+                 "VEC4",
+                 5121,
+                 4);
+    document["accessors"][attributes["COLOR_0"].get<std::size_t>()]["normalized"] = true;
     attributes["JOINTS_0"] =
         accessor(std::array<std::uint16_t, 16>{0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3}, "VEC4", 5123, 4);
     attributes["JOINTS_1"] =
@@ -95,6 +101,11 @@ void checkGeometry(const grimlock::assets::ModelData& model, bool suppliedNormal
         require(vertex.position == positions[index], "flat vertex ordering changed");
         require(vertex.normal == expectedNormal, "normal normalization/generation changed");
         require(vertex.tangent == glm::vec4{1, 0, 0, 1}, "imported tangent changed");
+        const std::array colors{glm::vec4{1, 0, 0, 1},
+                                glm::vec4{0, 1, 0, 128 / 255.0F},
+                                glm::vec4{0, 0, 1, 64 / 255.0F}};
+        require(glm::length(vertex.color - colors[original]) < 0.0001F,
+                "Linear vertex color/alpha lost during vertex splitting");
         require(vertex.joints0 == glm::uvec4{0, 1, 2, 3} && vertex.joints1 == glm::uvec4{4, 5, 6, 7},
                 "skin joint lanes changed");
         require(vertex.weights0 == glm::vec4{0.5F, 0, 0, 0} && vertex.weights1 == glm::vec4{0.5F, 0, 0, 0},
@@ -152,6 +163,22 @@ int main(int argc, char** argv) {
         std::filesystem::create_directories(output);
         const auto document = writeFixtureBuffer(output);
         checkGeometry(loadFixture(output, document));
+
+        const auto colorAccessor = document["meshes"][0]["primitives"][0]["attributes"]["COLOR_0"].get<std::size_t>();
+        auto rgb = document;
+        rgb["accessors"][colorAccessor]["type"] = "VEC3";
+        rgb["bufferViews"][rgb["accessors"][colorAccessor]["bufferView"].get<std::size_t>()]["byteStride"] = 4;
+        const auto rgbModel = loadFixture(output, rgb);
+        require(rgbModel.meshes.front().vertices.front().color == glm::vec4{0, 0, 1, 1},
+                "VEC3 color did not default alpha to one");
+
+        auto noColors = document;
+        noColors["meshes"][0]["primitives"][0]["attributes"].erase("COLOR_0");
+        require(loadFixture(output, noColors).meshes.front().vertices.front().color == glm::vec4{1},
+                "Missing vertex colors did not default to white");
+        auto badColors = document;
+        badColors["accessors"][colorAccessor]["normalized"] = false;
+        rejects(output, badColors, "COLOR_0");
 
         auto generatedNormals = document;
         generatedNormals["meshes"][0]["primitives"][0]["attributes"].erase("NORMAL");

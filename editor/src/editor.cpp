@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <grimlock/color.hpp>
 #include <grimlock/editor.hpp>
 #include <grimlock/grid_debug.hpp>
 #include <imgui.h>
@@ -107,12 +108,8 @@ void theme() {
     colors[ImGuiCol_DragDropTarget] = colors[ImGuiCol_CheckMark];
 
     // Theme values are sRGB; the existing sRGB swapchain encodes linear shader output.
-    const auto linear = [](float value) {
-        return value <= 0.04045F ? value / 12.92F : std::pow((value + 0.055F) / 1.055F, 2.4F);
-    };
-
     for (auto& color : style.Colors) {
-        color = {linear(color.x), linear(color.y), linear(color.z), color.w};
+        color = {srgbToLinear(color.x), srgbToLinear(color.y), srgbToLinear(color.z), color.w};
     }
 }
 
@@ -676,6 +673,43 @@ void Editor::hierarchy() {
     }
 }
 
+void Editor::renderingControls() {
+    if (!ImGui::CollapsingHeader("Rendering Settings")) {
+        return;
+    }
+    auto settings = engine_.renderSettings();
+    int filtering = static_cast<int>(settings.textureFiltering);
+    const auto supported = engine_.supportedAnisotropy();
+    const char* names[]{"Bilinear", "Trilinear", "Anisotropic"};
+    bool changed = ImGui::Combo("Texture filtering", &filtering, names, supported.back() > 1 ? 3 : 2);
+    settings.textureFiltering = static_cast<TextureFiltering>(filtering);
+    if (settings.textureFiltering == TextureFiltering::anisotropic && supported.back() > 1 && settings.anisotropy < 2) {
+        settings.anisotropy = supported[1];
+        changed = true;
+    }
+    if (settings.textureFiltering == TextureFiltering::anisotropic &&
+        ImGui::BeginCombo("Anisotropy", (std::to_string(settings.anisotropy) + "x").c_str())) {
+        for (auto value : supported) {
+            if (value < 2) {
+                continue;
+            }
+            if (ImGui::Selectable((std::to_string(value) + "x").c_str(), settings.anisotropy == value)) {
+                settings.anisotropy = value;
+                changed = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    int tone = static_cast<int>(settings.toneMapping);
+    changed |= ImGui::Combo("Tone mapping", &tone, "Linear clamp\0Reinhard\0Filmic\0");
+    settings.toneMapping = static_cast<ToneMapping>(tone);
+    if (changed) {
+        attempt([&] {
+            engine_.setRenderSettings(settings);
+        });
+    }
+}
+
 void Editor::lightingControls() {
     if (!ImGui::CollapsingHeader("Lighting & Shadows")) {
         return;
@@ -795,12 +829,13 @@ void Editor::inspector() {
     }
 
     ImGui::Begin("Inspector");
-    lightingControls();
     const float height = ImGui::GetWindowHeight();
     const bool revealAnimation = selectionChanged || height < inspectorHeight_;
     inspectorHeight_ = height;
 
     if (!selected) {
+        renderingControls();
+        lightingControls();
         ImGui::TextWrapped("Select an object in the scene or hierarchy.");
         ImGui::End();
         rotationObject_.reset();
@@ -810,15 +845,6 @@ void Editor::inspector() {
 
     const auto id = *selected;
     const auto& object = scene.object(id);
-    if (object.model) {
-        auto properties = object.shadows;
-        bool changed = ImGui::Checkbox("Cast shadows", &properties.cast);
-        changed |= ImGui::Checkbox("Receive shadows", &properties.receive);
-        if (changed) {
-            scene.setShadowProperties(id, properties);
-            document_.markChanged();
-        }
-    }
     const auto key = std::to_string(id);
     ImGui::PushID(key.c_str());
     ImGui::SeparatorText("General");
@@ -925,7 +951,40 @@ void Editor::inspector() {
         requestDelete(id);
     }
 
+    if (object.model && ImGui::CollapsingHeader("Materials")) {
+        const auto& materials = scene.animation(id).model().materials;
+        for (std::size_t index = 0; index < materials.size(); ++index) {
+            const auto& material = materials[index];
+            ImGui::PushID(static_cast<int>(index));
+            ImGui::Text("%s", material.name.empty() ? "Material" : material.name.c_str());
+            ImGui::ColorButton(
+                "Linear base color",
+                {material.baseColor.r, material.baseColor.g, material.baseColor.b, material.baseColor.a});
+            ImGui::SameLine();
+            ImGui::Text("Metallic %.2f | Roughness %.2f", material.metallic, material.roughness);
+            ImGui::TextDisabled("%s | %s | %s",
+                                material.unlit ? "Unlit" : "Lit",
+                                material.alphaMode == assets::AlphaMode::opaque ? "Opaque"
+                                : material.alphaMode == assets::AlphaMode::mask ? "Masked"
+                                                                                : "Blended",
+                                material.doubleSided ? "Double-sided" : "Single-sided");
+            ImGui::PopID();
+        }
+    }
+    if (object.model && ImGui::CollapsingHeader("Object shadows")) {
+        auto properties = object.shadows;
+        bool shadowsChanged = ImGui::Checkbox("Cast shadows", &properties.cast);
+        shadowsChanged |= ImGui::Checkbox("Receive shadows", &properties.receive);
+        if (shadowsChanged) {
+            scene.setShadowProperties(id, properties);
+            document_.markChanged();
+        }
+    }
+
     ImGui::PopID();
+    // Keep the existing object and animation controls in their original positions.
+    renderingControls();
+    lightingControls();
     ImGui::End();
 }
 

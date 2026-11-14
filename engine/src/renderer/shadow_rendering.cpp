@@ -36,15 +36,18 @@ void VulkanRenderer::detectShadowSupport() {
     }
     if (shadowFormat_ != VK_FORMAT_UNDEFINED) {
         VkImageFormatProperties image{};
-        shadowReadback_ =
-            vkGetPhysicalDeviceImageFormatProperties(context_.physicalDevice(),
-                                                     shadowFormat_,
-                                                     VK_IMAGE_TYPE_2D,
-                                                     VK_IMAGE_TILING_OPTIMAL,
-                                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                                                         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                                     0,
-                                                     &image) == VK_SUCCESS;
+        const auto result = vkGetPhysicalDeviceImageFormatProperties(
+            context_.physicalDevice(),
+            shadowFormat_,
+            VK_IMAGE_TYPE_2D,
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+            0,
+            &image);
+        if (result != VK_ERROR_FORMAT_NOT_SUPPORTED) {
+            checkVk(result, "vkGetPhysicalDeviceImageFormatProperties(shadow readback)");
+        }
+        shadowReadback_ = result == VK_SUCCESS;
     }
     setShadowSettings(shadowSettings_);
 }

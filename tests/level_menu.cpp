@@ -126,6 +126,12 @@ void control(Engine& engine,
             const glm::vec2 point{scanX, y};
             mouse(window, SDL_EVENT_MOUSE_MOTION, point);
             tick(engine, runtime, 1);
+            if (std::string_view{panelName} == "Settings") {
+                for (const char* removed : {"Texture filtering", "Anisotropy", "Tone mapping"}) {
+                    require(ImGui::GetHoveredID() != ImHashStr(removed, 0, panel->ID),
+                            "Technical rendering control still appears in Game Options");
+                }
+            }
             if (ImGui::GetHoveredID() == id) {
                 click(engine, runtime, window, point);
                 return;
@@ -199,7 +205,11 @@ int main() {
         PlayerProgress progress{progressPath};
         runtime.attachProgress(progress);
         const auto optionsPath = root.parent_path() / "menu-options-check.json";
-        std::filesystem::remove(optionsPath);
+        {
+            std::ofstream legacy{optionsPath};
+            legacy << R"({"texture_filtering":"obsolete", "anisotropy":-1, "tone_mapping":{"old":true}})";
+        }
+        engine.setRenderSettings({TextureFiltering::bilinear, 2, ToneMapping::reinhard});
         GameHud hud{engine, runtime, true, {}, optionsPath};
         tick(engine, runtime, 3);
         require(!engine.scene() && !runtime.level().waves() && !runtime.navigation().enemies(),
@@ -247,6 +257,17 @@ int main() {
         control(engine, runtime, window, "Settings", "APPLY");
         const auto savedShadow = engine.shadowSettings().quality;
         require(savedShadow == engine.supportedShadowQualities().back(), "Shadow quality option did not apply");
+        const auto savedGraphics = engine.renderSettings();
+        require(savedGraphics.toneMapping == ToneMapping::filmic &&
+                    savedGraphics.anisotropy == engine.supportedAnisotropy().back() &&
+                    savedGraphics.textureFiltering ==
+                        (savedGraphics.anisotropy > 1 ? TextureFiltering::anisotropic : TextureFiltering::trilinear),
+                "Game did not use fixed technical rendering defaults");
+        const auto savedOptions = contents(optionsPath);
+        require(savedOptions.find("texture_filtering") == std::string::npos &&
+                    savedOptions.find("anisotropy") == std::string::npos &&
+                    savedOptions.find("tone_mapping") == std::string::npos,
+                "Game still saved obsolete technical options");
         control(engine, runtime, window, "Settings", "Back");
         control(engine, runtime, window, "Main Menu", "Choose Level");
         capture(engine, root.parent_path() / "phase48_levels.png");
@@ -354,7 +375,7 @@ int main() {
             GameHud reopenedHud{engine, runtime, true, {}, optionsPath};
             tick(engine, runtime, 2);
             require(engine.vsyncEnabled() && engine.msaaSamples() == savedMsaa &&
-                        engine.shadowSettings().quality == savedShadow,
+                        engine.shadowSettings().quality == savedShadow && engine.renderSettings() == savedGraphics,
                     "Saved display/MSAA/shadow preferences did not reload");
             control(engine, runtime, window, "Main Menu", "Choose Level");
             for (int frame = 0; frame < 20; ++frame) {
@@ -368,7 +389,11 @@ int main() {
                     reopened.find(second.id)->victories == 1,
                 "gameplay progress did not survive reopening");
         std::filesystem::remove(progressPath);
-        std::filesystem::remove(optionsPath);
+        {
+            std::ofstream legacy{optionsPath};
+            legacy << R"({"texture_filtering":"obsolete", "anisotropy":-1, "tone_mapping":{"old":true}})";
+        }
+        engine.setRenderSettings({TextureFiltering::bilinear, 2, ToneMapping::reinhard});
         std::filesystem::remove_all(folder);
         std::cout << "PASS discovery, descriptions, live edits, menus, complete loading, switching, restart and "
                      "failed-load cleanup.\n";
