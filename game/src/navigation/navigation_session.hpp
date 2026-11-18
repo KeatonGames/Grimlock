@@ -32,6 +32,15 @@ public:
     void shutdown() noexcept;
     void rebuild(Engine& engine);
 
+    void reserveConstructionSites(bool enabled) {
+        reserveSites_ = enabled;
+        geometryRevision_.reset();
+    }
+
+    [[nodiscard]] std::span<const Tower> reservedSites() const noexcept {
+        return reservedSites_;
+    }
+
     void setDestination(std::optional<glm::dvec2> destination);
     void setDestinationHeight(double height);
     void selectAnimal(Engine& engine, EnemyTypeId type);
@@ -162,6 +171,11 @@ private:
     };
 
     std::optional<PlacementCandidate> candidate_;
+    bool reserveSites_ = false;
+    std::vector<BuildZone> reservedZones_;
+    std::vector<Tower> reservedSites_;
+    std::map<std::pair<ObjectId, std::string>, std::string> siteErrors_;
+    [[nodiscard]] bool reserved(const Tower& tower) const;
     void preparePlacement(const Tower& tower);
     [[nodiscard]] bool profileInUse(EnemyTypeId type) const;
     [[nodiscard]] std::string checkEnemyRoutes(const PlacementCandidate& candidate) const;

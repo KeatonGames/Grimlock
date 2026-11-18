@@ -15,7 +15,7 @@ public:
     Input& operator=(const Input&) = delete;
     void beginFrame();
     void handleEvent(const SDL_Event& event);
-    void finishFrame(bool navigationEnabled);
+    void finishFrame(bool navigationEnabled, bool middleNavigation = true);
     void cancelNavigation();
     void capture(bool mouse, bool keyboard);
 

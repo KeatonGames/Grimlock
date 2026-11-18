@@ -40,10 +40,14 @@ private:
     void transitions();
     void menu();
     void refreshLevels();
+    void worldMap();
+    float mapLaunch_ = 0;
+    bool mapFocus_ = false;
     void clearFeedback();
     void progressNotice();
     void status();
     void bossHealth();
+    void heroControls();
     void construction();
     void coins();
     void coinIcon(ImVec2 center, float size);
@@ -93,7 +97,7 @@ private:
     std::vector<BossBar> bossBars_;
     enum class Screen {
         mainMenu,
-        levels,
+        worldMap,
         gameplay
     };
     Screen screen_ = Screen::gameplay;

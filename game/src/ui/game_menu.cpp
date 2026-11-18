@@ -180,7 +180,7 @@ void GameHud::menu() {
     ImGui::PushFont(menuFont_, 20);
     const auto* v = ImGui::GetMainViewport();
     const float s = layout_.scale;
-    const bool selecting = screen_ == Screen::levels;
+    const bool selecting = screen_ == Screen::worldMap;
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
         if (settingsOpen_) {
             settingsOpen_ = false;
@@ -188,7 +188,9 @@ void GameHud::menu() {
             requestedScreen_ = Screen::mainMenu;
         }
     }
-    menuBackground(selecting);
+    if (!selecting) {
+        menuBackground(false);
+    }
     if (catalog_.levels.empty() && refreshRemaining_ <= 0) {
         refreshLevels();
     }
@@ -217,20 +219,9 @@ void GameHud::menu() {
             ImGui::PopFont();
             ImGui::Dummy({0, std::clamp(v->Size.y * 0.07F, 12.0F, 50.0F)});
             const float button = std::min(54 * s, v->Size.y * 0.09F);
-            if (presentation::menuAction("START GAME", {-1, button}, true)) {
-                refreshLevels();
-                const auto level = std::find_if(catalog_.levels.begin(), catalog_.levels.end(), [](const auto& item) {
-                    return item.path.filename() == "forest_defense.json";
-                });
-                if (level != catalog_.levels.end()) {
-                    requestedLevel_ = level->path;
-                } else {
-                    error_ = "Level 1 is unavailable.";
-                    requestedScreen_ = Screen::levels;
-                }
-            }
-            if (presentation::menuAction("LEVELS###Choose Level", {-1, button})) {
-                requestedScreen_ = Screen::levels;
+            if (presentation::menuAction("PLAY", {-1, button}, true)) {
+                selectedLevel_.reset();
+                requestedScreen_ = Screen::worldMap;
             }
             if (presentation::menuAction("OPTIONS###Settings", {-1, button})) {
                 settingsOpen_ = true;
@@ -242,164 +233,220 @@ void GameHud::menu() {
         }
         ImGui::End();
     } else {
-        ImGui::SetNextWindowPos({v->Pos.x + v->Size.x * 0.5F, v->Pos.y + v->Size.y * 0.5F},
-                                ImGuiCond_Always,
-                                {0.5F, 0.5F});
-        ImGui::SetNextWindowSize({std::min(1100 * s, v->Size.x - 32 * s), v->Size.y - 32 * s});
-        if (ImGui::Begin("Level Selection", nullptr, menuFlags | ImGuiWindowFlags_NoBackground)) {
-            ImGui::PushFont(menuFont_, 32);
-            ImGui::TextColored(presentation::menuColor(presentation::ivory), "SELECT LEVEL");
-            ImGui::PopFont();
-            ImGui::TextDisabled("Choose where your watch begins.");
-            ImGui::Dummy({0, 12 * s});
-            refreshRemaining_ -= ImGui::GetIO().DeltaTime;
-            if (refreshRemaining_ <= 0) {
-                refreshLevels();
-            }
-            const float footer = 94 * s;
-            if (ImGui::BeginChild("Available Levels", {0, -footer})) {
-                const auto available = ImGui::GetContentRegionAvail();
-                const float padding = 6 * s;
-                const float gap = 20 * s;
-                const float captionHeight = 72 * s;
-                const float preferredWidth = (catalog_.levels.size() == 1 ? 420 : 300) * s;
-                const float heightWidth = std::max(80.0F, (available.y - 2 * padding - captionHeight) * 16 / 9);
-                const float cardWidth =
-                    std::max(1.0F, std::min({preferredWidth, available.x - 2 * padding, heightWidth}));
-                const float cardHeight = cardWidth * 9 / 16 + captionHeight;
-                const int columns =
-                    std::max(1,
-                             std::min(static_cast<int>(catalog_.levels.size()),
-                                      static_cast<int>((available.x - 2 * padding + gap) / (cardWidth + gap))));
-                auto start = ImGui::GetCursorPos();
-                start.x += std::max(0.0F, (available.x - columns * cardWidth - (columns - 1) * gap) * 0.5F);
-                start.y += padding;
-                if (catalog_.levels.size() == 1) {
-                    start.y += std::max(0.0F, (available.y - cardHeight - 2 * padding) * 0.5F);
-                }
-                std::size_t index = 0;
-                for (const auto& level : catalog_.levels) {
-                    ImGui::SetCursorPos({start.x + (index % columns) * (cardWidth + gap),
-                                         start.y + (index / columns) * (cardHeight + gap)});
-                    ++index;
-                    ImGui::PushID(level.path.generic_string().c_str());
-                    const bool selected = selectedLevel_ == level.path;
-                    // The card owns all its visuals; a Selectable would draw a second label/highlight underneath.
-                    const bool clicked =
-                        ImGui::InvisibleButton(level.name.c_str(), {cardWidth, cardHeight}, ImGuiButtonFlags_EnableNav);
-                    const bool doubleClicked =
-                        ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-                    if (clicked || doubleClicked) {
-                        selectedLevel_ = level.path;
-                        error_.clear();
-                        if (doubleClicked) {
-                            requestedLevel_ = level.path;
-                        }
-                    }
-                    const auto a = ImGui::GetItemRectMin();
-                    const ImVec2 b{a.x + cardWidth, a.y + cardHeight};
-                    auto* storage = ImGui::GetStateStorage();
-                    const auto id = ImGui::GetID("hover");
-                    float hover = storage->GetFloat(id);
-                    const bool active = ImGui::IsItemHovered() || ImGui::IsItemFocused();
-                    hover += (static_cast<float>(active) - hover) * (1 - std::exp(-12 * ImGui::GetIO().DeltaTime));
-                    storage->SetFloat(id, hover);
-                    const float growth = 2 * s * hover;
-                    auto* draw = ImGui::GetWindowDrawList();
-                    draw->AddRectFilled({a.x - growth, a.y - growth},
-                                        {b.x + growth, b.y + growth},
-                                        presentation::menuInk(presentation::panel),
-                                        6);
-                    auto preview = engine_.assetRoot() / "previews" / level.path.stem();
-                    preview += ".png";
-                    if (!std::filesystem::exists(preview)) {
-                        preview = engine_.assetRoot() / "ui/menu_background.png";
-                    }
-                    const ImVec2 imageEnd{b.x, a.y + cardWidth * 9 / 16};
-                    imageCover(draw, menuImage(preview), a, imageEnd);
-                    draw->AddRect(
-                        {a.x - growth, a.y - growth},
-                        {b.x + growth, b.y + growth},
-                        presentation::menuInk(selected || active ? presentation::menuGold : presentation::stone),
-                        6.0F);
-                    const float textWidth = std::max(1.0F, cardWidth - 24 * s);
-                    float nameSize = (cardWidth < 260 * s ? 18 : 21) * s;
-                    ImVec2 nameBounds;
-                    do {
-                        ImGui::PushFont(menuFont_, nameSize / s);
-                        nameBounds = ImGui::CalcTextSize(level.name.c_str(), nullptr, false, textWidth);
-                        ImGui::PopFont();
-                        if (nameBounds.y <= 2 * nameSize + 1 || nameSize <= 12 * s) {
-                            break;
-                        }
-                        nameSize -= s;
-                    } while (true);
-                    const float nameHeight = std::min(nameBounds.y, 2 * nameSize);
-                    draw->PushClipRect({a.x + 8 * s, imageEnd.y}, {b.x - 8 * s, b.y - 4 * s}, true);
-                    draw->PushClipRect({a.x + 8 * s, imageEnd.y + 10 * s},
-                                       {b.x - 8 * s, imageEnd.y + 10 * s + nameHeight},
-                                       true);
-                    draw->AddText(menuFont_ ? menuFont_ : ImGui::GetFont(),
-                                  nameSize,
-                                  {a.x + 12 * s, imageEnd.y + 10 * s},
-                                  presentation::menuInk(presentation::ivory),
-                                  level.name.c_str(),
-                                  nullptr,
-                                  textWidth);
-                    draw->PopClipRect();
-                    const auto* record = runtime_.progress() ? runtime_.progress()->find(level.id) : nullptr;
-                    const char* state = record && record->completed  ? "Completed"
-                                        : record && record->attempts ? "Your watch continues"
-                                                                     : "Unexplored";
-                    const float stateSize =
-                        std::min(15 * s,
-                                 textWidth / std::max(ImGui::CalcTextSize(state).x, 1.0F) * ImGui::GetFontSize());
-                    draw->AddText(menuFont_ ? menuFont_ : ImGui::GetFont(),
-                                  stateSize,
-                                  {a.x + 12 * s, imageEnd.y + 16 * s + nameHeight},
-                                  presentation::menuInk(presentation::secondaryText),
-                                  state);
-                    draw->PopClipRect();
-                    if (ImGui::IsItemHovered() && record) {
-                        ImGui::BeginTooltip();
-                        ImGui::Text("Attempts %llu | Victories %llu",
-                                    static_cast<unsigned long long>(record->attempts),
-                                    static_cast<unsigned long long>(record->victories));
-                        if (record->bestSeconds) {
-                            ImGui::Text("Best time %.2f s", *record->bestSeconds);
-                        }
-                        ImGui::EndTooltip();
-                    }
-                    ImGui::PopID();
-                }
-                if (catalog_.levels.empty()) {
-                    ImGui::TextWrapped("No playable levels available.");
-                }
-            }
-            ImGui::EndChild();
-            ImGui::BeginDisabled(!selectedLevel_);
-            if (presentation::menuAction("PLAY###Play", {160 * s, 42 * s}, true)) {
-                requestedLevel_ = selectedLevel_;
-            }
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (presentation::menuAction("REFRESH###Refresh", {125 * s, 42 * s})) {
-                refreshLevels();
-            }
-            ImGui::SameLine();
-            if (presentation::menuAction("BACK###Main Menu", {125 * s, 42 * s})) {
-                requestedScreen_ = Screen::mainMenu;
-            }
-            if (!error_.empty()) {
-                ImGui::TextColored(presentation::menuColor(presentation::danger), "%s", error_.c_str());
-            }
-            progressNotice();
-        }
-        ImGui::End();
+        worldMap();
     }
     ImGui::EndDisabled();
     ImGui::PopStyleVar();
     ImGui::PopFont();
+}
+
+void GameHud::worldMap() {
+    const auto* v = ImGui::GetMainViewport();
+    if (!engine_.scene() || engine_.scene()->name() != "Kingdom World Map") {
+        try {
+            engine_.setScene(engine_.loadScene(engine_.assetRoot() / "scenes/world_map.json"));
+            engine_.setCameraNavigationEnabled(true);
+            auto controls = engine_.cameraNavigationConfig();
+            controls.strategyControls = true;
+            controls.keyboardMovement = true;
+            controls.panHalfExtent = glm::vec2{35, 28};
+            controls.minPitch = 0.8F;
+            controls.maxPitch = 1.3F;
+            controls.minDistance = 20;
+            controls.maxDistance = 70;
+            engine_.configureCameraNavigation(controls);
+            engine_.setObjectSelectionEnabled(false);
+            mapLaunch_ = 0;
+        } catch (const std::exception& e) {
+            error_ = e.what();
+            requestedScreen_ = Screen::mainMenu;
+            return;
+        }
+    }
+    auto& scene = *engine_.scene();
+    auto camera = scene.resolvedCamera();
+    glm::vec3 target{0, 1, 2};
+    bool markerHovered = false;
+    bool panelHovered = false;
+    for (const auto& [id, object] : scene.objects()) {
+        constexpr std::string_view prefix = "grimlock.map_location:";
+        if (!scene.enabledInHierarchy(id) || !object.role.starts_with(prefix)) {
+            continue;
+        }
+        const auto key = object.role.substr(prefix.size());
+        const auto level = std::find_if(catalog_.levels.begin(), catalog_.levels.end(), [&](const auto& item) {
+            return item.id == key;
+        });
+        const bool available = level != catalog_.levels.end() && levelUnlocked(*level, runtime_.progress());
+        const bool selected = level != catalog_.levels.end() && selectedLevel_ == level->path;
+        const glm::vec3 position = scene.worldTransform(id)[3];
+        if (selected) {
+            target = position * 0.65F + glm::vec3{0, 1, 0};
+        }
+        const auto clip =
+            camera.projection(v->Size.x / v->Size.y) * camera.view() * glm::vec4{position + glm::vec3{0, 5, 0}, 1};
+        if (clip.w <= 0) {
+            continue;
+        }
+        const ImVec2 pixel{v->Pos.x + (clip.x / clip.w + 1) * v->Size.x * 0.5F,
+                           v->Pos.y + (clip.y / clip.w + 1) * v->Size.y * 0.5F};
+        ImGui::SetNextWindowPos({pixel.x - 24, pixel.y - 24});
+        ImGui::SetNextWindowSize({48, 48});
+        const auto window = "Map marker##" + std::to_string(id);
+        ImGui::Begin(window.c_str(), nullptr, menuFlags | ImGuiWindowFlags_NoBackground);
+        const bool clicked = ImGui::InvisibleButton("Location", {32, 32});
+        const bool hovered = ImGui::IsItemHovered();
+        markerHovered |= hovered;
+        auto* draw = ImGui::GetWindowDrawList();
+        const auto a = ImGui::GetItemRectMin();
+        const ImVec2 center{a.x + 16, a.y + 16};
+        draw->AddCircleFilled(center,
+                              selected  ? 13.0F
+                              : hovered ? 11.0F
+                                        : 8.0F,
+                              presentation::menuInk(available ? presentation::menuGold : presentation::stone));
+        draw->AddCircle(center,
+                        18 + std::sin(static_cast<float>(ImGui::GetTime()) * 2) * 2,
+                        presentation::menuInk(presentation::ivory),
+                        24,
+                        1.5F);
+        if (hovered) {
+            ImGui::SetTooltip("%s%s",
+                              object.name.c_str(),
+                              available                        ? ""
+                              : level != catalog_.levels.end() ? " (Locked)"
+                                                               : " (Unavailable)");
+        }
+        if (clicked && !settingsOpen_ && mapLaunch_ == 0) {
+            if (level != catalog_.levels.end()) {
+                selectedLevel_ = level->path;
+                mapFocus_ = true;
+                error_.clear();
+            } else {
+                selectedLevel_.reset();
+                error_ = "This location is unavailable.";
+            }
+        }
+        scene.setTint(id, selected ? glm::vec4{1.3F, 1.2F, 0.75F, 1} : hovered ? glm::vec4{1.15F} : glm::vec4{1});
+        ImGui::End();
+    }
+    if (selectedLevel_) {
+        const auto level = std::find_if(catalog_.levels.begin(), catalog_.levels.end(), [&](const auto& entry) {
+            return entry.path == *selectedLevel_;
+        });
+        const bool available = level != catalog_.levels.end() &&
+                               std::any_of(scene.objects().begin(), scene.objects().end(), [&](const auto& entry) {
+                                   return entry.second.role == "grimlock.map_location:" + level->id &&
+                                          scene.enabledInHierarchy(entry.first);
+                               });
+        if (!available) {
+            selectedLevel_.reset();
+            mapLaunch_ = 0;
+        }
+    }
+    if (mapFocus_ && selectedLevel_) {
+        const auto& input = engine_.input();
+        if (input.key(SDL_SCANCODE_W).held || input.key(SDL_SCANCODE_A).held || input.key(SDL_SCANCODE_S).held ||
+            input.key(SDL_SCANCODE_D).held) {
+            mapFocus_ = false;
+        } else {
+            engine_.followCameraTarget(target, ImGui::GetIO().DeltaTime);
+        }
+    }
+    ImGui::SetNextWindowPos({v->Pos.x + 22, v->Pos.y + 22});
+    ImGui::Begin("World Map Navigation", nullptr, menuFlags | ImGuiWindowFlags_AlwaysAutoResize);
+    if (presentation::menuAction("BACK", {110, 40})) {
+        mapLaunch_ = 0;
+        requestedScreen_ = Screen::mainMenu;
+    }
+    panelHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    ImGui::TextUnformatted("THE KINGDOM");
+    if (!error_.empty()) {
+        ImGui::TextWrapped("%s", error_.c_str());
+    }
+    ImGui::End();
+    if (selectedLevel_) {
+        const auto level = std::find_if(catalog_.levels.begin(), catalog_.levels.end(), [&](const auto& item) {
+            return item.path == *selectedLevel_;
+        });
+        if (level != catalog_.levels.end()) {
+            ImGui::SetNextWindowPos({v->Pos.x + v->Size.x / 2, v->Pos.y + v->Size.y - 24}, ImGuiCond_Always, {0.5F, 1});
+            ImGui::SetNextWindowSize({360, 0});
+            ImGui::Begin("Map location details", nullptr, menuFlags | ImGuiWindowFlags_AlwaysAutoResize);
+            const auto panelPosition = ImGui::GetWindowPos();
+            const auto panelSize = ImGui::GetWindowSize();
+            panelHovered |= ImGui::IsMouseHoveringRect(panelPosition,
+                                                       {panelPosition.x + panelSize.x, panelPosition.y + panelSize.y},
+                                                       false);
+            ImGui::TextWrapped("%s", level->name.c_str());
+            const auto* record = runtime_.progress() ? runtime_.progress()->find(level->id) : nullptr;
+            const bool unlocked = levelUnlocked(*level, runtime_.progress());
+            ImGui::TextDisabled("%s",
+                                !unlocked                     ? "Locked - complete the previous chapter"
+                                : record && record->completed ? "Completed"
+                                                              : "Unlocked");
+            ImGui::TextWrapped("%s", level->description.c_str());
+            const auto p = ImGui::GetCursorScreenPos();
+            ImGui::BeginDisabled(!unlocked);
+            const bool launch = ImGui::InvisibleButton("Launch selected level", {312, 48});
+            auto* draw = ImGui::GetWindowDrawList();
+            draw->AddRectFilled(p,
+                                {p.x + 312, p.y + 48},
+                                presentation::menuInk(unlocked ? presentation::menuGold : presentation::stone),
+                                4);
+            draw->AddTriangleFilled({p.x + 140, p.y + 12},
+                                    {p.x + 140, p.y + 36},
+                                    {p.x + 163, p.y + 24},
+                                    presentation::menuInk(presentation::panel));
+            ImGui::EndDisabled();
+            if (launch && unlocked && mapLaunch_ == 0) {
+                mapLaunch_ = 0.001F;
+            }
+            ImGui::End();
+        }
+    }
+    if (!panelHovered && !markerHovered && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
+        ImGui::IsMouseClicked(0) && mapLaunch_ == 0) {
+        selectedLevel_.reset();
+        int width = 0, height = 0, drawableWidth = 0, drawableHeight = 0;
+        SDL_GetWindowSize(native_.window, &width, &height);
+        SDL_GetWindowSizeInPixels(native_.window, &drawableWidth, &drawableHeight);
+        const auto mouse = ImGui::GetIO().MousePos;
+        const auto ray = mouseRay(camera,
+                                  {mouse.x - v->Pos.x, mouse.y - v->Pos.y},
+                                  {width, height},
+                                  {drawableWidth, drawableHeight});
+        if (ray) {
+            auto hit = engine_.pickObject(*ray);
+            while (hit) {
+                const auto& picked = scene.object(*hit);
+                if (picked.role.starts_with("grimlock.map_location:")) {
+                    const auto key = picked.role.substr(std::string{"grimlock.map_location:"}.size());
+                    const auto level =
+                        std::find_if(catalog_.levels.begin(), catalog_.levels.end(), [&](const auto& entry) {
+                            return entry.id == key;
+                        });
+                    if (level != catalog_.levels.end()) {
+                        selectedLevel_ = level->path;
+                        mapFocus_ = true;
+                    }
+                    break;
+                }
+                hit = picked.parent;
+            }
+        }
+    }
+    if (mapLaunch_ > 0) {
+        mapLaunch_ += ImGui::GetIO().DeltaTime;
+        ImGui::GetForegroundDrawList()->AddRectFilled(
+            v->Pos,
+            {v->Pos.x + v->Size.x, v->Pos.y + v->Size.y},
+            IM_COL32(20, 24, 22, static_cast<int>(std::min(1.0F, mapLaunch_ / 0.35F) * 255)));
+        if (mapLaunch_ >= 0.35F) {
+            requestedLevel_ = selectedLevel_;
+            mapLaunch_ = 0;
+        }
+    }
 }
 
 void GameHud::pauseMenu() {

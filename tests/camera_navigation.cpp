@@ -192,6 +192,50 @@ int main() {
                     near(scene.resolvedCamera().position, world.position),
                 "attached camera world/local conversion failed");
 
+        auto bounded = controller.config();
+        bounded.panHalfExtent = glm::vec2{8, 6};
+        bounded.target = {100, 2, -100};
+        controller.configure(bounded);
+        controller.apply(world);
+        require(world.target.x == 8 && world.target.z == -6, "Camera pan bounds did not clamp the target");
+        rejects([&] {
+            auto invalid = bounded;
+            invalid.panHalfExtent = glm::vec2{-1, 2};
+            controller.configure(invalid);
+        });
+
+        auto strategy = controller.config();
+        strategy.strategyControls = true;
+        strategy.keyboardMovement = true;
+        strategy.panHalfExtent = glm::vec2{100, 100};
+        strategy.target = {0, 1, 0};
+        controller.configure(strategy);
+        controller.apply(world);
+        InputState moving;
+        moving.focused = true;
+        moving.keys[static_cast<std::size_t>(Key::w)].held = true;
+        const auto before = world.target;
+        for (int i = 0; i < 60; ++i) {
+            (void)controller.update(world, moving, 720, 1.0 / 60);
+        }
+        require(glm::length(world.target - before) > 5, "Strategy WASD did not move the camera");
+        const auto oldYaw = controller.config().yaw;
+        moving = {};
+        moving.focused = true;
+        moving.mouseButtons[2].held = true;
+        (void)controller.update(world, moving, 720, 1.0 / 60);
+        moving.mouseMotion = {20, 0};
+        (void)controller.update(world, moving, 720, 1.0 / 60);
+        require(controller.config().yaw != oldYaw, "Strategy right drag did not rotate");
+        strategy = controller.config();
+        strategy.keyboardMovement = false;
+        controller.configure(strategy);
+        const auto fixed = world.target;
+        moving = {};
+        moving.focused = true;
+        moving.keys[static_cast<std::size_t>(Key::w)].held = true;
+        (void)controller.update(world, moving, 720, 1.0 / 60);
+        require(near(world.target, fixed), "Direct hero mode also moved strategy camera");
         std::cout << "PASS camera: initial pose, unmapped input, ground pan, stable orbit, "
                      "pitch/zoom bounds, focus, attached-camera conversion.\n";
         return 0;

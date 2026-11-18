@@ -2,6 +2,7 @@
 
 #include "entities/enemy_definition.hpp"
 #include "entities/level_definition.hpp"
+#include "runtime/player_progress.hpp"
 
 #include <algorithm>
 #include <grimlock/scene.hpp>
@@ -9,6 +10,11 @@
 #include <stdexcept>
 
 namespace grimlock::game {
+
+bool levelUnlocked(const AvailableLevel& level, const PlayerProgress* progress) noexcept {
+    const auto* prerequisite = progress ? progress->find(level.requiredLevel) : nullptr;
+    return level.requiredLevel.empty() || (prerequisite && prerequisite->completed);
+}
 
 LevelCatalog discoverLevels(const std::filesystem::path& assetRoot) {
     LevelCatalog result;
@@ -51,7 +57,8 @@ LevelCatalog discoverLevels(const std::filesystem::path& assetRoot) {
                 result.levels.push_back({std::filesystem::absolute(path),
                                          std::move(definition.name),
                                          std::move(definition.description),
-                                         std::move(definition.id)});
+                                         std::move(definition.id),
+                                         std::move(definition.requiredLevel)});
             } catch (const std::exception& failure) {
                 result.errors.push_back(path.filename().string() + ": " + failure.what());
             }

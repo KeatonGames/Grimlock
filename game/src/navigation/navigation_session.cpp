@@ -53,6 +53,22 @@ void NavigationSession::synchronize(Engine& engine) {
     combatGeometry_.synchronize(engine, towers_.towers());
     placement_.synchronize(engine.scene(), towers_.towers());
     levelGeometry_.synchronize(engine);
+    if (reserveSites_) {
+        std::vector<BuildZone> layout{placement_.zones().begin(), placement_.zones().end()};
+        for (auto& zone : layout) {
+            zone.occupants.clear();
+        }
+        if (layout != reservedZones_) {
+            reservedZones_ = std::move(layout);
+            geometryRevision_.reset();
+        }
+        if (geometryRevision_ == levelGeometry_.revision() &&
+            std::all_of(towers_.towers().begin(), towers_.towers().end(), [&](const auto& tower) {
+                return reserved(tower);
+            })) {
+            towerRevision_ = towers_.revision();
+        }
+    }
     const auto* scene = engine.scene();
     const auto* grid = scene && !levelGeometry_.imported() ? scene->navigationGrid() : nullptr;
     const bool replaced = scene_ != scene || grid_ != grid;
@@ -104,10 +120,43 @@ void NavigationSession::buildNavigation() {
     }
     terrain_.assign(levelGeometry_.boxes().begin(), levelGeometry_.boxes().end());
     geometry_ = levelGeometry_.navigation();
-    for (const auto& tower : towers_.towers()) {
+    reservedSites_.clear();
+    siteErrors_.clear();
+    if (reserveSites_) {
+        for (const auto& zone : reservedZones_) {
+            std::optional<Tower> reservation;
+            for (const auto& definition : towers_.definitions()) {
+                const auto tower = zone.snap(definition.instance());
+                auto error =
+                    zone.contains(tower) ? levelGeometry_.supportError(tower) : "Tower does not fit this build zone.";
+                siteErrors_[{zone.object, definition.id}] = error;
+                if (!error.empty()) {
+                    continue;
+                }
+                if (!reservation) {
+                    reservation = tower;
+                }
+                const auto bottom = tower.position.y - tower.halfExtent.y;
+                reservation->halfExtent = glm::max(reservation->halfExtent, tower.halfExtent);
+                reservation->position.y = bottom + reservation->halfExtent.y;
+            }
+            if (reservation) {
+                reservedSites_.push_back(*reservation);
+            }
+        }
+    }
+    const auto addFootprint = [&](const Tower& tower) {
         glm::mat4 transform{glm::mat4_cast(tower.rotation)};
         transform[3] = glm::vec4{tower.position, 1};
         geometry_.addBox(-glm::vec3{tower.halfExtent}, glm::vec3{tower.halfExtent}, transform);
+    };
+    for (const auto& site : reservedSites_) {
+        addFootprint(site);
+    }
+    for (const auto& tower : towers_.towers()) {
+        if (!reserved(tower)) {
+            addFootprint(tower);
+        }
     }
     if (navigation_.ready() || profileInUse(0)) {
         buildProfile(0);
@@ -198,6 +247,10 @@ void NavigationSession::reset(Engine& engine) {
 }
 
 void NavigationSession::shutdown() noexcept {
+    reserveSites_ = false;
+    reservedSites_.clear();
+    reservedZones_.clear();
+    siteErrors_.clear();
     enemies_.reset();
     engine_ = nullptr;
     scene_ = nullptr;
@@ -346,6 +399,13 @@ std::string NavigationSession::checkTower(Engine& engine, const Tower& tower, bo
     if (const auto zoneError = placement_.check(tower); !zoneError.empty()) {
         return zoneError;
     }
+    if (mode == PlacementMode::gameplay && reserved(tower)) {
+        const auto error = siteErrors_.find({tower.buildZone, tower.type});
+        if (error != siteErrors_.end() && !error->second.empty()) {
+            return error->second;
+        }
+        return towers_.check(tower, {}, enemies_->enemies(), nullptr, true);
+    }
     if (!navigation().ready()) {
         return "Tower placement requires navigable terrain.";
     }
@@ -385,6 +445,16 @@ ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower, Place
     if (!error.empty()) {
         throw std::invalid_argument(error);
     }
+    if (mode == PlacementMode::gameplay && reserved(tower)) {
+        const auto zone = std::find_if(placement_.zones().begin(), placement_.zones().end(), [&](const auto& item) {
+            return item.object == tower.buildZone;
+        });
+        const auto point = PlacementSystem::ensureConstructionPoint(*engine.scene(), *zone);
+        const auto id = towers_.create(engine, tower, point);
+        placement_.synchronize(engine.scene(), towers_.towers());
+        towerRevision_ = towers_.revision();
+        return id;
+    }
     auto prepared = std::move(*candidate_);
     candidate_.reset();
     const auto zone = std::find_if(placement_.zones().begin(), placement_.zones().end(), [&](const BuildZone& item) {
@@ -410,6 +480,18 @@ ObjectId NavigationSession::placeTower(Engine& engine, const Tower& tower, Place
     towerRevision_ = towers_.revision();
     ++navigationRevision_;
     return id;
+}
+
+bool NavigationSession::reserved(const Tower& tower) const {
+    return reserveSites_ && std::any_of(reservedSites_.begin(), reservedSites_.end(), [&](const Tower& site) {
+               return tower.buildZone == site.buildZone &&
+                      glm::length(glm::dvec2{tower.position.x - site.position.x, tower.position.z - site.position.z}) <
+                          1e-6 &&
+                      glm::all(glm::lessThanEqual(tower.halfExtent, site.halfExtent + glm::dvec3{1e-6})) &&
+                      std::abs((tower.position.y - tower.halfExtent.y) - (site.position.y - site.halfExtent.y)) <
+                          1e-6 &&
+                      std::abs(glm::dot(tower.rotation, site.rotation)) > 1 - 1e-6;
+           });
 }
 
 bool NavigationSession::removeTower(Engine& engine, ObjectId object) {

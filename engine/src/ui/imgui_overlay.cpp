@@ -163,8 +163,17 @@ int projectPolygon(const glm::dmat4& matrix,
     }
     std::array<glm::dvec4, 12> polygon{}, clipped{};
     int count = static_cast<int>(vertices.size());
+    unsigned outside = 0, sharedOutside = 63;
     for (int i = 0; i < count; ++i) {
         polygon[i] = matrix * glm::dvec4{vertices[i], 1};
+        const auto p = polygon[i];
+        const unsigned code = (p.x < -p.w ? 1U : 0U) | (p.x > p.w ? 2U : 0U) | (p.y < -p.w ? 4U : 0U) |
+                              (p.y > p.w ? 8U : 0U) | (p.z < 0 ? 16U : 0U) | (p.z > p.w ? 32U : 0U);
+        outside |= code;
+        sharedOutside &= code;
+    }
+    if (sharedOutside) {
+        return 0;
     }
 
     const auto distance = [](glm::dvec4 p, int plane) {
@@ -184,7 +193,8 @@ int projectPolygon(const glm::dmat4& matrix,
         }
     };
 
-    for (int plane = 0; plane < 6 && count; ++plane) {
+    // Most construction rings are wholly visible: project them directly instead of clipping all six planes.
+    for (int plane = 0; outside && plane < 6 && count; ++plane) {
         int output = 0;
         auto previous = polygon[count - 1];
         double before = distance(previous, plane);

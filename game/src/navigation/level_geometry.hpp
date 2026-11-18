@@ -41,6 +41,7 @@ private:
         std::filesystem::path model;
         glm::mat4 world;
         std::string role;
+        std::shared_ptr<const Heightfield> heightfield;
         bool operator==(const ObjectGeometry&) const = default;
     };
 

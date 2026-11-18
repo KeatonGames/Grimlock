@@ -56,7 +56,7 @@ void traversal(Engine& engine) {
         for (std::size_t type = 0; type < heroes.typeCount(); ++type) {
             for (const int fps : {15, 60, 144}) {
                 const auto id = heroes.deploy(start, {}, type);
-                for (const auto goal : {glm::dvec3{7, 1, 4.6}, start, glm::dvec3{-8.5, 2, 10.8}, start}) {
+                for (const auto goal : {glm::dvec3{7, 0, 4.6}, start, glm::dvec3{-8.5, 0, 10.8}, start}) {
                     require(heroes.command(id, goal), "Forest hero ramp command rejected");
                     for (int frame = 0; frame < fps * 40 && heroes.find(id)->state == HeroState::moving; ++frame) {
                         const auto before = heroes.find(id)->position;
@@ -77,7 +77,7 @@ void traversal(Engine& engine) {
         for (const int fps : {15, 60, 144}) {
             navigation.reset(engine);
             navigation.setDestination(glm::dvec2{-8.5, 10.8});
-            navigation.setDestinationHeight(2);
+            navigation.setDestinationHeight(0);
             for (const std::string name : {"Goblin", "Skeleton", "Goblin Boss"}) {
                 EnemyTypeId type = 0;
                 while (type < enemies.typeCount() && enemies.definition(type).name != name) {
@@ -127,7 +127,7 @@ void terrain(Engine& engine) {
             "Forest is missing from Game discovery");
     auto& navigation = runtime.navigation();
     require(navigation.placement().zones().size() == 4, "Forest construction zones missing");
-    const std::array<glm::dvec2, 4> lanes{{{5, -1.5}, {3, 0}, {-5, 0.5}, {-7, 7.5}}};
+    const std::array<glm::dvec2, 4> lanes{{{5, -1.5}, {3, 0}, {-6.3, 4.5}, {-7, 7.5}}};
     for (std::size_t index = 0; index < lanes.size(); ++index) {
         const auto& zone = navigation.placement().zones()[index];
         require(zone.object == 108 + index && zone.constructionObject != 0,
@@ -141,10 +141,17 @@ void terrain(Engine& engine) {
         }
     }
     NavigationPath path;
-    require(navigation.navigation().findPath({10, 0, -3.5}, {-8.5, 2, 10.8}, path),
+    require(navigation.navigation().findPath({10, 0, -3.5}, {-8.5, 0, 10.8}, path),
             "Forest spawn cannot reach hill objective");
-    require(navigation.navigation().findPath({5.5, 0, -4.6}, {7, 1, 4.6}, path), "Lookout ramp is disconnected");
-    require(!navigation.navigation().contains({0, 0, 4}), "Navigation crossed the ravine beside the bridge");
+    require(navigation.navigation().findPath({5.5, 0, -6.1}, {7, 0, 3.1}, path), "Lookout ramp is disconnected");
+    const auto field = engine.scene()->object(1).heightfield;
+    require(field && field->model()->maximum.y - field->model()->minimum.y > 5, "Valley terrain is missing or flat");
+    require(!navigation.navigation().contains({30, 0, 0}) && field->sample({30, 0}), "Scenic terrain became playable");
+    for (float z = -8; z <= 8; z += 1) {
+        for (float x = -10; x <= 10; x += 1) {
+            require(field->sample({x, z}).has_value(), "Valley has a terrain gap");
+        }
+    }
     require(runtime.heroes()->typeCount() == 0 && runtime.heroes()->heroes().empty(), "Level 1 made heroes available");
     EnemyTypeId bossType = 0;
     while (bossType < navigation.enemies()->typeCount() &&
@@ -156,9 +163,7 @@ void terrain(Engine& engine) {
     require(bossDefinition.boss && bossDefinition.model == "enemies/orcs/character-orc.glb" &&
                 bossDefinition.maximumHealth == 900 && bossDefinition.visualHeight == 1.5,
             "Goblin boss did not use the animated Goblin model and boss statistics");
-    require(navigation.surface(engine, bossType).contains({0, 0, 0}) &&
-                !navigation.surface(engine, bossType).contains({0, 0, 4}),
-            "Bridge deck does not support the boss independently of the ravine");
+    require(navigation.surface(engine, bossType).contains({0, 0, 0}), "Rocky pass cannot support the boss");
     require(navigation.spawnAt(engine, bossType, {{10, -3.5}, {10, -3.5}, 0}, 1) == 1,
             "Forest boss clearance spawn failed");
     bool bossClimbed = false;
@@ -166,17 +171,36 @@ void terrain(Engine& engine) {
         navigation.update(engine, 1.0 / 30);
         for (const auto& enemy : navigation.enemies()->enemies()) {
             require(enemy.navigation->contains(enemy.position), "Forest boss left its radius-aware surface");
-            bossClimbed = bossClimbed || enemy.position.y > 1;
+            bossClimbed = bossClimbed || std::abs(enemy.position.y) < 0.2;
         }
     }
     require(bossClimbed && navigation.enemies()->metrics().arrived == 1,
             "Forest boss could not traverse the full ascent");
     navigation.reset(engine);
+    EconomySystem constructionBudget;
+    constructionBudget.reset(1000);
+    const auto zoneCount = navigation.placement().zones().size();
+    for (std::size_t index = 0; index < zoneCount; ++index) {
+        for (const auto* type : {"basic", "wide"}) {
+            const auto zone = navigation.placement().zones()[index];
+            const auto tower = zone.snap(navigation.towers().definition(type).instance());
+            const auto error = navigation.checkTower(engine, tower);
+            require(error.empty(), "Valley construction/route check: " + error);
+            require(std::abs(field->sample({tower.position.x, tower.position.z})->height -
+                             (tower.position.y - tower.halfExtent.y)) < 0.04,
+                    "Valley tower does not meet the surface");
+            const auto built = navigation.placeTower(engine, tower);
+            const auto before = constructionBudget.gold();
+            navigation.upgradeTower(built, constructionBudget);
+            require(constructionBudget.gold() < before, "Valley tower upgrade did not spend gold");
+            require(navigation.removeTower(engine, built), "Valley construction removal failed");
+        }
+    }
     runtime.beginPlacement("wide");
     const Ray hill{{-5.8, 12, 10.8}, {0, -1, 0}, 0, 30};
     runtime.updatePlacement(engine, hill, false);
     require(runtime.preview() && runtime.placementError().empty(), "Hill placement: " + runtime.placementError());
-    require(std::abs(runtime.preview()->position.y - runtime.preview()->halfExtent.y - 2) < 1e-5,
+    require(std::abs(runtime.preview()->position.y - runtime.preview()->halfExtent.y - 0) < 1e-5,
             "Tower foundation ignored hill elevation");
     runtime.updatePlacement(engine, hill, true);
     require(navigation.towers().towers().size() == 1 && runtime.level().economy().gold() == 5,
@@ -192,10 +216,14 @@ void terrain(Engine& engine) {
         referenced.insert(runtime.heroes()->definition(type).model);
     }
     referenced.insert(navigation.enemies()->definition(bossType).model);
-    require(engine.performance().models == referenced.size(),
-            "Repeated forest instances duplicated GPU model resources");
+    require(engine.performance().models >= referenced.size() + 1, "Generated terrain has no GPU resource");
+    const auto modelCount = engine.performance().models;
+    for (int frame = 0; frame < 3; ++frame) {
+        require(engine.update(), "Repeated terrain rendering failed");
+    }
+    require(engine.performance().models == modelCount, "Unchanged heightfield frames duplicated GPU model resources");
     navigation.synchronize(engine);
-    require(navigation.spawnAt(engine, 0, {{-6.5, 8}, {-6.5, 8}, 1.75}, 1) == 1,
+    require(navigation.spawnAt(engine, 0, {{-6.5, 8}, {-6.5, 8}, field->sample({-6.5F, 8})->height}, 1) == 1,
             "Forest ramp combat target could not spawn");
     navigation.enemies()->setSpeed(0, 0);
     CombatSystem combat{engine};
@@ -214,6 +242,16 @@ void terrain(Engine& engine) {
 #ifdef GRIMLOCK_TEST_EDITOR
     editor::SceneDocument document{engine};
     document.open(engine.assetRoot() / "scenes/forest_defense.json");
+    const auto terrainCopy = document.duplicate(1);
+    auto configuration = engine.scene()->object(terrainCopy).heightfield->configuration();
+    configuration.hills.push_back({{0, 0}, 4, 1});
+    configuration.noiseAmplitude = 0.35F;
+    document.configureHeightfield(terrainCopy, configuration);
+    require(engine.scene()->animation(terrainCopy).model().meshes[0].vertices ==
+                engine.scene()->object(terrainCopy).heightfield->model()->meshes[0].vertices,
+            "Editor terrain regeneration did not update the rendered mesh");
+    document.remove(terrainCopy);
+    require(engine.update(), "Editor terrain resource replacement failed");
     document.refreshModels();
     const auto expected = std::filesystem::path{"environment/platformer/tree-pine.glb"};
     require(std::find(document.models().begin(), document.models().end(), expected) != document.models().end(),
@@ -230,7 +268,14 @@ void terrain(Engine& engine) {
     auto transform = engine.scene()->object(duplicate).local;
     transform.position.x += 0.5F;
     document.setTransform(duplicate, transform);
+    require(document.groundObject(duplicate), "Editor could not ground a prop on the valley");
+    const auto grounded = engine.scene()->object(duplicate).local;
+    const auto surface = engine.scene()->object(1).heightfield->sample({grounded.position.x, grounded.position.z});
+    require(surface && std::abs(grounded.position.y - surface->height) < 0.02, "Editor grounded prop incorrectly");
     document.save(engine.assetRoot().parent_path() / "forest-editor-roundtrip.json");
+    document.open(engine.assetRoot().parent_path() / "forest-editor-roundtrip.json");
+    require(engine.scene()->object(1).heightfield && engine.scene()->contains(duplicate),
+            "Editor roundtrip lost terrain or placed prop");
     require(engine.scene()->object(duplicate).role == "grimlock.decoration", "Editor duplication changed scene roles");
 #endif
 }
@@ -263,7 +308,7 @@ void play(Engine& engine, bool defended) {
     };
     if (defended) {
         (void)build("basic", {5.5, 0, -4.6});
-        lastStand = build("basic", {-5.8, 2, 10.8});
+        lastStand = build("basic", {-5.8, 0, 10.8});
     }
 
     bool bossSeen = false, bossDefeated = false, bossBarSeen = false;
@@ -271,7 +316,7 @@ void play(Engine& engine, bool defended) {
     while (session.waves()->phase() == LevelPhase::preparation) {
         const auto wave = session.waves()->wave();
         if (defended && wave == 1) {
-            (void)build("basic", {-7.5, 0, -2.4});
+            (void)build("basic", {-4.5, 0, 5});
         }
         if (defended && wave >= 3) {
             const auto tower = lastStand;

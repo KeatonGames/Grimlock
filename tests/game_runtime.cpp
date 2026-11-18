@@ -379,11 +379,11 @@ int main() {
         const auto afterPan = engine.scene()->resolvedCamera();
         require(afterPan.position != beforePan.position && !runtime.selectedHero()->destination &&
                     runtime.selectedHero()->state == HeroState::reached,
-                "right drag did not pan or issued a hero command");
+                "right drag did not rotate or issued a hero command");
         drag(SDL_BUTTON_MIDDLE, {30, 12});
         const auto afterOrbit = engine.scene()->resolvedCamera();
-        require(afterOrbit.position != afterPan.position && afterOrbit.target == afterPan.target,
-                "middle drag did not preserve camera orbit");
+        require(afterOrbit.position == afterPan.position && afterOrbit.target == afterPan.target,
+                "Obsolete middle drag changed the strategy camera");
         mouse(id, SDL_EVENT_MOUSE_MOTION, gesturePoint);
         tick(engine, runtime);
         SDL_Event wheel{};
@@ -408,16 +408,24 @@ int main() {
                 "gameplay UI right click commanded hero");
         auto& enemies = *runtime.navigation().enemies();
         const auto& mesh = runtime.navigation().surface(engine, 0);
-        require(enemies.spawn(mesh, {{-5, -2}, {-5, -2}, 0}, 1) == 1, "Game hero target spawn failed");
+        const auto originalEnemySpeed = enemies.definition(0).speed;
+        enemies.setSpeed(0, 0);
+        require(enemies.spawn(mesh, {{-6, 2}, {-6, 2}, 0}, 1) == 1, "Game hero target spawn failed");
         const auto enemyId = enemies.enemies().back().id;
+        engine.animation(*enemies.find(enemyId)->instance).pause();
         glm::ivec2 windowSize{};
         SDL_GetWindowSize(window, &windowSize.x, &windowSize.y);
         std::optional<glm::vec2> enemyPixel;
         for (float height = 0.05F; height < 0.4F && !enemyPixel; height += 0.03F) {
             for (float offset = -0.2F; offset <= 0.2F; offset += 0.04F) {
-                const auto point = screen(engine, window, {-5 + offset, height, -2});
-                const auto ray = mouseRay(engine.scene()->resolvedCamera(), point, windowSize, windowSize);
-                if (ray && HeroCombatSystem::pick(engine, enemies, *ray) == enemyId) {
+                const auto point = screen(engine, window, {-6 + offset, height, 2});
+                auto ray = mouseRay(engine.scene()->resolvedCamera(), point, windowSize, windowSize);
+                if (ray) {
+                    if (const auto ground = runtime.heroes()->ground(*ray)) {
+                        ray->maximum = std::min(ray->maximum, glm::distance(*ground, ray->origin));
+                    }
+                }
+                if (ray && HeroCombatSystem::pick(engine, enemies, *ray) == enemyId && !engine.pickObject(*ray)) {
                     enemyPixel = point;
                     break;
                 }
@@ -426,27 +434,33 @@ int main() {
         require(enemyPixel.has_value(), "Game enemy geometry was not pickable");
         mouse(id, SDL_EVENT_MOUSE_MOTION, *enemyPixel);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, *enemyPixel, SDL_BUTTON_RIGHT);
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_DOWN, *enemyPixel, SDL_BUTTON_LEFT);
         tick(engine, runtime);
-        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, *enemyPixel, SDL_BUTTON_RIGHT);
+        mouse(id, SDL_EVENT_MOUSE_BUTTON_UP, *enemyPixel, SDL_BUTTON_LEFT);
         tick(engine, runtime);
-        require(runtime.selectedHero()->combat.target == enemyId && runtime.selectedHero()->combat.explicitTarget,
-                "Game right-click enemy did not issue explicit attack");
+        require(runtime.selectedHero() && runtime.selectedHero()->combat.target == enemyId &&
+                    runtime.selectedHero()->combat.explicitTarget,
+                "Game left-click enemy did not issue explicit attack");
         require(runtime.heroes()->command(runtime.selectedHero()->id, {-5, 0, -1}), "Game combat move override failed");
         tick(engine, runtime);
         require(!runtime.activateHeroAbility(HeroAbility::cleave), "Knight retained a special ability");
         require(enemies.remove(enemyId), "Game hero target cleanup failed");
+        enemies.setSpeed(0, originalEnemySpeed);
         runtime.cancelHeroOrder();
         require(!runtime.selectedHero()->combat.swinging && !runtime.selectedHero()->combat.playerMoving &&
                     !runtime.selectedHero()->combat.target && runtime.selectedHero()->combat.cleaveCooldown == 0,
                 "Game cancel order failed or Knight acquired an ability cooldown");
+        const auto& defense = runtime.heroes()->definition(*runtime.selectedHero()).combat;
+        const float expectedHealth =
+            runtime.selectedHero()->health -
+            (runtime.selectedHero()->combat.blockRemaining <= 0 ? 1 - defense.blockReduction : 1);
         require(runtime.heroes()->applyDamage(runtime.selectedHero()->id, 1), "Game hero hit feedback setup failed");
         for (const auto& tower : runtime.navigation().towers().towers()) {
             require(runtime.navigation().towers().applyDamage(engine, tower.object, 1),
                     "Game tower health setup failed");
         }
         tick(engine, runtime);
-        require(runtime.selectedHero()->health == 99, "Game hero health HUD state incorrect");
+        require(runtime.selectedHero()->health == expectedHealth, "Game hero health HUD state incorrect");
         finishBattle(engine, runtime);
         const auto* resultPanel = ImGui::FindWindowByName("Level Result");
         const auto& metrics = runtime.navigation().enemies()->metrics();
@@ -468,7 +482,7 @@ int main() {
                 runtime.navigation().navigation().contains({-3.3, 0, 0}),
             "game restart retained runtime state");
         require(runtime.heroes()->heroes().size() == 3 && !runtime.selectedHero() &&
-                    runtime.heroes()->heroes().front().health == 100 &&
+                    runtime.heroes()->heroes().front().health == runtime.heroes()->definition().maximumHealth &&
                     runtime.heroes()->heroes().front().state == HeroState::idle,
                 "Restart did not restore the automatic party");
         auto rebuilt = runtime.navigation().towers().definition("basic").instance();

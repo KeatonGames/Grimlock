@@ -229,7 +229,8 @@ std::optional<ObjectId> Scene::selectedObject() const {
 
         if (found == objects_.end() ||
             (!selectionIncludesInactive_ &&
-             (!found->second.selectable || !found->second.model || !enabledInHierarchy(*selected_)))) {
+             (!found->second.selectable || (!found->second.model && !found->second.heightfield) ||
+              !enabledInHierarchy(*selected_)))) {
             selected_.reset();
         }
     }
@@ -241,7 +242,8 @@ void Scene::selectObject(std::optional<ObjectId> id, bool includeInactive) {
     if (id) {
         const auto& value = object(*id);
 
-        if (!includeInactive && (!value.selectable || !value.model || !enabledInHierarchy(*id))) {
+        if (!includeInactive &&
+            (!value.selectable || (!value.model && !value.heightfield) || !enabledInHierarchy(*id))) {
             throw std::invalid_argument("Object is not selectable.");
         }
     }
@@ -254,6 +256,9 @@ void Scene::setModel(ObjectId id, std::optional<std::filesystem::path> model) {
     auto& value = objects_.at(id);
 
     if (model) {
+        if (value.heightfield) {
+            throw std::invalid_argument("Remove heightfield before assigning a model");
+        }
         checkPath(*model);
         *model = model->lexically_normal();
     }
@@ -273,6 +278,18 @@ void Scene::setModel(ObjectId id, std::optional<std::filesystem::path> model) {
         value.initialAnimation.reset();
         value.materialOverride.reset();
     }
+}
+
+void Scene::setHeightfield(ObjectId id, std::optional<HeightfieldConfiguration> configuration) {
+    auto& object = objects_.at(id);
+    if (configuration && object.model) {
+        throw std::invalid_argument("A heightfield cannot also reference an imported model");
+    }
+    auto terrain = configuration ? std::make_shared<const Heightfield>(std::move(*configuration)) : nullptr;
+    object.heightfield = std::move(terrain);
+    object.instance_.reset();
+    object.initialAnimation.reset();
+    object.materialOverride.reset();
 }
 
 void Scene::setTint(ObjectId id, const glm::vec4& tint) {

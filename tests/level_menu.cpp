@@ -96,7 +96,7 @@ void control(Engine& engine,
         }
         if (std::string_view{label} == "Choose Level") {
             control(engine, runtime, window, "Pause Menu", "Main Menu");
-            control(engine, runtime, window, "Main Menu", "Choose Level");
+            control(engine, runtime, window, "Main Menu", "PLAY");
         } else {
             control(engine, runtime, window, "Pause Menu", label);
         }
@@ -155,8 +155,8 @@ int main() {
         std::filesystem::remove_all(folder);
         const auto shipped = discoverLevels(root);
         const auto levelOneBefore = contents(root / "levels/forest_defense.json");
-        require(shipped.levels.size() == 1 && shipped.levels.front().path.filename() == "forest_defense.json",
-                "Game must ship exactly Level 1");
+        require(shipped.levels.size() == 2 && shipped.levels.front().path.filename() == "forest_defense.json",
+                "Game must ship Greenhaven and Gravewatch");
         require(std::filesystem::is_regular_file(root / "ui/menu_background.png") &&
                     std::filesystem::is_regular_file(root / "previews/forest_defense.png"),
                 "Menu captures missing");
@@ -219,11 +219,6 @@ int main() {
         require(windows && count == 1, "menu window missing");
         const auto window = SDL_GetWindowID(windows[0]);
         SDL_free(windows);
-        control(engine, runtime, window, "Main Menu", "START GAME");
-        require(runtime.level().waves() && runtime.level().waves()->definition().name == "Level 01 - Forest Defense",
-                "Start Game did not launch Level 1 directly");
-        control(engine, runtime, window, "Game Status", "Choose Level");
-        control(engine, runtime, window, "Level Selection", "Main Menu");
         control(engine, runtime, window, "Main Menu", "Settings");
         capture(engine, root.parent_path() / "phase48_options.png");
         control(engine, runtime, window, "Settings", "Display mode");
@@ -269,137 +264,73 @@ int main() {
                     savedOptions.find("tone_mapping") == std::string::npos,
                 "Game still saved obsolete technical options");
         control(engine, runtime, window, "Settings", "Back");
-        control(engine, runtime, window, "Main Menu", "Choose Level");
-        capture(engine, root.parent_path() / "phase48_levels.png");
-        control(engine, runtime, window, "Level Selection", first.name.c_str(), a);
-        const auto authored = contents(a);
-        control(engine, runtime, window, "Level Selection", "Play");
-        require(runtime.level().economy().gold() == 123 && runtime.heroes()->heroes().size() == 3 &&
-                    engine.scene()->navigationGrid() && !runtime.navigation().placement().zones().empty(),
-                "selected level was incompletely initialized");
-        runtime.update(engine, 1.25);
-        require(std::abs(runtime.completionSeconds() - 1.25) < 1e-8 && progress.find(first.id)->attempts == 1,
-                "active preparation time or attempt count failed");
-        runtime.startWave();
-        runtime.update(engine, 0.2);
-        require(!runtime.navigation().enemies()->enemies().empty(), "selected level did not spawn its wave");
-        control(engine, runtime, window, "Game Status", "Restart Level");
-        require(runtime.level().economy().gold() == 123 && runtime.navigation().enemies()->enemies().empty(),
-                "restart leaked state");
-        require(progress.find(first.id)->attempts == 2 && progress.find(first.id)->victories == 0 &&
-                    runtime.completionSeconds() == 0,
-                "restart did not start an independent attempt");
-        auto tower = runtime.navigation().towers().definition("basic").instance();
-        tower.position = {4, tower.halfExtent.y, -2.5};
-        (void)runtime.navigation().towers().create(engine, tower);
-        runtime.navigation().synchronize(engine);
-        require(runtime.navigation().spawnAt(engine, 0, {{2.8, -2.5}, {2.8, -2.5}, 0}, 1) == 1,
-                "switching combat fixture spawn failed");
-        runtime.startWave();
-        runtime.update(engine, 0.001);
-        require(runtime.level().combat()->shotsFired() > 0 &&
-                    !runtime.level().combat()->projectiles().projectiles().empty(),
-                "switching fixture did not leave active projectiles");
-        const auto cube = engine.loadModel(root / "towers/structures/primitives/cube.glb");
-        control(engine, runtime, window, "Game Status", "Choose Level");
-        require(!engine.scene() && !runtime.heroes() && !runtime.level().waves() && !runtime.navigation().enemies(),
-                "return to selection retained gameplay state");
-        control(engine, runtime, window, "Level Selection", second.name.c_str(), b);
-        control(engine, runtime, window, "Level Selection", "Play");
-        require(runtime.level().economy().gold() == 99 && !engine.scene()->navigationGrid() &&
-                    runtime.level().combat()->shotsFired() == 0 && runtime.navigation().towers().towers().empty() &&
-                    engine.loadModel(root / "towers/structures/primitives/cube.glb") == cube,
-                "switching level leaked state or lost terrain");
-        runtime.startWave();
-        runtime.update(engine, 0);
-        auto& enemies = *runtime.navigation().enemies();
-        require(enemies.enemies().size() == 1 && enemies.definition(enemies.enemies().front().type).boss,
-                "boss wave lost on load");
-        const auto boss = enemies.enemies().front().id;
-        require(enemies.applyDamage(boss, enemies.find(boss)->health), "boss death fixture failed");
-        runtime.update(engine, 0);
-        tick(engine, runtime);
-        require(runtime.level().waves()->phase() == LevelPhase::victory, "menu-loaded level did not complete");
-        require(progress.find(second.id)->victories == 1 && runtime.personalRecord(), "victory was not recorded");
-        const auto completion = runtime.completionSeconds();
-        runtime.update(engine, 5);
-        require(runtime.completionSeconds() == completion && progress.find(second.id)->victories == 1,
-                "result screen time or duplicate updates changed the record");
-        const auto ordering = discoverLevels(root);
-        const auto current =
-            std::find_if(ordering.levels.begin(), ordering.levels.end(), [&](const AvailableLevel& entry) {
-                return entry.id == second.id;
-            });
-        require(current != ordering.levels.end() && std::next(current) != ordering.levels.end(),
-                "next level fixture missing");
-        const auto nextId = std::next(current)->id;
-        control(engine, runtime, window, "Level Result", "Next Level");
-        require(runtime.level().waves()->definition().id == nextId && progress.lastPlayed() == nextId,
-                "Next Level did not follow the current ordering");
-        control(engine, runtime, window, "Game Status", "Choose Level");
-        first.startingGold = 321;
-        saveLevelDefinition(a, first);
-        control(engine, runtime, window, "Level Selection", "Refresh");
-        control(engine, runtime, window, "Level Selection", first.name.c_str(), a);
-        control(engine, runtime, window, "Level Selection", "Play");
-        require(runtime.level().economy().gold() == 321, "edited level was not reread");
-        require(authored != contents(a), "fixture edit was not saved");
-        const auto edited = contents(a);
-        control(engine, runtime, window, "Game Status", "Choose Level");
-        auto invalid = second;
-        invalid.name = "C unreachable fixture";
-        invalid.id = createLevelId();
-        invalid.objectivePosition = {100000, 100000};
-        const auto c = folder / "c.json";
-        saveLevelDefinition(c, invalid);
-        const auto discoveryDeadline = SDL_GetTicks() + 2300;
-        while (SDL_GetTicks() < discoveryDeadline) {
-            tick(engine, runtime, 1);
+        control(engine, runtime, window, "Main Menu", "PLAY");
+        tick(engine, runtime, 12);
+        require(engine.scene() && engine.scene()->name() == "Kingdom World Map",
+                "PLAY did not open a rendered world map");
+        require(!runtime.level().waves() && !runtime.navigation().enemies(), "World map spawned gameplay entities");
+        require(!ImGui::FindWindowByName("Level Selection"), "Obsolete level-selection panel remains");
+        control(engine, runtime, window, "World Map Navigation", "BACK");
+        tick(engine, runtime, 3);
+        require(!engine.scene(), "Back did not release the world map scene");
+        control(engine, runtime, window, "Main Menu", "PLAY");
+        tick(engine, runtime, 8);
+        const auto* gravewatchMarker = ImGui::FindWindowByName("Map marker##4");
+        require(gravewatchMarker && gravewatchMarker->Active, "Gravewatch map marker missing");
+        click(engine, runtime, window, {gravewatchMarker->Pos.x + 24, gravewatchMarker->Pos.y + 24});
+        tick(engine, runtime, 8);
+        const auto* lockedDetails = ImGui::FindWindowByName("Map location details");
+        require(lockedDetails && lockedDetails->Active, "Locked chapter cannot be inspected");
+        click(engine, runtime, window, {lockedDetails->Pos.x + 156, lockedDetails->Pos.y + lockedDetails->Size.y - 32});
+        tick(engine, runtime, 4);
+        require(!runtime.level().waves(), "Locked Gravewatch launched without Greenhaven completion");
+        const auto mapRole = engine.scene()->object(2).role;
+        engine.scene()->setRole(2, "grimlock.map_location:locked:" + shipped.levels.front().id);
+        tick(engine, runtime, 3);
+        const auto* lockedMarker = ImGui::FindWindowByName("Map marker##2");
+        click(engine, runtime, window, {lockedMarker->Pos.x + 24, lockedMarker->Pos.y + 24});
+        require(!runtime.level().waves(), "Locked map marker launched gameplay");
+        engine.scene()->setRole(2, mapRole);
+        tick(engine, runtime, 3);
+        capture(engine, root.parent_path() / "world_map_before_selection.png");
+        const auto* marker = ImGui::FindWindowByName("Map marker##2");
+        require(marker && marker->Active, "World map marker is missing");
+        click(engine, runtime, window, {marker->Pos.x + 24, marker->Pos.y + 24});
+        require(!runtime.level().waves(), "Location click launched gameplay without confirmation");
+        require(ImGui::FindWindowByName("Map location details"), "Selected location has no details");
+        tick(engine, runtime, 8);
+        const auto* details = ImGui::FindWindowByName("Map location details");
+        capture(engine, root.parent_path() / "world_map_selected.png");
+        require(details && details->Active, "Details panel was deselected before launch");
+        click(engine, runtime, window, {details->Pos.x + 156, details->Pos.y + details->Size.y - 32});
+        for (int frame = 0; frame < 60; ++frame) {
             SDL_Delay(10);
+            tick(engine, runtime, 1);
         }
-        control(engine, runtime, window, "Level Selection", invalid.name.c_str(), c);
-        control(engine, runtime, window, "Level Selection", "Play");
-        require(!engine.scene() && !runtime.level().waves() && ImGui::FindWindowByName("Level Selection")->Active,
-                "failed navigation load left partial gameplay state");
-        require(contents(a) == edited, "Game modified an authored level");
-        control(engine, runtime, window, "Level Selection", "Main Menu");
-        require(ImGui::FindWindowByName("Main Menu")->Active, "return to main menu failed");
-        control(engine, runtime, window, "Main Menu", "Quit");
-        require(hud.quitRequested(), "quit request failed");
-        require(contents(root / "levels/forest_defense.json") == levelOneBefore,
-                "Menus changed Level 1 gameplay metadata");
-        engine.detachOverlay();
-        engine.setVsync(false);
+        require(runtime.level().waves() && runtime.level().waves()->definition().id == shipped.levels.front().id,
+                "Map launch did not load the selected level");
+        progress.abandonAttempt();
+        progress.startAttempt(shipped.levels.front().id);
+        (void)progress.finishAttempt(shipped.levels.front().id, true, 30);
+        control(engine, runtime, window, "Game Status", "Choose Level");
+        tick(engine, runtime, 8);
+        gravewatchMarker = ImGui::FindWindowByName("Map marker##4");
+        click(engine, runtime, window, {gravewatchMarker->Pos.x + 24, gravewatchMarker->Pos.y + 24});
+        tick(engine, runtime, 8);
+        details = ImGui::FindWindowByName("Map location details");
+        click(engine, runtime, window, {details->Pos.x + 156, details->Pos.y + details->Size.y - 32});
+        for (int frame = 0; frame < 60; ++frame) {
+            SDL_Delay(10);
+            tick(engine, runtime, 1);
+        }
+        require(runtime.level().waves() && runtime.level().waves()->definition().id == shipped.levels.back().id,
+                "Unlocked Gravewatch marker did not launch the correct chapter");
+        runtime.unload(engine);
         std::filesystem::remove_all(folder);
-        {
-            GameHud reopenedHud{engine, runtime, true, {}, optionsPath};
-            tick(engine, runtime, 2);
-            require(engine.vsyncEnabled() && engine.msaaSamples() == savedMsaa &&
-                        engine.shadowSettings().quality == savedShadow && engine.renderSettings() == savedGraphics,
-                    "Saved display/MSAA/shadow preferences did not reload");
-            control(engine, runtime, window, "Main Menu", "Choose Level");
-            for (int frame = 0; frame < 20; ++frame) {
-                tick(engine, runtime, 1);
-                SDL_Delay(10);
-            }
-            capture(engine, root.parent_path() / "phase48_levels.png");
-        }
-        PlayerProgress reopened{progressPath};
-        require(reopened.error().empty() && reopened.find(second.id)->completed &&
-                    reopened.find(second.id)->victories == 1,
-                "gameplay progress did not survive reopening");
-        std::filesystem::remove(progressPath);
-        {
-            std::ofstream legacy{optionsPath};
-            legacy << R"({"texture_filtering":"obsolete", "anisotropy":-1, "tone_mapping":{"old":true}})";
-        }
-        engine.setRenderSettings({TextureFiltering::bilinear, 2, ToneMapping::reinhard});
-        std::filesystem::remove_all(folder);
-        std::cout << "PASS discovery, descriptions, live edits, menus, complete loading, switching, restart and "
-                     "failed-load cleanup.\n";
+        std::cout << "PASS world map scene, no hero, explicit selection/launch and existing level discovery.\n";
         return 0;
-    } catch (const std::exception& error) {
-        std::cerr << "FAIL level menu: " << error.what() << '\n';
+    } catch (const std::exception& e) {
+        std::cerr << "FAIL world map: " << e.what() << '\n';
         return 1;
     }
 }

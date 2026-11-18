@@ -1,133 +1,131 @@
 {
-    "id":  "68369f21-3bfd-4d83-a5c2-c09c52922401",
-    "version":  1,
-    "name":  "Level 01 - Forest Defense",
-    "description":  "Cross the arched stone bridge, defend four construction points, and hold the walled mausoleum above the woodland meadow.",
-    "scene":  "scenes/forest_defense.json",
-    "starting_gold":  20,
-    "hero_spawns":  [
-                        [
-                            -7,
-                            2,
-                            11
-                        ]
-                    ],
-    "objective":  {
-                      "position":  [
-                                       -8.5,
-                                       10.8
-                                   ],
-                      "height":  2,
-                      "health":  10,
-                      "damage_per_arrival":  1
-                  },
-    "spawns":  [
-                   {
-                       "name":  "Woodland entrance",
-                       "minimum":  [
-                                       9.3,
-                                       -3.9
-                                   ],
-                       "maximum":  [
-                                       10.7,
-                                       -3.1
-                                   ],
-                       "height":  0
-                   },
-                   {
-                       "name":  "Goblin boss entrance",
-                       "minimum":  [
-                                       10,
-                                       -3.5
-                                   ],
-                       "maximum":  [
-                                       10,
-                                       -3.5
-                                   ],
-                       "height":  0
-                   }
-               ],
-    "waves":  [
-                  {
-                      "name":  "Scouts on the trail",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  6,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     }
-                                 ]
-                  },
-                  {
-                      "name":  "Beneath the roots",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  10,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     }
-                                 ]
-                  },
-                  {
-                      "name":  "The woodland raiders",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  12,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     }
-                                 ]
-                  },
-                  {
-                      "name":  "Hold the ascent",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  12,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     }
-                                 ]
-                  },
-                  {
-                      "name":  "The Goblin Boss",
-                      "gold_reward":  0,
-                      "groups":  [
-                                     {
-                                         "enemy":  "Goblin Boss",
-                                         "count":  1,
-                                         "spawn":  "Goblin boss entrance",
-                                         "start":  0,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     },
-                                     {
-                                         "enemy":  "Goblin",
-                                         "count":  4,
-                                         "spawn":  "Woodland entrance",
-                                         "start":  0.6,
-                                         "batch_size":  1,
-                                         "interval":  0.6
-                                     }
-                                 ]
-                  }
-              ],
-    "available_heroes":  [
-
-                         ]
+    "available_heroes": [],
+    "description": "Defend the winding valley road, hold the rocky pass, and protect the hilltop castle.",
+    "hero_spawns": [
+        [
+            -7,
+            0,
+            11
+        ]
+    ],
+    "id": "68369f21-3bfd-4d83-a5c2-c09c52922401",
+    "name": "Level 01 - Greenhaven Valley",
+    "objective": {
+        "damage_per_arrival": 1,
+        "health": 10,
+        "height": 0,
+        "position": [
+            -8.5,
+            10.8
+        ]
+    },
+    "scene": "scenes/forest_defense.json",
+    "spawns": [
+        {
+            "height": 0,
+            "maximum": [
+                10.7,
+                -3.1
+            ],
+            "minimum": [
+                9.3,
+                -3.9
+            ],
+            "name": "Woodland entrance"
+        },
+        {
+            "height": 0,
+            "maximum": [
+                10,
+                -3.5
+            ],
+            "minimum": [
+                10,
+                -3.5
+            ],
+            "name": "Goblin boss entrance"
+        }
+    ],
+    "starting_gold": 20,
+    "version": 1,
+    "waves": [
+        {
+            "gold_reward": 0,
+            "groups": [
+                {
+                    "batch_size": 1,
+                    "count": 6,
+                    "enemy": "Goblin",
+                    "interval": 0.6,
+                    "spawn": "Woodland entrance",
+                    "start": 0
+                }
+            ],
+            "name": "Scouts on the trail"
+        },
+        {
+            "gold_reward": 0,
+            "groups": [
+                {
+                    "batch_size": 1,
+                    "count": 10,
+                    "enemy": "Goblin",
+                    "interval": 0.6,
+                    "spawn": "Woodland entrance",
+                    "start": 0
+                }
+            ],
+            "name": "Beneath the roots"
+        },
+        {
+            "gold_reward": 0,
+            "groups": [
+                {
+                    "batch_size": 1,
+                    "count": 12,
+                    "enemy": "Goblin",
+                    "interval": 0.6,
+                    "spawn": "Woodland entrance",
+                    "start": 0
+                }
+            ],
+            "name": "The woodland raiders"
+        },
+        {
+            "gold_reward": 0,
+            "groups": [
+                {
+                    "batch_size": 1,
+                    "count": 12,
+                    "enemy": "Goblin",
+                    "interval": 0.6,
+                    "spawn": "Woodland entrance",
+                    "start": 0
+                }
+            ],
+            "name": "Hold the ascent"
+        },
+        {
+            "gold_reward": 0,
+            "groups": [
+                {
+                    "batch_size": 1,
+                    "count": 1,
+                    "enemy": "Goblin Boss",
+                    "interval": 0.6,
+                    "spawn": "Goblin boss entrance",
+                    "start": 0
+                },
+                {
+                    "batch_size": 1,
+                    "count": 4,
+                    "enemy": "Goblin",
+                    "interval": 0.6,
+                    "spawn": "Woodland entrance",
+                    "start": 0.6
+                }
+            ],
+            "name": "The Goblin Boss"
+        }
+    ]
 }

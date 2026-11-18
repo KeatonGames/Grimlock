@@ -509,6 +509,128 @@ Json readSceneDocument(const std::filesystem::path& path) {
     return root;
 }
 
+HeightfieldConfiguration readHeightfield(const Json& j, const std::string& field) {
+    fields(j,
+           field,
+           {"size",
+            "resolution",
+            "playable_size",
+            "base_height",
+            "noise_amplitude",
+            "noise_frequency",
+            "seed",
+            "boundary_height",
+            "road_width",
+            "road_end_width",
+            "minimalistic",
+            "grass_color",
+            "road_color",
+            "rock_color",
+            "hills",
+            "pads",
+            "road"});
+    HeightfieldConfiguration c;
+    if (j.contains("minimalistic")) {
+        c.minimalistic = boolean(j.at("minimalistic"), field + ".minimalistic");
+    }
+    if (j.contains("size")) {
+        c.size = vector<2>(j.at("size"), field + ".size");
+    }
+    if (j.contains("playable_size")) {
+        c.playableSize = vector<2>(j.at("playable_size"), field + ".playable_size");
+    }
+    if (j.contains("resolution")) {
+        const auto& r = j.at("resolution");
+        array(r, field + ".resolution", 2);
+        if (r.size() != 2) {
+            fail(field, "resolution requires two integers");
+        }
+        const auto x = index(r[0], field), z = index(r[1], field);
+        if (x < 2 || z < 2 || x > 513 || z > 513) {
+            fail(field, "resolution must be between 2 and 513");
+        }
+        c.resolution = {x, z};
+    }
+    if (j.contains("seed")) {
+        const auto seed = index(j.at("seed"), field + ".seed");
+        if (seed > UINT32_MAX) {
+            fail(field, "seed exceeds uint32");
+        }
+        c.seed = static_cast<std::uint32_t>(seed);
+    }
+    for (const auto& [key, target] :
+         std::initializer_list<std::pair<const char*, float*>>{{"base_height", &c.baseHeight},
+                                                               {"noise_amplitude", &c.noiseAmplitude},
+                                                               {"noise_frequency", &c.noiseFrequency},
+                                                               {"boundary_height", &c.boundaryHeight},
+                                                               {"road_width", &c.roadWidth},
+                                                               {"road_end_width", &c.roadEndWidth}}) {
+        if (j.contains(key)) {
+            *target = number(j.at(key), field + "." + key);
+        }
+    }
+    for (const auto& [key, target] :
+         std::initializer_list<std::pair<const char*, glm::vec3*>>{{"grass_color", &c.grassColor},
+                                                                   {"road_color", &c.roadColor},
+                                                                   {"rock_color", &c.rockColor}}) {
+        if (j.contains(key)) {
+            *target = vector<3>(j.at(key), field + "." + key);
+        }
+    }
+    for (const auto& [key, target] :
+         std::initializer_list<std::pair<const char*, std::vector<TerrainFeature>*>>{{"hills", &c.hills},
+                                                                                     {"pads", &c.pads}}) {
+        if (!j.contains(key)) {
+            continue;
+        }
+        array(j.at(key), field + "." + key, 256);
+        for (const auto& f : j.at(key)) {
+            fields(f, field, {"center", "radius", "height"});
+            target->push_back({vector<2>(required(f, "center", field), field),
+                               number(required(f, "radius", field), field),
+                               number(required(f, "height", field), field)});
+        }
+    }
+    if (j.contains("road")) {
+        array(j.at("road"), field + ".road", 256);
+        for (const auto& p : j.at("road")) {
+            c.road.push_back(vector<3>(p, field + ".road"));
+        }
+    }
+    return c;
+}
+
+Json writeHeightfield(const HeightfieldConfiguration& c) {
+    Json j = {{"minimalistic", c.minimalistic},
+              {"size", json(c.size)},
+              {"resolution", {c.resolution.x, c.resolution.y}},
+              {"playable_size", json(c.playableSize)},
+              {"base_height", c.baseHeight},
+              {"noise_amplitude", c.noiseAmplitude},
+              {"noise_frequency", c.noiseFrequency},
+              {"seed", c.seed},
+              {"boundary_height", c.boundaryHeight},
+              {"road_width", c.roadWidth},
+              {"road_end_width", c.roadEndWidth},
+              {"grass_color", json(c.grassColor)},
+              {"road_color", json(c.roadColor)},
+              {"rock_color", json(c.rockColor)},
+              {"hills", Json::array()},
+              {"pads", Json::array()},
+              {"road", Json::array()}};
+    for (const auto& [key, source] :
+         std::initializer_list<std::pair<const char*, const std::vector<TerrainFeature>*>>{{"hills", &c.hills},
+                                                                                           {"pads", &c.pads}}) {
+        for (const auto& f : *source) {
+            j[key].push_back({{"center", json(f.center)}, {"radius", f.radius}, {"height", f.height}});
+        }
+    }
+    for (const auto p : c.road) {
+        j["road"].push_back(json(p));
+    }
+    return j;
+}
+
 void readObjectProperties(Scene& scene, ObjectId object, const Json& record, const std::string& field) {
     ShadowProperties shadow;
     if (record.contains("casts_shadow")) {
@@ -538,6 +660,11 @@ void readObjectProperties(Scene& scene, ObjectId object, const Json& record, con
 
     if (record.contains("tint")) {
         scene.setTint(object, vector<4>(record.at("tint"), field + ".tint"));
+    }
+    if (record.contains("heightfield")) {
+        context(field + ".heightfield", [&] {
+            scene.setHeightfield(object, readHeightfield(record.at("heightfield"), field + ".heightfield"));
+        });
     }
 
     if (record.contains("material_override")) {
@@ -593,6 +720,9 @@ Json writeObject(ObjectId id, const SceneObject& object) {
     }
 
     record["casts_shadow"] = object.shadows.cast;
+    if (object.heightfield) {
+        record["heightfield"] = writeHeightfield(object.heightfield->configuration());
+    }
     record["receives_shadow"] = object.shadows.receive;
     if (object.model) {
         const auto text = object.model->generic_u8string();
@@ -712,6 +842,7 @@ std::unique_ptr<Scene> Scene::load(const std::filesystem::path& path) {
                         "name",
                         "parent",
                         "model",
+                        "heightfield",
                         "transform",
                         "enabled",
                         "tint",

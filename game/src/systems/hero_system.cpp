@@ -128,11 +128,25 @@ void HeroSystem::synchronize(const TowerSystem& towers) {
         }
     }
     levelGeometry_.synchronize(engine_, true);
-    if (geometryRevision_ == levelGeometry_.revision() && towerRevision_ == towers.revision()) {
+    auto navigationTowers = reservedSites_;
+    for (const auto& tower : towers.towers()) {
+        const bool reserved = std::any_of(reservedSites_.begin(), reservedSites_.end(), [&](const auto& site) {
+            return tower.buildZone && tower.buildZone == site.buildZone &&
+                   glm::length(glm::dvec2{tower.position.x - site.position.x, tower.position.z - site.position.z}) <
+                       1e-6 &&
+                   glm::all(glm::lessThanEqual(tower.halfExtent, site.halfExtent + glm::dvec3{1e-6})) &&
+                   std::abs((tower.position.y - tower.halfExtent.y) - (site.position.y - site.halfExtent.y)) < 1e-6 &&
+                   std::abs(glm::dot(tower.rotation, site.rotation)) > 1 - 1e-6;
+        });
+        if (!reserved) {
+            navigationTowers.push_back(tower);
+        }
+    }
+    if (geometryRevision_ == levelGeometry_.revision() && navigationTowers_ == navigationTowers) {
         return;
     }
     auto geometry = levelGeometry_.navigation();
-    for (const auto& tower : towers.towers()) {
+    for (const auto& tower : navigationTowers) {
         glm::mat4 transform{glm::mat4_cast(tower.rotation)};
         transform[3] = glm::vec4{tower.position, 1};
         geometry.addBox(-glm::vec3{tower.halfExtent}, glm::vec3{tower.halfExtent}, transform);
@@ -146,6 +160,7 @@ void HeroSystem::synchronize(const TowerSystem& towers) {
         }
     }
     geometryRevision_ = levelGeometry_.revision();
+    navigationTowers_ = std::move(navigationTowers);
     towerRevision_ = towers.revision();
 }
 
@@ -261,6 +276,30 @@ HeroId HeroSystem::deploy(glm::dvec3 position, std::optional<HeroId> existing, s
     return hero->id;
 }
 
+void HeroSystem::directControl(std::optional<HeroId> selected, glm::dvec2 movement) {
+    if (!std::isfinite(glm::length(movement))) {
+        throw std::invalid_argument("Invalid direct hero movement");
+    }
+    if (glm::length(movement) > 1) {
+        movement = glm::normalize(movement);
+    }
+    for (auto& hero : heroes_) {
+        const bool controlled = selected == hero.id && hero.health > 0 && hero.controllable;
+        if (controlled != hero.directlyControlled) {
+            hero.destination.reset();
+            hero.path.valid = false;
+            hero.state = HeroState::idle;
+            hero.combat.playerMoving = hero.combat.returning = hero.combat.explicitTarget = false;
+            hero.combat.excludedTarget.reset();
+            hero.combat.unreachableTarget.reset();
+            hero.combat.retryDelay = 0;
+            hero.defensivePosition = hero.position;
+        }
+        hero.directlyControlled = controlled;
+        hero.directMovement = controlled ? movement : glm::dvec2{0};
+    }
+}
+
 bool HeroSystem::command(HeroId id, glm::dvec3 destination) {
     auto* hero = findMutable(id);
     if (!hero || !hero->controllable || hero->health <= 0) {
@@ -314,6 +353,12 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
     if (!hero || hero->health <= 0 || damage == 0) {
         return false;
     }
+    const auto& defense = definition(*hero).combat;
+    const bool blocked = defense.blockReduction > 0 && hero->combat.blockRemaining <= 0;
+    if (blocked) {
+        damage *= 1 - defense.blockReduction;
+        hero->combat.blockRemaining = defense.blockCooldown;
+    }
     const auto deathClip = types_.at(hero->type)->deathClip;
     if (receiveDamage(*hero, damage)) {
         finishAttack(*hero);
@@ -335,7 +380,8 @@ bool HeroSystem::applyDamage(HeroId id, float damage) {
             hero->locomotionClip.reset();
         }
         hero->hitFlashRemaining = 0.15;
-        engine_.scene()->setTint(hero->object, {1, 0.35F, 0.3F, 1});
+        engine_.scene()->setTint(hero->object,
+                                 blocked ? glm::vec4{0.35F, 0.7F, 1.4F, 1} : glm::vec4{1, 0.35F, 0.3F, 1});
     }
     return true;
 }
@@ -627,6 +673,7 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
         throw std::invalid_argument("Hero delta must be finite and nonnegative.");
     }
     for (auto& hero : heroes_) {
+        hero.combat.blockRemaining = std::max(0.0, hero.combat.blockRemaining - delta);
         hero.hitAnimationRemaining = std::max(0.0, hero.hitAnimationRemaining - delta);
         if (hero.health > 0 && hero.hitFlashRemaining > 0) {
             hero.hitFlashRemaining = std::max(0.0, hero.hitFlashRemaining - delta);
@@ -639,6 +686,19 @@ void HeroSystem::update(double delta, bool movingAllowed, std::span<const Enemy>
         }
         const auto& config = definition(hero);
         double remaining = delta;
+        if (hero.directlyControlled && hero.health > 0 && movingAllowed) {
+            hero.defensivePosition = hero.position;
+            if (glm::length(hero.directMovement) > 0) {
+                const auto destination =
+                    navigation(hero.type).move(hero.position, hero.directMovement * config.speed * 0.5);
+                if (navigation(hero.type).findPath(hero.position, destination, hero.path)) {
+                    hero.destination = destination;
+                    hero.state = HeroState::moving;
+                }
+            } else {
+                stop(hero, HeroState::idle);
+            }
+        }
         while (movingAllowed && hero.state == HeroState::moving && remaining > 1e-10) {
             const double stepTime = std::min(remaining, std::min(1.0 / 60, config.radius * 0.4 / config.speed));
             step(hero, stepTime, enemies);

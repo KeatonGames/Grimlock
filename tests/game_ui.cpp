@@ -180,6 +180,22 @@ int main(int argc, char**) {
         require(runtime.paused(), "Escape did not pause after placement was canceled");
         escape(engine, runtime, id);
         require(!runtime.paused(), "Escape did not resume");
+        const auto press = [&](SDL_Keycode code, SDL_Scancode scan) {
+            SDL_Event event{};
+            event.type = SDL_EVENT_KEY_DOWN;
+            event.key.windowID = id;
+            event.key.key = code;
+            event.key.scancode = scan;
+            require(SDL_PushEvent(&event), SDL_GetError());
+            tick(engine, runtime, 1);
+            event.type = SDL_EVENT_KEY_UP;
+            require(SDL_PushEvent(&event), SDL_GetError());
+            tick(engine, runtime, 1);
+        };
+        press(SDLK_1, SDL_SCANCODE_1);
+        require(!runtime.controlledHero(), "Preparation hotkey enabled direct control");
+        const auto* cards = ImGui::FindWindowByName("Hero Controls");
+        require(cards && cards->Active, "Hero model cards are missing");
         const auto hero = runtime.heroes()->heroes().front().id;
         const auto instancesBeforeSelection = engine.performance().instances;
         const auto objectsBeforeSelection = engine.scene()->objects().size();
@@ -195,6 +211,16 @@ int main(int argc, char**) {
         require(runtime.selectHero(hero), "Hero reselection failed");
         runtime.startWave();
         tick(engine, runtime);
+        press(SDLK_1, SDL_SCANCODE_1);
+        require(runtime.controlledHero() == hero, "Hero 1 hotkey failed");
+        press(SDLK_2, SDL_SCANCODE_2);
+        require(runtime.controlledHero() && runtime.controlledHero() != hero, "Hero 2 switch failed");
+        press(SDLK_2, SDL_SCANCODE_2);
+        require(!runtime.controlledHero(), "Selected hero number failed to release control");
+        press(SDLK_1, SDL_SCANCODE_1);
+        press(SDLK_SPACE, SDL_SCANCODE_SPACE);
+        require(!runtime.controlledHero() && engine.cameraNavigationConfig().keyboardMovement,
+                "Space did not restore strategy mode");
         auto& enemies = *runtime.navigation().enemies();
         EnemyTypeId rat = 0, boss = 0;
         for (EnemyTypeId type = 0; type < enemies.typeCount(); ++type) {
@@ -271,22 +297,17 @@ int main(int argc, char**) {
         if (argc <= 1) {
             require(SDL_SetWindowSize(window, 640, 480), SDL_GetError());
             tick(engine, runtime, 5);
-            control(engine, runtime, id, "Main Menu", "Choose Level");
-            auto* selection = ImGui::FindWindowByName("Level Selection");
-            require(selection && selection->Active, "small-window level selection did not open");
-            const auto* v = ImGui::GetMainViewport();
-            require(selection->Pos.y >= v->Pos.y && selection->Pos.y + selection->Size.y <= v->Pos.y + v->Size.y + 1,
-                    "small-window level selection exceeded viewport");
-            const ImGuiWindow* cards = nullptr;
-            for (const auto* child : ImGui::GetCurrentContext()->Windows) {
-                if (child->Active && child->ParentWindow == selection) {
-                    cards = child;
-                    break;
-                }
-            }
-            require(cards && cards->ScrollMax.y < 1 && cards->ScrollMax.x < 1,
-                    "Single level card did not fit the small-window content area");
-            control(engine, runtime, id, "Level Selection", "Main Menu");
+            control(engine, runtime, id, "Main Menu", "PLAY");
+            tick(engine, runtime, 5);
+            auto* navigation = ImGui::FindWindowByName("World Map Navigation");
+            require(navigation && navigation->Active && engine.scene() && engine.scene()->name() == "Kingdom World Map",
+                    "small-window world map did not open");
+            const auto* viewport = ImGui::GetMainViewport();
+            require(navigation->Pos.y >= viewport->Pos.y &&
+                        navigation->Pos.y + navigation->Size.y <= viewport->Pos.y + viewport->Size.y + 1,
+                    "world-map navigation exceeded the small viewport");
+            require(!ImGui::FindWindowByName("Level Selection"), "Obsolete card selection remains");
+            control(engine, runtime, id, "World Map Navigation", "BACK");
         } else {
             for (int frame = 0; frame < 600; ++frame) {
                 require(engine.update(), "menu preview closed");

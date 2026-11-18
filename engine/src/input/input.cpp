@@ -39,6 +39,7 @@ Input::~Input() {
 }
 
 void Input::beginFrame() {
+    state_.keyboardCaptured = false;
     state_.leftPressPosition.reset();
 
     for (auto& b : state_.mouseButtons) {
@@ -190,9 +191,10 @@ void Input::relativeMode(bool enabled) {
     }
 }
 
-void Input::finishFrame(bool navigationEnabled) {
-    relativeMode(navigationEnabled && state_.focused &&
-                 (state_.button(MouseButton::right).held || state_.button(MouseButton::middle).held));
+void Input::finishFrame(bool navigationEnabled, bool middleNavigation) {
+    relativeMode(
+        navigationEnabled && state_.focused &&
+        (state_.button(MouseButton::right).held || (middleNavigation && state_.button(MouseButton::middle).held)));
 }
 
 void Input::cancelNavigation() {
@@ -203,6 +205,7 @@ void Input::cancelNavigation() {
 }
 
 void Input::capture(bool mouse, bool keyboard) {
+    state_.keyboardCaptured = keyboard;
     if (mouse) {
         clearButtons(false);
     }

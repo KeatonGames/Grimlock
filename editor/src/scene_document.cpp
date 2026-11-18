@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -230,6 +231,86 @@ ObjectId SceneDocument::groupObject(ObjectId object) {
     return group;
 }
 
+ObjectId SceneDocument::addHeightfield() {
+    auto& scene = *engine_.scene();
+    const auto id = scene.createObject("Continuous terrain");
+    try {
+        scene.setHeightfield(id, HeightfieldConfiguration{});
+        scene.setRole(id, "grimlock.terrain");
+        engine_.prepareScene(scene);
+        scene.selectObject(id, true);
+    } catch (...) {
+        scene.removeObject(id);
+        throw;
+    }
+    dirty_ = true;
+    return id;
+}
+
+void SceneDocument::configureHeightfield(ObjectId id, HeightfieldConfiguration configuration) {
+    auto& scene = *engine_.scene();
+    const auto previous = scene.object(id).heightfield;
+    try {
+        scene.setHeightfield(id, std::move(configuration));
+        engine_.prepareScene(scene);
+    } catch (...) {
+        scene.setHeightfield(id, previous ? std::optional{previous->configuration()} : std::nullopt);
+        engine_.prepareScene(scene);
+        throw;
+    }
+    dirty_ = true;
+}
+
+bool SceneDocument::groundObject(ObjectId id) {
+    auto& scene = *engine_.scene();
+    const auto& object = scene.object(id);
+    if (object.heightfield) {
+        return false;
+    }
+    const auto world = scene.worldTransform(id);
+    const glm::dvec3 origin = world[3];
+    std::optional<double> height;
+    for (const auto& [terrainId, terrain] : scene.objects()) {
+        if (!terrain.heightfield || !scene.enabledInHierarchy(terrainId)) {
+            continue;
+        }
+        const glm::dmat4 terrainWorld = scene.worldTransform(terrainId);
+        const auto inverse = glm::inverse(terrainWorld);
+        const Ray ray{glm::dvec3{inverse * glm::dvec4{origin.x, 10000, origin.z, 1}},
+                      glm::dvec3{inverse * glm::dvec4{0, -1, 0, 0}},
+                      0,
+                      20000};
+        if (const auto hit = terrain.heightfield->intersect(ray)) {
+            const auto y = (terrainWorld * glm::dvec4{*hit, 1}).y;
+            if (!height || y > *height) {
+                height = y;
+            }
+        }
+    }
+    if (!height) {
+        return false;
+    }
+    double bottom = origin.y;
+    if (object.model) {
+        const auto& data = scene.animation(id).model();
+        bottom = std::numeric_limits<double>::max();
+        for (const auto x : {data.minimum.x, data.maximum.x}) {
+            for (const auto y : {data.minimum.y, data.maximum.y}) {
+                for (const auto z : {data.minimum.z, data.maximum.z}) {
+                    bottom = std::min(bottom, static_cast<double>((world * glm::vec4{x, y, z, 1}).y));
+                }
+            }
+        }
+    }
+    auto transform = object.local;
+    const auto delta = glm::dvec4{0, *height - bottom, 0, 0};
+    transform.position +=
+        glm::vec3{object.parent ? glm::inverse(glm::dmat4{scene.worldTransform(*object.parent)}) * delta : delta};
+    scene.setTransform(id, transform);
+    dirty_ = true;
+    return true;
+}
+
 ObjectId SceneDocument::addModel(const std::filesystem::path& model) {
     auto& scene = *engine_.scene();
     const auto id = scene.createObject(text(model.stem()));
@@ -253,6 +334,7 @@ ObjectId SceneDocument::addModel(const std::filesystem::path& model) {
         transform.scale = glm::vec3{scale};
         transform.position = {target.x - center.x * scale, -data.minimum.y * scale, target.z - center.z * scale};
         scene.setTransform(id, transform);
+        (void)groundObject(id);
         engine_.prepareScene(scene);
         scene.selectObject(id, true);
     } catch (...) {
@@ -278,6 +360,9 @@ ObjectId SceneDocument::duplicate(ObjectId source) {
         scene.setTint(id, original.tint);
         scene.setShadowProperties(id, original.shadows);
         scene.setModel(id, original.model);
+        if (original.heightfield) {
+            scene.setHeightfield(id, original.heightfield->configuration());
+        }
         scene.setMaterialOverride(id, original.materialOverride);
 
         if (original.model) {

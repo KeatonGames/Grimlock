@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     try {
         require(argc == 3, "expected asset and fixture directories");
         const auto definitions = loadAnimalDefinitions(argv[1]);
-        require(definitions.size() == 18 && definitions.front().model == "enemies/animals/chicken.glb" &&
+        require(definitions.size() == 19 && definitions.front().model == "enemies/animals/chicken.glb" &&
                     definitions.front().radius == 0.195 && definitions.front().visualHeight == 0.36F,
                 "animal catalog/default settings incorrect");
         bool varied = false;
@@ -55,7 +55,9 @@ int main(int argc, char** argv) {
                     hunter.name == "Hunter" && hunter.maximumHealth > grunt.maximumHealth &&
                     hunter.speed > grunt.speed && hunter.combat.heroPriority > hunter.combat.towerPriority,
                 "archetype statistics or independent animal inheritance incorrect");
-        const auto& goblinBoss = definitions.back();
+        const auto& goblinBoss = *std::find_if(definitions.begin(), definitions.end(), [](const auto& definition) {
+            return definition.name == "Goblin Boss";
+        });
         require(goblinBoss.name == "Goblin Boss" && goblinBoss.boss && goblinBoss.model == grunt.model &&
                     goblinBoss.maximumHealth == 900 && goblinBoss.visualHeight == 1.5F && goblinBoss.radius == 0.4 &&
                     goblinBoss.combat.firstDetected && goblinBoss.combat.damage == 18 &&

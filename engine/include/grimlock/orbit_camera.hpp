@@ -3,6 +3,8 @@
 #include "grimlock/camera.hpp"
 #include "grimlock/input.hpp"
 
+#include <optional>
+
 namespace grimlock {
 
 struct OrbitCameraConfig {
@@ -10,8 +12,11 @@ struct OrbitCameraConfig {
     float distance = 10, yaw = 0, pitch = 0.610865238F; // Angles in radians, pitch above XZ.
     float panSensitivity = 1, rotationSensitivity = 0.005F, zoomSensitivity = 0.15F;
     float panDragThreshold = 0; // Logical pixels; zero preserves immediate editor panning.
+    bool strategyControls = false, keyboardMovement = true;
+    float keyboardSpeed = 12;
     float minDistance = 0.5F, maxDistance = 100;
     float minPitch = 0.087266463F, maxPitch = 1.483529864F; // 5 to 85 degrees.
+    std::optional<glm::vec2> panHalfExtent;                 // Optional world X/Z bounds centered on the origin.
 };
 
 // Changes the existing Camera, not a second view/projection system. Mouse deltas
@@ -29,7 +34,8 @@ public:
     // necessary limits/world-up correction, preserving normal authored poses.
     void synchronize(Camera& camera);
     void apply(Camera& camera) const;
-    [[nodiscard]] bool update(Camera& camera, const InputState& input, float windowHeight);
+    void follow(Camera& camera, glm::vec3 target, double delta);
+    [[nodiscard]] bool update(Camera& camera, const InputState& input, float windowHeight, double delta = 1.0 / 60);
     void cancelDrag() noexcept;
 
 private:
@@ -40,6 +46,7 @@ private:
     };
     OrbitCameraConfig config_;
     Drag drag_ = Drag::none;
+    glm::vec2 keyboardVelocity_{0};
 };
 
 } // namespace grimlock

@@ -1,6 +1,6 @@
 # Handcrafted levels and waves
 
-Game discovers only **Level 01 - Forest Defense** from `assets/levels/`.
+Game discovers only **Level 01 - Greenhaven Valley** from `assets/levels/`.
 The older scenarios below are preserved under `assets/test_fixtures/levels/`
 for automated checks and existing Editor shortcuts, outside the playable catalog.
 

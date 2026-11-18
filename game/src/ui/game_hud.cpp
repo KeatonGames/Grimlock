@@ -74,7 +74,7 @@ OverlayInput GameHud::frame() {
         } catch (const std::exception& error) {
             error_ = error.what();
             runtime_.unload(engine_);
-            screen_ = Screen::levels;
+            screen_ = Screen::worldMap;
             refreshLevels();
         }
     }
@@ -98,6 +98,9 @@ OverlayInput GameHud::frame() {
         viewportMouse_ = false;
         commandCursor_.reset();
         commandGesture_ = {};
+        if (screen_ == Screen::worldMap) {
+            return {ImGui::GetIO().WantCaptureMouse, ImGui::GetIO().WantTextInput, false, true};
+        }
         return {true, true, false, true};
     }
     const auto* waves = runtime_.level().waves();
@@ -142,6 +145,7 @@ OverlayInput GameHud::frame() {
     upgradeFlashRemaining_ = std::max(0.0, upgradeFlashRemaining_ - io.DeltaTime);
     orderRemaining_ = std::max(0.0F, orderRemaining_ - io.DeltaTime);
     status();
+    heroControls();
     if (waves) {
         construction();
         coins();
@@ -151,9 +155,9 @@ OverlayInput GameHud::frame() {
     notifications();
     const bool overUi = io.WantCaptureMouse || ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow);
     viewportMouse_ = !runtime_.paused() && !relative && !overUi && !cancelWorldInput_;
-    const bool commandsAllowed = !cancelWorldInput_ && !runtime_.placing();
-    commandCursor_ = commandGesture_.update(engine_.input(), commandsAllowed && (relative || !overUi));
-    return {!relative && overUi, io.WantCaptureKeyboard, false, runtime_.placing()};
+    commandCursor_.reset();
+    commandGesture_ = {};
+    return {!relative && overUi, io.WantTextInput, false, runtime_.placing()};
 }
 
 void GameHud::clearFeedback() {
@@ -190,17 +194,6 @@ void GameHud::refreshLevels() {
         selectedLevel_.reset();
     }
     refreshRemaining_ = 2;
-    if (!selectedLevel_ && runtime_.progress()) {
-        for (const auto& level : catalog_.levels) {
-            if (level.id == runtime_.progress()->lastPlayed() && !level.id.empty()) {
-                selectedLevel_ = level.path;
-                break;
-            }
-        }
-    }
-    if (!selectedLevel_ && !catalog_.levels.empty()) {
-        selectedLevel_ = catalog_.levels.front().path;
-    }
 }
 
 void GameHud::progressNotice() {
@@ -220,7 +213,7 @@ void GameHud::transitions() {
         clearFeedback();
         screen_ = next;
         SDL_SetWindowRelativeMouseMode(native_.window, false);
-        if (screen_ == Screen::levels) {
+        if (screen_ == Screen::worldMap) {
             refreshLevels();
         }
     }
@@ -229,11 +222,20 @@ void GameHud::transitions() {
         requestedLevel_.reset();
         clearFeedback();
         try {
+            const auto definition = loadLevelDefinition(path);
+            const AvailableLevel entry{path,
+                                       definition.name,
+                                       definition.description,
+                                       definition.id,
+                                       definition.requiredLevel};
+            if (!levelUnlocked(entry, runtime_.progress())) {
+                throw std::runtime_error("Complete the previous chapter to unlock this level.");
+            }
             runtime_.load(engine_, path);
             screen_ = Screen::gameplay;
         } catch (const std::exception& error) {
             runtime_.unload(engine_);
-            screen_ = Screen::levels;
+            screen_ = Screen::worldMap;
             error_ = error.what();
             refreshLevels();
         }
@@ -675,8 +677,8 @@ void GameHud::result() {
                 }
             }
         }
-        if (presentation::menuAction("LEVELS###Choose Level", {-1, 38 * layout_.scale})) {
-            requestedScreen_ = Screen::levels;
+        if (presentation::menuAction("WORLD MAP###World Map", {-1, 38 * layout_.scale})) {
+            requestedScreen_ = Screen::worldMap;
         }
     }
     ImGui::End();
@@ -1182,4 +1184,89 @@ void GameHud::placementOverlay(const Camera& camera) {
     }
 }
 
+} // namespace grimlock::game
+
+namespace grimlock::game {
+void GameHud::heroControls() {
+    const auto* heroes = runtime_.heroes();
+    const auto* waves = runtime_.level().waves();
+    if (!heroes || !waves || heroes->typeCount() == 0) {
+        return;
+    }
+    const bool battle = waves->phase() == LevelPhase::battle && !runtime_.paused();
+    if (battle && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive()) {
+        for (std::size_t slot = 0; slot < std::min<std::size_t>(3, heroes->typeCount()); ++slot) {
+            if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(ImGuiKey_1 + slot), false)) {
+                (void)runtime_.controlHeroSlot(slot);
+            }
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+            runtime_.releaseHeroControl();
+        }
+    }
+    const auto* viewport = ImGui::GetMainViewport();
+    const float top = 90 * layout_.scale;
+    const float lower =
+        runtime_.inspectedTower() ? viewport->Size.y - layout_.contextHeight - layout_.gap : viewport->Size.y - 90;
+    const float size = std::clamp((lower - top - 24) / 3, 28.0F, 78.0F);
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - 18, viewport->Pos.y + top}, ImGuiCond_Always, {1, 0});
+    ImGui::Begin("Hero Controls", nullptr, hudFlags | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoNav);
+    for (std::size_t slot = 0; slot < std::min<std::size_t>(3, heroes->typeCount()); ++slot) {
+        const auto found = std::find_if(heroes->heroes().begin(), heroes->heroes().end(), [&](const auto& hero) {
+            return hero.type == slot;
+        });
+        if (found == heroes->heroes().end()) {
+            continue;
+        }
+        const bool alive = found->health > 0 && found->controllable;
+        const bool active = runtime_.controlledHero() == found->id;
+        ImGui::PushID(static_cast<int>(slot));
+        const auto p = ImGui::GetCursorScreenPos();
+        const bool clicked = ImGui::InvisibleButton("Hero", {size, size});
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImVec2 end{p.x + size, p.y + size};
+        const ImVec2 corners[]{{p.x + 6, p.y},
+                               {end.x, p.y},
+                               {end.x, end.y - 6},
+                               {end.x - 6, end.y},
+                               {p.x, end.y},
+                               {p.x, p.y + 6}};
+        draw->AddConvexPolyFilled(corners, 6, presentation::menuInk(presentation::panel));
+        const auto portrait = engine_.assetRoot() / "ui/heroes" / (heroes->definition(slot).id + ".png");
+        if (menuImages_.contains(portrait) || std::filesystem::is_regular_file(portrait)) {
+            const int frame = static_cast<int>(ImGui::GetTime() * 8) % 16;
+            const ImVec2 uv{(frame % 4) * 0.25F, (frame / 4) * 0.25F};
+            draw->AddImage(menuImage(portrait),
+                           {p.x + 3, p.y + 3},
+                           {end.x - 3, end.y - 3},
+                           uv,
+                           {uv.x + 0.25F, uv.y + 0.25F},
+                           alive ? IM_COL32_WHITE : IM_COL32(90, 90, 100, 180));
+        }
+        draw->AddPolyline(corners,
+                          6,
+                          presentation::menuInk(active  ? presentation::menuGold
+                                                : alive ? presentation::ivory
+                                                        : presentation::stone),
+                          ImDrawFlags_Closed,
+                          active ? 3.0F : 1.0F);
+        const auto number = std::to_string(slot + 1);
+        draw->AddText({p.x + 6, p.y + 4}, presentation::menuInk(presentation::ivory), number.c_str());
+        const float health = std::clamp(found->health / heroes->definition(slot).maximumHealth, 0.0F, 1.0F);
+        draw->AddRectFilled({p.x + 4, end.y - 6},
+                            {p.x + 4 + (size - 8) * health, end.y - 3},
+                            IM_COL32(207, 177, 103, 255));
+        if (clicked && battle && alive) {
+            (void)runtime_.controlHeroSlot(slot);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s\n%s",
+                              heroes->definition(slot).name.c_str(),
+                              battle ? "WASD move | SPACE release" : "Available during waves");
+        }
+        ImGui::PopID();
+        ImGui::Dummy({0, 5});
+    }
+    ImGui::End();
+}
 } // namespace grimlock::game

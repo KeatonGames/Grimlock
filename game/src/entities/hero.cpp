@@ -85,6 +85,13 @@ HeroDefinition readHeroDefinition(const std::filesystem::path& assets, const nlo
             throw std::invalid_argument("Invalid hero projectile model.");
         }
     }
+    stats.blockCooldown = combat.value("block_cooldown", 0.0);
+    stats.blockReduction = combat.value("block_reduction", 0.0F);
+    if (!std::isfinite(stats.blockCooldown) || stats.blockCooldown < 0 || !std::isfinite(stats.blockReduction) ||
+        stats.blockReduction < 0 || stats.blockReduction > 1 ||
+        (stats.blockReduction > 0 && stats.blockCooldown <= 0)) {
+        throw std::invalid_argument("Invalid automatic shield block configuration.");
+    }
     stats.specialAbilities = combat.value("special_abilities", stats.specialAbilities);
     const auto ability = combat.value("cleave", nlohmann::json::object());
     stats.cleave.damage = ability.value("damage", stats.cleave.damage);

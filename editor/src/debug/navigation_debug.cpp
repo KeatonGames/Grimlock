@@ -585,6 +585,7 @@ void NavigationDebug::levelDefinitionMenu(Engine& engine) {
     }
     ImGui::InputText("Level Name", &definition.name);
     ImGui::InputTextMultiline("Description", &definition.description, {0, 65});
+    ImGui::InputText("Required level ID", &definition.requiredLevel);
     auto scene = definition.scene.generic_string();
     if (ImGui::InputText("Scene (asset relative)", &scene)) {
         definition.scene = scene;

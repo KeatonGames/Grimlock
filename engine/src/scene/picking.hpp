@@ -30,9 +30,23 @@ private:
         glm::dvec3 minimum{}, maximum{};
     };
 
+    struct Node {
+        Bounds bounds;
+        std::size_t first = 0, count = 0, left = 0, right = 0;
+    };
+
+    struct MeshTree {
+        std::vector<std::size_t> triangles;
+        std::vector<Node> nodes;
+    };
+
+    static std::size_t partition(MeshTree& tree, const assets::MeshData& mesh, std::size_t first, std::size_t count);
+
     [[nodiscard]] std::optional<Bounds> skinBounds(std::size_t mesh, std::span<const glm::mat4> joints) const;
 
     std::vector<Bounds> bounds_;
+    std::vector<MeshTree> trees_;
+    std::vector<std::size_t> stack_;
     std::vector<std::vector<Bounds>> jointBounds_;
     std::vector<glm::dvec3> positions_; // Scratch for exact skinned/morphed triangle tests.
 };

@@ -116,6 +116,22 @@ $target.nodes += [pscustomobject]@{ name = $(if ($Character -eq 'Knight') { 'Kni
 $target.meshes += $weaponAsset.meshes
 $slot = $target.nodes[$names[$socket]]
 $slot | Add-Member children @(@($slot.children) + @($nodeIndex) | Where-Object { $null -ne $_ }) -Force
+if ($Character -eq 'Knight') {
+    $shield = Read-Glb (Join-Path $root 'towers/weapons/kaykit/shield_square.glb')
+    $base = Append-Data $shield.json $shield.bin
+    foreach ($mesh in $shield.json.meshes) {
+        foreach ($primitive in $mesh.primitives) {
+            foreach ($attribute in $primitive.attributes.PSObject.Properties) { $attribute.Value += $base }
+            $primitive.indices += $base
+            $primitive.material = $material
+        }
+    }
+    $shieldNode = $target.nodes.Count
+    $target.nodes += [pscustomobject]@{ name = 'Knight_Shield'; mesh = $target.meshes.Count; rotation = @(-0.5, 0.5, 0.5, 0.5) }
+    $target.meshes += $shield.json.meshes
+    $leftHand = $target.nodes[$names['handslot.l']]
+    $leftHand | Add-Member children @(@($leftHand.children) + @($shieldNode) | Where-Object { $null -ne $_ }) -Force
+}
 if ($Character -eq 'Ranger') {
     function Add-Scalars([float[]]$values) {
         while ($binary.Length % 4) { $binary.WriteByte(0) }

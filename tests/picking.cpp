@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <glm/ext/matrix_transform.hpp>
+#include <grimlock/heightfield.hpp>
 #include <grimlock/scene.hpp>
 #include <iostream>
 #include <stdexcept>
@@ -37,6 +38,43 @@ std::shared_ptr<assets::ModelData> triangleModel() {
     model->roots = {0};
 
     return model;
+}
+
+void spatialPicking() {
+    HeightfieldConfiguration config;
+    config.size = {12, 12};
+    config.playableSize = config.size;
+    config.resolution = {13, 13};
+    config.boundaryHeight = 0;
+    config.noiseAmplitude = 0.4F;
+    const Heightfield terrain{config};
+    const auto model = terrain.model();
+    auto reference = std::make_shared<assets::ModelData>(*model);
+    const auto mesh = reference->meshes.front();
+    reference->meshes.clear();
+    reference->nodes[0].meshes.clear();
+    // Small batches exercise the original triangle path as an independent reference for the spatial tree.
+    for (std::size_t first = 0; first < mesh.indices.size(); first += 96) {
+        auto batch = mesh;
+        batch.indices.assign(mesh.indices.begin() + first,
+                             mesh.indices.begin() + std::min(first + 96, mesh.indices.size()));
+        reference->nodes[0].meshes.push_back(reference->meshes.size());
+        reference->meshes.push_back(std::move(batch));
+    }
+    assets::ModelInstance instance{model}, referenceInstance{reference};
+    picking::Geometry accelerated{*model}, exhaustive{*reference};
+    for (const auto scale : {glm::vec3{1}, glm::vec3{-1, 1.3F, 0.8F}}) {
+        const auto world = glm::scale(glm::translate(glm::mat4{1}, glm::vec3{2, 1, -3}), scale);
+        for (int z = -7; z <= 7; ++z) {
+            for (int x = -7; x <= 7; ++x) {
+                const auto query = ray({x + 2.13, 12, z - 2.79}, {0.03, -1, 0.02});
+                const auto actual = accelerated.intersect(query, instance, world, {}, 100);
+                const auto expected = exhaustive.intersect(query, referenceInstance, world, {}, 100);
+                require(actual.has_value() == expected.has_value() && (!actual || std::abs(*actual - *expected) < 1e-8),
+                        "Spatial picking differs from exhaustive terrain triangles");
+            }
+        }
+    }
 }
 
 void rays() {
@@ -389,6 +427,7 @@ int main(int argc, char** argv) {
     try {
         rays();
         geometry();
+        spatialPicking();
         deformation();
         skinBroadPhase();
         alphaCoverage();

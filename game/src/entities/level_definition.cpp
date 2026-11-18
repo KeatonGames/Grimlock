@@ -71,6 +71,10 @@ void validateLevelDefinition(const LevelDefinition& definition) {
     if (!definition.id.empty() && !validLevelId(definition.id)) {
         throw std::invalid_argument("Invalid stable level ID.");
     }
+    if (!definition.requiredLevel.empty() &&
+        (!validLevelId(definition.requiredLevel) || definition.requiredLevel == definition.id)) {
+        throw std::invalid_argument("Invalid prerequisite level ID.");
+    }
     if (definition.name.empty() || definition.scene.empty() || definition.scene.is_absolute() ||
         definition.scene.has_root_name() || definition.scene.extension() != ".json" ||
         !finite(definition.objectivePosition) || !std::isfinite(definition.objectiveHeight) ||
@@ -136,6 +140,7 @@ LevelDefinition loadLevelDefinition(const std::filesystem::path& path) {
     LevelDefinition result;
     result.name = document.at("name").get<std::string>();
     result.id = document.value("id", std::string{});
+    result.requiredLevel = document.value("required_level", std::string{});
     result.description = document.value("description", std::string{});
     if (document.contains("available_heroes")) {
         result.availableHeroes = document.at("available_heroes").get<std::vector<std::string>>();
@@ -204,6 +209,9 @@ void saveLevelDefinition(const std::filesystem::path& path, const LevelDefinitio
                               {"damage_per_arrival", definition.damagePerArrival}}},
                             {"spawns", nlohmann::json::array()},
                             {"waves", nlohmann::json::array()}};
+    if (!definition.requiredLevel.empty()) {
+        document["required_level"] = definition.requiredLevel;
+    }
     if (!definition.description.empty()) {
         document["description"] = definition.description;
     }

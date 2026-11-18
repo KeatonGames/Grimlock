@@ -1,5 +1,6 @@
 #include "grimlock/orbit_camera.hpp"
 
+#include <SDL3/SDL_scancode.h>
 #include <algorithm>
 #include <cmath>
 #include <glm/geometric.hpp>
@@ -46,6 +47,7 @@ void OrbitCameraController::configure(const OrbitCameraConfig& value) {
                          value.yaw,
                          value.pitch,
                          value.panSensitivity,
+                         value.keyboardSpeed,
                          value.panDragThreshold,
                          value.rotationSensitivity,
                          value.zoomSensitivity,
@@ -61,12 +63,23 @@ void OrbitCameraController::configure(const OrbitCameraConfig& value) {
     if (value.minDistance <= 0 || value.maxDistance < value.minDistance || value.minPitch < 0 ||
         value.maxPitch >= pi / 2 || value.maxPitch < value.minPitch || value.panSensitivity < 0 ||
         value.rotationSensitivity < 0 || value.zoomSensitivity < 0 || value.panDragThreshold < 0 ||
-        value.target.y + value.maxDistance * std::sin(value.maxPitch) < 0) {
+        value.keyboardSpeed < 0 || value.target.y + value.maxDistance * std::sin(value.maxPitch) < 0) {
         throw std::invalid_argument(
             "Invalid orbit sensitivities/bounds or target unreachable above the Y=0 ground plane.");
     }
 
     auto next = value;
+    if (value.keyboardMovement != config_.keyboardMovement || value.strategyControls != config_.strategyControls) {
+        keyboardVelocity_ = {0, 0};
+    }
+    if (value.panHalfExtent) {
+        const auto extent = *value.panHalfExtent;
+        if (!finite(glm::vec3{extent, 0}) || extent.x <= 0 || extent.y <= 0) {
+            throw std::invalid_argument("Invalid pan bounds");
+        }
+        next.target.x = std::clamp(next.target.x, -extent.x, extent.x);
+        next.target.z = std::clamp(next.target.z, -extent.y, extent.y);
+    }
     next.yaw = wrap(next.yaw);
     next.distance = std::clamp(next.distance, next.minDistance, next.maxDistance);
 
@@ -93,8 +106,10 @@ void OrbitCameraController::synchronize(Camera& camera) {
     next.pitch = static_cast<float>(std::asin(std::clamp(offset.y / glm::length(offset), -1.0, 1.0)));
     const auto distance = next.distance, pitch = next.pitch;
     configure(next);
+    keyboardVelocity_ = {0, 0};
 
-    if (distance != config_.distance || pitch != config_.pitch || camera.up != glm::vec3{0, 1, 0}) {
+    if (distance != config_.distance || pitch != config_.pitch || camera.target != config_.target ||
+        camera.up != glm::vec3{0, 1, 0}) {
         apply(camera);
     }
 }
@@ -116,20 +131,62 @@ void OrbitCameraController::cancelDrag() noexcept {
     drag_ = Drag::none;
 }
 
-bool OrbitCameraController::update(Camera& camera, const InputState& input, float windowHeight) {
+void OrbitCameraController::follow(Camera& camera, glm::vec3 target, double delta) {
+    if (!finite(target) || !std::isfinite(delta) || delta < 0) {
+        throw std::invalid_argument("Invalid camera follow input");
+    }
+    if (config_.panHalfExtent) {
+        target.x = std::clamp(target.x, -config_.panHalfExtent->x, config_.panHalfExtent->x);
+        target.z = std::clamp(target.z, -config_.panHalfExtent->y, config_.panHalfExtent->y);
+    }
+    config_.target = glm::mix(config_.target, target, static_cast<float>(1 - std::exp(-6 * delta)));
+    apply(camera);
+}
+
+bool OrbitCameraController::update(Camera& camera, const InputState& input, float windowHeight, double delta) {
+    if (!std::isfinite(delta) || delta < 0) {
+        throw std::invalid_argument("Invalid camera delta");
+    }
     if (!input.focused || !std::isfinite(windowHeight) || windowHeight <= 0) {
         cancelDrag();
+        keyboardVelocity_ = {0, 0};
 
         return false;
     }
 
-    const auto action = input.button(MouseButton::middle).held  ? Drag::orbit
-                        : input.button(MouseButton::right).held ? Drag::pan
-                                                                : Drag::none;
+    const auto action = config_.strategyControls ? (input.button(MouseButton::right).held ? Drag::orbit : Drag::none)
+                        : input.button(MouseButton::middle).held ? Drag::orbit
+                        : input.button(MouseButton::right).held  ? Drag::pan
+                                                                 : Drag::none;
     const auto& button = input.button(action == Drag::orbit ? MouseButton::middle : MouseButton::right);
     const bool continuing = action == drag_ && !button.pressed && !button.released;
     drag_ = action;
     bool changed = false, rebuild = false;
+    if (config_.strategyControls && config_.keyboardMovement) {
+        if (input.keyboardCaptured) {
+            keyboardVelocity_ = {0, 0};
+        }
+        glm::vec2 axes{static_cast<float>(input.key(SDL_SCANCODE_D).held) - input.key(SDL_SCANCODE_A).held,
+                       static_cast<float>(input.key(SDL_SCANCODE_W).held) - input.key(SDL_SCANCODE_S).held};
+        if (input.keyboardCaptured) {
+            axes = {0, 0};
+        }
+        if (glm::length(axes) > 1) {
+            axes = glm::normalize(axes);
+        }
+        keyboardVelocity_ = glm::mix(keyboardVelocity_, axes, static_cast<float>(1 - std::exp(-12 * delta)));
+        if (glm::length(keyboardVelocity_) > 1e-4F) {
+            axes = keyboardVelocity_;
+            const glm::vec3 forward{-std::sin(config_.yaw), 0, -std::cos(config_.yaw)};
+            const glm::vec3 right{std::cos(config_.yaw), 0, -std::sin(config_.yaw)};
+            config_.target += (right * axes.x + forward * axes.y) * config_.keyboardSpeed * static_cast<float>(delta);
+            if (config_.panHalfExtent) {
+                config_.target.x = std::clamp(config_.target.x, -config_.panHalfExtent->x, config_.panHalfExtent->x);
+                config_.target.z = std::clamp(config_.target.z, -config_.panHalfExtent->y, config_.panHalfExtent->y);
+            }
+            changed = rebuild = true;
+        }
+    }
     const auto motion = input.mouseMotion;
 
     if (continuing && std::isfinite(motion.x) && std::isfinite(motion.y) && (motion.x != 0 || motion.y != 0)) {
@@ -159,7 +216,11 @@ bool OrbitCameraController::update(Camera& camera, const InputState& input, floa
                                  windowHeight * config_.panSensitivity;
             const auto target = glm::dvec3{config_.target} +
                                 (-static_cast<double>(motion.x) * right + static_cast<double>(motion.y) * up) * scale;
-            const auto next = glm::vec3{target};
+            auto next = glm::vec3{target};
+            if (config_.panHalfExtent) {
+                next.x = std::clamp(next.x, -config_.panHalfExtent->x, config_.panHalfExtent->x);
+                next.z = std::clamp(next.z, -config_.panHalfExtent->y, config_.panHalfExtent->y);
+            }
 
             if (!finite(next)) {
                 throw std::overflow_error("Orbit pan exceeds finite coordinates.");

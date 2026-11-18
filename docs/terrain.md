@@ -1,5 +1,48 @@
-# Elevated terrain
+# Continuous and imported terrain
 
+## Heightfield scene component
+
+Engine's `Heightfield` generates an immutable connected surface from
+`HeightfieldConfiguration`. The scene object `heightfield` field stores authored
+parameters, not baked triangles. Scene load regenerates the same model used by
+the Vulkan renderer and triangle picking. No additional renderer or asset format
+is required. A heightfield and imported `model` are mutually exclusive on an object.
+
+Use **Create Terrain** in the Editor hierarchy. Select the object and expand
+**Terrain generation** to configure visual dimensions, vertex resolution (2 to
+513 vertices per axis), playable dimensions, base height, seeded smooth noise,
+boundary hills, grass/dirt/rock colors, hills, flat pads and road points.
+Colors are linear RGB. Roads are authored XYZ polylines with width and end width;
+terrain elevation and vertex color blend around the route. Pads flatten a disc
+and smoothly join the surrounding terrain. Hills use radial smooth profiles.
+The last pads in the list take precedence where they overlap.
+
+`Heightfield::sample(localXZ)` returns the exact rendered triangle elevation and
+face normal, including both halves of a cell and the outer edge. `intersect(ray)`
+returns a hit on the same triangles, respecting the supplied interval. Queries
+outside visual bounds return no sample. Scene transforms apply to the generated
+model in rendering, picking, and navigation; direct Heightfield queries are local.
+
+Mark the component `grimlock.terrain`. The game feeds its generated triangles
+within `playable_size` into the existing Recast pipeline. Scenery beyond that
+extent still renders. The maximum slope and agent clearance rules remain the
+same as for imported terrain. Existing obstacles, full-footprint building support,
+combat cover, enemy movement and hero movement reuse those triangles. Terrain
+parameter changes invalidate the navigation source; ordinary frames reuse it.
+
+**Ground on terrain** positions an edited object's lowest transformed bound on
+the heightfield, including objects with parents. Add Model uses this automatically
+when a heightfield is beneath the camera target. Terrain edits do not silently
+move existing decorations or construction areas; re-ground them and check
+navigation before saving. Flat pads should cover complete building footprints.
+Game still rejects unsupported or overlapping tower placement.
+
+This implementation uses one mesh, smooth vertex normals, UVs and existing PBR
+vertex-color materials. It has no streaming, LOD, sculpting brushes or water
+simulation. `Terrain.Heightfield` provides CPU generation/query/serialization
+checks; `Level.Forest` exercises the generated surface through gameplay and Editor.
+
+## Imported terrain fixtures
 Run the handcrafted test level from the repository root after building:
 
 ```powershell
@@ -84,11 +127,14 @@ hero ascent, elevated placement/removal, cross-height projectiles, scene/level
 round trips, wave completion and restart. The remaining CTest suite covers existing
 flat gameplay, rendering, assets, input, economy, combat and Editor interactions.
 
-Initial terrain verification: Game and Editor build in Debug and Release, with no compiler warnings;
+Historical imported-terrain verification: Game and Editor build in Debug and Release, with no compiler warnings;
 all 33 CTest checks pass in both configurations (Release 99.26 s, Debug 218.15 s).
-Vulkan validation reports no errors or synchronization hazards. Formatting and
+That verification reported no Vulkan errors or synchronization hazards. Formatting and
 whitespace checks pass. Logs are under `out/archive/terrain/`.
 
 For the subsequent solid-cover, projectile collision and visibility work, see
-[combat and cover](combat.md). Current verification passes all 34 tests in both
+[combat and cover](combat.md). That historical verification passed all 34 tests in both
 configurations; logs are under `out/archive/phase28/`.
+
+Current Greenhaven heightfield build, test and validation results are recorded in
+[the level guide](forest_defense.md#validation).

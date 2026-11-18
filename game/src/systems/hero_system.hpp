@@ -18,6 +18,10 @@ public:
     HeroSystem& operator=(const HeroSystem&) = delete;
     void synchronize(const TowerSystem& towers);
 
+    void reserveConstructionSites(std::span<const Tower> sites) {
+        reservedSites_.assign(sites.begin(), sites.end());
+    }
+
     void shareCombatGeometry(const CombatGeometry& geometry) noexcept {
         sharedGeometry_ = &geometry;
     }
@@ -29,6 +33,7 @@ public:
     [[nodiscard]] HeroId deploy(glm::dvec3 position, std::optional<HeroId> existing = {}, std::size_t type = 0);
     [[nodiscard]] bool command(HeroId hero, glm::dvec3 destination);
     [[nodiscard]] bool cancelCommand(HeroId hero);
+    void directControl(std::optional<HeroId> hero, glm::dvec2 movement = {});
     [[nodiscard]] bool applyDamage(HeroId hero, float damage);
     void update(double delta, bool movingAllowed, std::span<const Enemy> enemies = {});
     void clear() noexcept;
@@ -107,6 +112,7 @@ private:
     CombatGeometry combatGeometry_;
     const CombatGeometry* sharedGeometry_ = nullptr;
     std::uint64_t geometryRevision_ = 0, towerRevision_ = 0;
+    std::vector<Tower> reservedSites_, navigationTowers_;
     std::optional<InstanceId> preview_;
     NavigationPath commandPath_;
     std::size_t previewType_ = 0;

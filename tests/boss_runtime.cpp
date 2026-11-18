@@ -82,10 +82,12 @@ void combat(Engine& engine) {
             "boss did not damage tower");
     require(navigation.removeTower(engine, towerId), "boss tower cleanup failed");
     heroes.synchronize(navigation.towers());
-    for (int frame = 0; frame < 300 && heroes.find(hero)->health == 100; ++frame) {
+    for (int frame = 0; frame < 300 && heroes.find(hero)->health == heroes.definition().maximumHealth; ++frame) {
         tick();
     }
-    require(heroes.find(hero)->health == 100 - definition.combat.damage, "boss did not attack hero");
+    require(heroes.find(hero)->health == heroes.definition().maximumHealth -
+                                             definition.combat.damage * (1 - heroes.definition().combat.blockReduction),
+            "boss did not attack hero");
     attacks.stop(enemies);
     HeroCombatSystem heroCombat;
     const float health = enemies.find(id)->health;

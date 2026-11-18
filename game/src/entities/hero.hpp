@@ -35,6 +35,8 @@ struct HeroCombatDefinition {
     double splashRadius = 0;
     double aimingTime = 0;
     CleaveDefinition cleave;
+    double blockCooldown = 0;
+    float blockReduction = 0;
     bool specialAbilities = true;
 };
 
@@ -52,6 +54,7 @@ struct HeroCombatState {
     bool explicitTarget = false, playerMoving = false, swinging = false, abilitySwing = false;
     double cooldown = 0, impactRemaining = 0, cleaveCooldown = 0, feedbackRemaining = 0, retryDelay = 0;
     double drawRemaining = -1;
+    double blockRemaining = 0;
 };
 
 using HeroId = ecs::Entity;
@@ -95,6 +98,8 @@ struct HeroRuntimeComponent : HealthComponent {
     MovementBlockage blockage = MovementBlockage::none;
     double visualYaw = 0;
     bool controllable = true;
+    bool directlyControlled = false;
+    glm::dvec2 directMovement{0};
     HeroState state = HeroState::idle;
     std::optional<glm::dvec3> destination;
     NavigationPath path;

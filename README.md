@@ -10,12 +10,12 @@ and development tools. Game does not link Editor or GameDebug.
 ## Features
 
 - Forest-themed Game menus with captured Platformer Kit scenery, real level previews,
-  persistent display options and a single playable Forest Defense level; see [menus](docs/menus.md).
+  persistent display options, an interactive 3D kingdom map and a playable Greenhaven Valley level; see [menus](docs/menus.md).
 
-- **Level 01 - Forest Defense:** a handcrafted woodland with an arched stone bridge, raised
-  garden, four construction points and a walled mausoleum. This level is tower-only;
-  other levels can enable zero to three heroes in their definitions. Five fixed waves end
-  with a Goblin boss and four Goblins in one final swarm. See [the level guide](docs/forest_defense.md).
+- **Level 01 - Greenhaven Valley:** a continuous rolling landscape with a winding dirt road,
+  forest entrance, rocky pass, four construction points and a hilltop castle. Reusable
+  heightfields support seeded hills, flat building pads and terrain-aware editing.
+  This level remains tower-only with five Goblin waves. See [the level guide](docs/forest_defense.md).
 - Vulkan 1.3+ Dynamic Rendering and Synchronization2, with window resizing and deterministic cleanup.
 - OBJ and glTF/GLB loading, textured PBR materials, punctual lights, image-based lighting and HDR tone mapping.
 - Shared model resources with independent skeletal, node and morph animation playback per instance.
@@ -167,8 +167,10 @@ For Knight, Ranger, and Mage deployment, models, and combat configuration,
 see [hero types](docs/hero_types.md).
 
 See [gameplay controls](docs/gameplay_controls.md) for selection, orders, cancellation,
-and interaction priorities. Camera controls remain right-drag pan, middle-drag orbit, and wheel zoom.
+and interaction priorities. Gameplay and world-map cameras use WASD, right-drag rotation and wheel zoom. Wave-only direct hero control uses 1/2/3 and SPACE. Editor retains right-drag pan and middle-drag orbit.
 
 Rendering quality: [MSAA, high-DPI rendering, filtering and validation](docs/rendering_quality.md).
 Directional lighting: [soft shadows, quality settings, Engine APIs and Editor debugging](docs/shadows.md).
 Color and materials: [linear color, vertex colors, texture filtering, mipmaps and tone mapping](docs/color_material_quality.md).
+
+Level 2, **Gravewatch Hollow**, adds rolling graveyard terrain, six construction sites, the playable tank Knight, and five waves of the existing reviving Skeleton plus a larger Skeleton Captain boss. It unlocks on the world map after Greenhaven completion. See [Gravewatch Hollow](docs/gravewatch_hollow.md).

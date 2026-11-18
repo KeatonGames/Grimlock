@@ -60,7 +60,8 @@ public:
     [[nodiscard]] std::string check(const Tower& tower,
                                     std::span<const TerrainBox> terrain,
                                     std::span<const Enemy> enemies,
-                                    const LevelGeometry* geometry = nullptr) const;
+                                    const LevelGeometry* geometry = nullptr,
+                                    bool supportValidated = false) const;
 
     [[nodiscard]] std::span<const Tower> towers() const noexcept {
         return towers_;

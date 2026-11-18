@@ -1,41 +1,76 @@
 # Gameplay controls
 
-Knight, Ranger and Mage spawn automatically on clear, reachable ground near the
-defense objective whenever a level starts or restarts. There is no hero shop,
-roster panel or deployment step.
+Game and world-map cameras use **WASD** to move relative to their orientation,
+**right mouse drag** to rotate, and the **wheel** to zoom. Keyboard movement eases
+in and out using frame time; mouse rotation uses accumulated pixel displacement.
+Pitch, zoom and authored map boundaries constrain the view. Middle-drag and short
+right-click orders are no longer gameplay bindings. Editor cameras retain their
+independent right-pan / middle-orbit controls.
 
-- Left-click a hero to select it. The orange kit corner marker identifies the selected hero.
-- Left-click a position on the map to move the selected hero there. This works
-  during Preparation and Battle, with the same terrain-aware navigation.
-- A successful move deselects the hero and hides its square. Its yellow route
-  and destination arrows stay visible during movement. Click the hero again
-  before issuing another order.
-- A dashed yellow line previews the selected hero's route to the mouse. Yellow arrows
-  mark the destination after clicking and remain while the hero moves there.
-  These are visual guides; movement and attack commands work as before.
-- The dashed route follows movement steering and terrain height. Travelled sections
-  disappear behind the hero; the remaining dashes stay fixed rather than sliding.
-- Selected heroes keep their original material colors and use only the square
-  corner marker for selection.
-- Click another hero to select that hero. Click a tower to inspect or upgrade it.
-- During Battle, clicking an enemy with a hero selected issues an attack order.
-  Short right-click commands also remain supported; right-drag pans the camera.
-- The selected hero keeps its command while you move the camera. Manual commands
-  temporarily override autonomous combat; normal defense resumes afterward.
-- Middle-drag orbits and the mouse wheel zooms.
-- Escape cancels tower placement first, then clears selection/orders, then opens
-  Pause. Escape resumes paused gameplay or closes Settings.
+## Strategy and direct hero control
 
-The towers-only shop is centered at the bottom. Select a tower card, then click
-an available build zone to construct at its fixed point and facing. Each zone holds
-one tower; destroying it frees the zone. Gold and tower costs appear in the shop. Escape or Cancel
-Placement exits build mode. Tower placement takes precedence over hero movement.
+Strategy is the default. WASD moves the camera, heroes keep their existing AI,
+and left-clicks retain tower, construction and selection interactions. Heroes are
+assigned by each level's `available_heroes` roster; empty rosters hide hero cards.
+This update does not change the existing tower-only Greenhaven roster.
 
-The top HUD has Round at the left, objective health in the center, and Start Wave
-at the right. Start Wave is enabled during Preparation. Pause, Settings, Restart,
-level selection and exit controls are available through Escape and the Pause menu.
-Hero statistics, portraits, health overlays and ability buttons are absent.
+During an active wave, press **1**, **2** or **3**, or click a living hero's card,
+to directly control that hero. Press its number again or **SPACE** to return to
+strategy. Numbers do nothing during preparation. Slot assignments use hero type
+order and do not change when a hero dies.
 
-UI clicks, camera gestures, paused gameplay and result screens suppress map
-commands. Invalid destinations preserve the selected hero and its current valid
-order. Hero selection and movement do not spend gold or modify authored level files.
+In direct control, WASD moves the hero relative to the camera. Diagonals are
+normalized, navigation and crowd contacts constrain movement, and existing
+acceleration, turning, terrain grounding and animations remain active. The camera
+smoothly follows X/Z while preserving rotation and zoom. WASD never moves the
+camera and hero simultaneously. Rotation alone does not rotate the hero.
+
+Combat remains automatic in both modes. Direct heroes acquire targets within
+normal range and keep existing cooldowns, projectiles, melee and area attacks.
+AI chasing and return-to-defense movement are suppressed only for the controlled
+hero. Other heroes retain their AI. Releasing control restores autonomous defense.
+
+Wave completion, hero death, pause, restart and leaving gameplay clear direct
+control. Strategy resumes near the current camera position. Losing keyboard
+focus stops movement; text input suppresses shortcuts and keyboard navigation.
+Escape retains the existing placement/selection/pause behavior.
+
+Normal left-click hero orders still work outside direct mode, including during
+preparation. Valid orders keep their terrain-following routes and destination
+markers. Direct mode ignores those movement orders, preventing competing inputs.
+
+## Hero cards and presentation
+
+Up to three compact square cards appear on the right, below wave controls and
+above the tower-inspection area. They show the actual model, a stable number,
+health, a gold active border, and a muted dead/unavailable state. Unassigned slots
+are hidden. Cards never appear in menus or on the world map.
+
+The portraits are animated idle atlases rendered from the existing hero models
+through Engine's Vulkan renderer. Each 1024-square atlas holds sixteen transparent
+256-square views. Game displays one cached texture region per card at eight frames
+per second; it neither reloads models nor renders additional 3D scenes per frame.
+Regenerate them after changing hero assets:
+
+```powershell
+cmake --build --preset debug --target MenuCapture --parallel 4
+.\out\build\debug\Debug\MenuCapture.exe "$PWD\game\assets" --hero-portraits
+```
+
+Currency, wave controls, construction, upgrades and existing combat UI remain.
+Camera and hero controls do not spend gold or write authored level data.
+
+## Validation
+
+`Camera.Navigation` covers both camera profiles, WASD, right-drag rotation,
+keyboard suppression and bounds. `Hero.Runtime` covers direct movement against
+walls, movement release, automatic combat, switching, preparation gating, death
+and restart. `Game.Ui` exercises number/SPACE input and hero-card visibility;
+world-map and Editor checks guard their separate input contexts.
+Debug verification passed for Game and Editor builds and nine focused checks:
+Hero.Runtime, Game.Runtime, Game.Ui, Game.LevelMenu, Camera.Navigation, Input.State,
+Camera.Runtime, Editor.Runtime and Game.Stress. The final hero-enabled HUD capture
+ran with Khronos core/synchronization validation and no errors or hazards. The
+capture uses a temporary hero-enabled level copy under out; authored level rosters
+remain unchanged. Logs and the capture use out/controls_* and out/hero_controls*.
+Release was not rebuilt for this update.

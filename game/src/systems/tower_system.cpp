@@ -470,7 +470,8 @@ void TowerSystem::updateEffects(Engine& engine, double delta) {
 std::string TowerSystem::check(const Tower& tower,
                                std::span<const TerrainBox> terrain,
                                std::span<const Enemy> enemies,
-                               const LevelGeometry* geometry) const {
+                               const LevelGeometry* geometry,
+                               bool supportValidated) const {
     const auto& configured = definition(tower.type);
     if (!std::isfinite(glm::length(tower.position)) || !std::isfinite(glm::length(tower.halfExtent)) ||
         tower.halfExtent != configured.halfExtent || tower.model != configured.model ||
@@ -500,7 +501,7 @@ std::string TowerSystem::check(const Tower& tower,
         if (const auto error = geometry->supportError(tower); !error.empty()) {
             return error;
         }
-    } else if (supportedArea + 1e-4 < 4 * box.halfExtent.x * box.halfExtent.z) {
+    } else if (!supportValidated && supportedArea + 1e-4 < 4 * box.halfExtent.x * box.halfExtent.z) {
         return "The entire footprint must rest on terrain.";
     }
     for (const auto& existing : towers_) {

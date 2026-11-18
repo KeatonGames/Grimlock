@@ -63,13 +63,28 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
     unload(engine);
     try {
         engine.setScene(std::move(scene));
+        const bool continuousTerrain =
+            std::any_of(engine.scene()->objects().begin(), engine.scene()->objects().end(), [](const auto& entry) {
+                return entry.second.heightfield != nullptr;
+            });
+        navigation_.reserveConstructionSites(continuousTerrain);
         level_.begin(engine, navigation_, std::move(definition));
         engine_ = &engine;
         heroes_ =
             std::make_unique<HeroSystem>(engine,
                                          std::span<const std::string>{level_.waves()->definition().availableHeroes});
         heroes_->shareCombatGeometry(navigation_.combatGeometry());
+        heroes_->reserveConstructionSites(navigation_.reservedSites());
         heroes_->synchronize(navigation_.towers());
+        if (continuousTerrain) {
+            // Fixed sites are already routed around. Upload their visuals now, away from the build click.
+            for (const auto& tower : navigation_.towers().definitions()) {
+                (void)engine.loadModel(engine.assetRoot() / tower.model);
+                if (!tower.operatorModel.empty()) {
+                    (void)engine.loadModel(engine.assetRoot() / tower.operatorModel);
+                }
+            }
+        }
         spawnHeroesNearObjective();
         for (const auto& [id, object] : engine.scene()->objects()) {
             engine.scene()->setSelectionHighlight(id, false);
@@ -81,7 +96,26 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
         engine.setObjectSelectionEnabled(false);
         engine.setCameraNavigationEnabled();
         auto camera = engine.cameraNavigationConfig();
+        const auto previousCamera = camera;
+        previousCamera_ = previousCamera;
+        camera.strategyControls = true;
+        camera.keyboardMovement = true;
+        camera.minDistance = 8;
+        camera.maxDistance = 60;
+        camera.minPitch = 0.65F;
+        camera.maxPitch = 1.3F;
         camera.panDragThreshold = GroundCommandGesture::dragThreshold;
+        for (const auto& [id, object] : engine.scene()->objects()) {
+            if (object.heightfield) {
+                previousCamera_ = previousCamera;
+                camera.panHalfExtent = object.heightfield->configuration().playableSize * 0.48F;
+                camera.minDistance = 14;
+                camera.maxDistance = 52;
+                camera.minPitch = 0.8F;
+                camera.maxPitch = 1.3F;
+                break;
+            }
+        }
         engine.configureCameraNavigation(camera);
     } catch (...) {
         unload(engine);
@@ -90,6 +124,11 @@ void LevelRuntime::load(Engine& engine, const std::filesystem::path& level) {
 }
 
 void LevelRuntime::unload(Engine& engine) {
+    controlledHero_.reset();
+    if (previousCamera_) {
+        engine.configureCameraNavigation(*previousCamera_);
+        previousCamera_.reset();
+    }
     paused_ = false;
     engine.setAnimationsPaused(false);
     if (progress_) {
@@ -127,6 +166,27 @@ void LevelRuntime::update(Engine& engine, double delta) {
     if (!level_.waves() || paused_) {
         return;
     }
+    const double frameDelta = delta;
+    if (controlledHero_) {
+        const auto* hero = heroes_ ? heroes_->find(*controlledHero_) : nullptr;
+        if (!hero || hero->health <= 0 || level_.waves()->phase() != LevelPhase::battle) {
+            releaseHeroControl();
+        }
+    }
+    if (controlledHero_) {
+        const auto& input = engine.input();
+        glm::dvec2 axes{static_cast<double>(input.key(Key::d).held) - input.key(Key::a).held,
+                        static_cast<double>(input.key(Key::w).held) - input.key(Key::s).held};
+        if (!input.focused) {
+            axes = {0, 0};
+        }
+        if (glm::length(axes) > 1) {
+            axes = glm::normalize(axes);
+        }
+        const auto yaw = engine.cameraNavigationConfig().yaw;
+        const glm::dvec2 forward{-std::sin(yaw), -std::cos(yaw)}, right{std::cos(yaw), -std::sin(yaw)};
+        heroes_->directControl(controlledHero_, right * axes.x + forward * axes.y);
+    }
     do {
         const double step = std::min(delta, 1.0 / 30);
         const auto phase = level_.waves()->phase();
@@ -153,6 +213,15 @@ void LevelRuntime::update(Engine& engine, double delta) {
             }
         }
     } while (delta > 1e-10);
+    if (controlledHero_) {
+        const auto* hero = heroes_->find(*controlledHero_);
+        if (!hero || hero->health <= 0 || level_.waves()->phase() != LevelPhase::battle) {
+            releaseHeroControl();
+        } else {
+            engine.followCameraTarget({hero->position.x, engine.scene()->resolvedCamera().target.y, hero->position.z},
+                                      frameDelta);
+        }
+    }
     if (!level_.waves() || level_.waves()->phase() != LevelPhase::preparation) {
         cancelPlacement();
     }
@@ -164,10 +233,50 @@ void LevelRuntime::startWave() {
 }
 
 void LevelRuntime::setPaused(bool paused) {
+    if (paused) {
+        releaseHeroControl();
+    }
     paused_ = paused && level_.waves();
     if (engine_) {
         engine_->setAnimationsPaused(paused_);
         engine_->setCameraNavigationEnabled(!paused_);
+    }
+}
+
+bool LevelRuntime::controlHeroSlot(std::size_t slot) {
+    if (paused_ || !heroes_ || !engine_ || !level_.waves() || level_.waves()->phase() != LevelPhase::battle) {
+        return false;
+    }
+    const auto found = std::find_if(heroes_->heroes().begin(), heroes_->heroes().end(), [&](const auto& hero) {
+        return hero.type == slot && hero.health > 0 && hero.controllable;
+    });
+    if (found == heroes_->heroes().end()) {
+        return false;
+    }
+    if (controlledHero_ == found->id) {
+        releaseHeroControl();
+        return true;
+    }
+    controlledHero_ = found->id;
+    heroes_->directControl(controlledHero_);
+    (void)selectHero(*controlledHero_);
+    auto camera = engine_->cameraNavigationConfig();
+    camera.keyboardMovement = false;
+    engine_->configureCameraNavigation(camera);
+    return true;
+}
+
+void LevelRuntime::releaseHeroControl() {
+    controlledHero_.reset();
+    if (heroes_) {
+        heroes_->directControl({});
+    }
+    if (engine_) {
+        auto camera = engine_->cameraNavigationConfig();
+        if (!camera.keyboardMovement) {
+            camera.keyboardMovement = true;
+            engine_->configureCameraNavigation(camera);
+        }
     }
 }
 
@@ -220,6 +329,9 @@ const Hero* LevelRuntime::selectedHero() const noexcept {
 }
 
 bool LevelRuntime::commandHero(const Ray& ray) {
+    if (controlledHero_) {
+        return false;
+    }
     if (paused_ || !selectedHero() || !level_.waves() ||
         (level_.waves()->phase() != LevelPhase::battle && level_.waves()->phase() != LevelPhase::preparation)) {
         return false;

@@ -26,6 +26,12 @@ public:
     }
 
     [[nodiscard]] bool selectHero(HeroId id);
+    bool controlHeroSlot(std::size_t slot);
+    void releaseHeroControl();
+
+    [[nodiscard]] std::optional<HeroId> controlledHero() const noexcept {
+        return controlledHero_;
+    }
 
     void attachProgress(PlayerProgress& progress) noexcept {
         progress_ = &progress;
@@ -98,7 +104,9 @@ private:
     std::unique_ptr<HeroSystem> heroes_;
     HeroCombatSystem heroCombat_;
     Engine* engine_ = nullptr;
+    std::optional<OrbitCameraConfig> previousCamera_;
     std::optional<HeroId> selectedHero_;
+    std::optional<HeroId> controlledHero_;
     std::string heroError_;
     std::filesystem::path levelPath_;
     std::string selectedTower_ = "basic", placementError_, rejectedError_;

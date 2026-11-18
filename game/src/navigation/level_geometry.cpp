@@ -79,13 +79,17 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
     bool imported = false;
     if (scene) {
         for (const auto& [id, object] : scene->objects()) {
-            if (!object.model || !scene->enabledInHierarchy(id)) {
+            if ((!object.model && !object.heightfield) || !scene->enabledInHierarchy(id)) {
                 continue;
             }
             const bool terrain = object.role == "grimlock.terrain";
             const bool obstacle = object.role == "grimlock.obstacle" || object.role == "grimlock.objective";
             if (terrain || obstacle || (legacyProps && object.role.empty())) {
-                scratch_.push_back({id, *object.model, scene->worldTransform(id), object.role});
+                scratch_.push_back({id,
+                                    object.model.value_or(std::filesystem::path{}),
+                                    scene->worldTransform(id),
+                                    object.role,
+                                    object.heightfield});
                 imported = imported || terrain;
             }
         }
@@ -104,6 +108,33 @@ void LevelGeometry::synchronize(Engine& engine, bool legacyProps) {
         geometry = navigationGeometry(boxes);
     }
     for (const auto& object : scratch_) {
+        if (object.heightfield) {
+            const auto& mesh = object.heightfield->model()->meshes[0];
+            const auto resolution = object.heightfield->configuration().resolution;
+            std::vector<std::uint32_t> surfaceIndices;
+            for (std::uint32_t z = 0; z + 1 < resolution.y; ++z) {
+                for (std::uint32_t x = 0; x + 1 < resolution.x; ++x) {
+                    const auto a = z * resolution.x + x, b = a + 1, d = a + resolution.x;
+                    surfaceIndices.insert(surfaceIndices.end(), {a, d, b, b, d, d + 1});
+                }
+            }
+            for (std::size_t i = 0; i < surfaceIndices.size(); i += 3) {
+                std::array<glm::vec3, 3> triangle;
+                bool playable = true;
+                for (std::size_t corner = 0; corner < 3; ++corner) {
+                    const auto p = mesh.vertices[surfaceIndices[i + corner]].position;
+                    playable = playable && object.heightfield->playable({p.x, p.z});
+                    triangle[corner] = object.world * glm::vec4{p, 1};
+                }
+                if (playable) {
+                    if (glm::determinant(glm::mat3{object.world}) < 0) {
+                        std::swap(triangle[1], triangle[2]);
+                    }
+                    geometry.addTriangle(triangle[0], triangle[1], triangle[2], object.role == "grimlock.terrain");
+                }
+            }
+            continue;
+        }
         if (object.role.empty()) {
             const auto info = engine.modelInfo(engine.loadModel(engine.assetRoot() / object.model));
             const glm::vec3 center = object.world * glm::vec4{(info.minimum + info.maximum) * 0.5F, 1};

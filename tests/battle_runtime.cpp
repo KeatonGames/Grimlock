@@ -109,7 +109,10 @@ void enemyBattle(Engine& engine) {
         }
     };
     const auto hero = heroes.deploy({-4, 0, 0});
-    require(heroes.applyDamage(hero, 92), "hero health fixture failed");
+    require(
+        heroes.applyDamage(hero,
+                           (heroes.definition().maximumHealth - 8) / (1 - heroes.definition().combat.blockReduction)),
+        "hero health fixture failed");
     auto decoy = navigation.towers().definition("basic").instance();
     decoy.position = {-5, decoy.halfExtent.y, 2};
     const auto decoyId = navigation.towers().create(engine, decoy);
@@ -193,9 +196,10 @@ void enemyBattle(Engine& engine) {
     for (int frame = 0; frame < 900 && enemies.find(opponent); ++frame) {
         tick(1.0 / 60, true);
     }
-    require(!enemies.find(opponent) && heroes.find(defender)->health > 0 && heroes.find(defender)->health < 100,
+    require(!enemies.find(opponent) && heroes.find(defender)->health > 0 &&
+                heroes.find(defender)->health < heroes.definition().maximumHealth,
             "autonomous hero/enemy duel did not exchange damage and resolve");
-    require(heroes.applyDamage(defender, 100), "large battle defender setup failed");
+    require(heroes.applyDamage(defender, 100000), "large battle defender setup failed");
     enemies.clear();
     const auto firstDefender = heroes.deploy({-5, 0, -5});
     const auto secondDefender = heroes.deploy({4, 0, -5});
@@ -214,7 +218,8 @@ void enemyBattle(Engine& engine) {
                     enemy.combat.target != DefensiveTarget{DefensiveTargetKind::hero, defender},
                 "large combat group targeted a dead hero");
     }
-    require(heroes.find(firstDefender)->health < 100 && heroes.find(secondDefender)->health < 100,
+    require(heroes.find(firstDefender)->health < heroes.definition().maximumHealth &&
+                heroes.find(secondDefender)->health < heroes.definition().maximumHealth,
             "both heroes did not participate in the mixed autonomous battle");
     std::cout << "508 mixed combat agents with two heroes: "
               << std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - crowdStart).count() / 120
@@ -296,7 +301,8 @@ void archetypes(Engine& engine) {
         navigation.update(engine, 1.0 / 60);
         combat.resolve(engine, enemies, navigation.towers(), &heroes, 1.0 / 60);
     }
-    require(heroes.find(hero)->health == heroHealth - 13.5F, "hunter hero damage modifier or impact timing incorrect");
+    require(heroes.find(hero)->health == heroHealth - 13.5F * (1 - heroes.definition().combat.blockReduction),
+            "hunter hero damage modifier or impact timing incorrect");
     (void)heroes.deploy({4, 0, -2}, hero);
     prepare(0.4);
     require(enemies.find(hunter)->combat.target.kind == DefensiveTargetKind::none,
@@ -329,7 +335,7 @@ void unreachableDefender(Engine& engine) {
     }
     const auto* remaining = navigation.enemies()->find(enemy);
     require(
-        heroes.find(hero)->health == 100 &&
+        heroes.find(hero)->health == heroes.definition().maximumHealth &&
             (!remaining || (remaining->combat.target.kind != DefensiveTargetKind::hero && remaining->position.x < -2)),
         "enemy hit through a wall or stalled instead of continuing to objective");
     navigation.enemies()->clear();

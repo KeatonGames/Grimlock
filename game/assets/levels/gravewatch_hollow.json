@@ -1,0 +1,170 @@
+{
+  "available_heroes": [
+    "knight"
+  ],
+  "description": "Hold the ruined gate and defend Gravewatch Keep against the waking dead.",
+  "hero_spawns": [
+    [
+      -1,
+      0.7,
+      0
+    ]
+  ],
+  "id": "38d63a72-c95f-44be-85b1-e303f0c5e002",
+  "name": "Level 02 - Gravewatch Hollow",
+  "objective": {
+    "damage_per_arrival": 1,
+    "health": 14,
+    "height": 2.0,
+    "position": [
+      11,
+      12
+    ]
+  },
+  "required_level": "68369f21-3bfd-4d83-a5c2-c09c52922401",
+  "scene": "scenes/gravewatch_hollow.json",
+  "spawns": [
+    {
+      "height": 0.3,
+      "maximum": [
+        -14.6,
+        -12.2
+      ],
+      "minimum": [
+        -15.4,
+        -12.8
+      ],
+      "name": "Forgotten Crypt"
+    }
+  ],
+  "starting_gold": 40,
+  "version": 1,
+  "waves": [
+    {
+      "gold_reward": 16,
+      "groups": [
+        {
+          "batch_size": 1,
+          "count": 6,
+          "enemy": "Skeleton",
+          "interval": 2.0,
+          "spawn": "Forgotten Crypt",
+          "start": 0.0
+        }
+      ],
+      "name": "The Awakening"
+    },
+    {
+      "gold_reward": 20,
+      "groups": [
+        {
+          "batch_size": 1,
+          "count": 7,
+          "enemy": "Skeleton",
+          "interval": 1.8,
+          "spawn": "Forgotten Crypt",
+          "start": 0.0
+        },
+        {
+          "batch_size": 1,
+          "count": 3,
+          "enemy": "Skeleton",
+          "interval": 3.0,
+          "spawn": "Forgotten Crypt",
+          "start": 4.0
+        }
+      ],
+      "name": "The Restless Dead"
+    },
+    {
+      "gold_reward": 24,
+      "groups": [
+        {
+          "batch_size": 1,
+          "count": 9,
+          "enemy": "Skeleton",
+          "interval": 1.8,
+          "spawn": "Forgotten Crypt",
+          "start": 0.0
+        },
+        {
+          "batch_size": 1,
+          "count": 3,
+          "enemy": "Skeleton",
+          "interval": 4.0,
+          "spawn": "Forgotten Crypt",
+          "start": 2.0
+        }
+      ],
+      "name": "The Graveguard"
+    },
+    {
+      "gold_reward": 30,
+      "groups": [
+        {
+          "batch_size": 1,
+          "count": 9,
+          "enemy": "Skeleton",
+          "interval": 1.4,
+          "spawn": "Forgotten Crypt",
+          "start": 0.0
+        },
+        {
+          "batch_size": 1,
+          "count": 4,
+          "enemy": "Skeleton",
+          "interval": 2.8,
+          "spawn": "Forgotten Crypt",
+          "start": 4.0
+        },
+        {
+          "batch_size": 1,
+          "count": 3,
+          "enemy": "Skeleton",
+          "interval": 5.0,
+          "spawn": "Forgotten Crypt",
+          "start": 1.0
+        }
+      ],
+      "name": "The Undead Assault"
+    },
+    {
+      "gold_reward": 0,
+      "groups": [
+        {
+          "batch_size": 1,
+          "count": 1,
+          "enemy": "Skeleton Captain",
+          "interval": 1.0,
+          "spawn": "Forgotten Crypt",
+          "start": 5.0
+        },
+        {
+          "batch_size": 1,
+          "count": 7,
+          "enemy": "Skeleton",
+          "interval": 2.0,
+          "spawn": "Forgotten Crypt",
+          "start": 0.0
+        },
+        {
+          "batch_size": 1,
+          "count": 3,
+          "enemy": "Skeleton",
+          "interval": 3.0,
+          "spawn": "Forgotten Crypt",
+          "start": 8.0
+        },
+        {
+          "batch_size": 1,
+          "count": 2,
+          "enemy": "Skeleton",
+          "interval": 5.0,
+          "spawn": "Forgotten Crypt",
+          "start": 2.0
+        }
+      ],
+      "name": "The Skeleton Captain"
+    }
+  ]
+}

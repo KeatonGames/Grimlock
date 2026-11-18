@@ -107,7 +107,7 @@ struct Engine::Impl {
 
     void bindSceneModels(Scene& scene) {
         for (const auto& [id, object] : scene.objects_) {
-            if (!object.model) {
+            if (!object.model && !object.heightfield) {
                 continue;
             }
 
@@ -118,6 +118,11 @@ struct Engine::Impl {
                     continue;
                 }
 
+                if (object.heightfield) {
+                    const auto model = store(object.heightfield->model(), "Generated heightfield", false);
+                    scene.bindModel(id, resources[model]->asset);
+                    continue;
+                }
                 const auto path = std::filesystem::weakly_canonical(assetRoot / *object.model);
                 const auto relative = path.lexically_relative(assetRoot);
 
@@ -130,7 +135,7 @@ struct Engine::Impl {
             } catch (const std::exception& e) {
                 const auto origin = scene.sourcePath_.empty() ? scene.name() : scene.sourcePath_.string();
                 throw std::runtime_error("Scene '" + origin + "', object " + std::to_string(id) + " ('" + object.name +
-                                         "'), model '" + object.model->string() +
+                                         "'), model '" + (object.model ? object.model->string() : "heightfield") +
                                          "', fields model/animation/material_override: " + e.what());
             }
         }
@@ -353,7 +358,7 @@ struct Engine::Impl {
         navigationSynchronized = false;
     }
 
-    void navigate(Camera& view) {
+    void navigate(Camera& view, double delta) {
         if (!navigationEnabled) {
             return;
         }
@@ -371,7 +376,7 @@ struct Engine::Impl {
 
         int width = 0, height = 0;
         SDL_GetWindowSize(window.native(), &width, &height);
-        const bool changed = navigation.update(view, input.state(), static_cast<float>(height));
+        const bool changed = navigation.update(view, input.state(), static_cast<float>(height), delta);
 
         if (synchronize || changed) {
             storeCamera(view);
@@ -474,7 +479,7 @@ struct Engine::Impl {
             navigation.cancelDrag();
         }
 
-        input.finishFrame(navigationEnabled && !capture.mouse && running);
+        input.finishFrame(navigationEnabled && !capture.mouse && running, !navigation.config().strategyControls);
         const auto now = std::chrono::steady_clock::now();
         // Match the crowd's recovery budget after a debugger pause, window drag or
         // synchronous asset load. Catching up an entire stall can cause another stall.
@@ -484,7 +489,7 @@ struct Engine::Impl {
         auto frameCamera = currentCamera();
         auto frameLighting = lighting;
 
-        navigate(frameCamera);
+        navigate(frameCamera, delta);
         if (overlay) {
             overlay->finishFrame(frameCamera);
         }
@@ -906,6 +911,12 @@ void Engine::configureCameraNavigation(const OrbitCameraConfig& config) {
     impl_->resetNavigation();
     impl_->navigationCameraId = impl_->activeScene ? impl_->activeScene->activeCamera() : std::string{};
     impl_->navigationSynchronized = true;
+}
+
+void Engine::followCameraTarget(glm::vec3 target, double delta) {
+    auto view = impl_->currentCamera();
+    impl_->navigation.follow(view, target, delta);
+    impl_->storeCamera(view);
 }
 
 FrameCapture Engine::captureFrame() {

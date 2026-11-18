@@ -9,6 +9,7 @@ add_library(Engine STATIC
     src/scene/scene.cpp
     src/scene/grid.cpp
     src/scene/terrain.cpp
+    src/scene/heightfield.cpp
     src/scene/picking.cpp
     src/scene/scene_serializer.cpp
     src/platform/window.cpp
@@ -52,7 +53,7 @@ target_link_libraries(Engine PUBLIC glm::glm PRIVATE
 target_compile_definitions(Engine PRIVATE
     STBI_ONLY_PNG STBI_ONLY_JPEG STBI_ONLY_HDR STBI_NO_STDIO STBI_MAX_DIMENSIONS=16384)
 # Baseline Debug decoding was ~6 seconds. Optimize only the third-party decoder;
-# all engine code retains the normal Debug checks and optimization settings.
+# Other engine code retains normal Debug settings except the picking kernel below.
 if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
     set_source_files_properties(src/assets/stb_image.cpp PROPERTIES
         VS_SETTINGS "Optimization=MaxSpeed;BasicRuntimeChecks=Default")
@@ -64,4 +65,8 @@ if(MSVC)
     target_compile_options(Engine PRIVATE /W4 /permissive-)
 else()
     target_compile_options(Engine PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+if(MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+    set_source_files_properties(src/scene/picking.cpp PROPERTIES
+        VS_SETTINGS "Optimization=MaxSpeed;InlineFunctionExpansion=AnySuitable;BasicRuntimeChecks=Default")
 endif()

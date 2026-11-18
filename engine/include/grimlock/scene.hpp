@@ -3,6 +3,7 @@
 #include "grimlock/assets/animation.hpp"
 #include "grimlock/camera.hpp"
 #include "grimlock/grid.hpp"
+#include "grimlock/heightfield.hpp"
 #include "grimlock/lighting.hpp"
 #include "grimlock/shadows.hpp"
 #include "grimlock/transform.hpp"
@@ -45,6 +46,7 @@ struct SceneObject {
     Transform local;
     std::optional<ObjectId> parent;
     std::optional<std::filesystem::path> model;
+    std::shared_ptr<const Heightfield> heightfield;
     bool enabled = true;
     ShadowProperties shadows;
     bool selectable = true;         // Runtime policy only; intentionally not serialized.
@@ -122,6 +124,7 @@ public:
     }
 
     void setModel(ObjectId id, std::optional<std::filesystem::path> model);
+    void setHeightfield(ObjectId id, std::optional<HeightfieldConfiguration> configuration);
     void setTint(ObjectId id, const glm::vec4& tint);
     void setMaterialOverride(ObjectId id, std::optional<std::size_t> material);
 

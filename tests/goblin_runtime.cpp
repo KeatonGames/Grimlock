@@ -130,7 +130,8 @@ void behavior(Engine& engine) {
     for (int step = 0; step < 600 && heroes.find(hero)->health == heroHealth; ++step) {
         tick(1.0 / 120);
     }
-    require(heroes.find(hero)->health == heroHealth - definition.combat.damage,
+    require(heroes.find(hero)->health ==
+                heroHealth - definition.combat.damage * (1 - heroes.definition().combat.blockReduction),
             "Goblin failed to damage its hero target exactly once");
     (void)heroes.deploy({-7, 0, 0}, hero);
     prepare(0.01);

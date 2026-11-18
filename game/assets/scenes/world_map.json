@@ -1,0 +1,2748 @@
+{
+    "cameras":  [
+                    {
+                        "position":  [
+                                         -32,
+                                         43,
+                                         -47
+                                     ],
+                        "target":  [
+                                       0,
+                                       1,
+                                       2
+                                   ],
+                        "vertical_fov_degrees":  42,
+                        "far":  250,
+                        "id":  "main"
+                    }
+                ],
+    "version":  1,
+    "lighting":  {
+                     "directional":  {
+                                         "color":  [
+                                                       1.0,
+                                                       0.949999988079071,
+                                                       0.8600000143051147
+                                                   ],
+                                         "direction":  [
+                                                           -0.44999998807907104,
+                                                           -0.8500000238418579,
+                                                           -0.30000001192092896
+                                                       ],
+                                         "enabled":  true,
+                                         "intensity":  2.799999952316284
+                                     },
+                     "environment_intensity":  0.8500000238418579,
+                     "environment_rotation":  0.0,
+                     "exposure":  1.0,
+                     "points":  [
+
+                                ],
+                     "spots":  [
+
+                               ]
+                 },
+    "objects":  [
+                    {
+                        "name":  "Kingdom landscape",
+                        "id":  "1",
+                        "heightfield":  {
+                                            "base_height":  0.0,
+                                            "boundary_height":  7.0,
+                                            "grass_color":  [
+                                                                0.12999999523162842,
+                                                                0.4000000059604645,
+                                                                0.06499999761581421
+                                                            ],
+                                            "hills":  [
+                                                          {
+                                                              "radius":  14,
+                                                              "center":  [
+                                                                             -28,
+                                                                             19
+                                                                         ],
+                                                              "height":  8
+                                                          },
+                                                          {
+                                                              "radius":  13,
+                                                              "center":  [
+                                                                             24,
+                                                                             23
+                                                                         ],
+                                                              "height":  10
+                                                          },
+                                                          {
+                                                              "radius":  10,
+                                                              "center":  [
+                                                                             32,
+                                                                             -12
+                                                                         ],
+                                                              "height":  6
+                                                          },
+                                                          {
+                                                              "radius":  12,
+                                                              "center":  [
+                                                                             18,
+                                                                             -12
+                                                                         ],
+                                                              "height":  -2
+                                                          },
+                                                          {
+                                                              "radius":  9,
+                                                              "center":  [
+                                                                             24,
+                                                                             -23
+                                                                         ],
+                                                              "height":  -1.5
+                                                          }
+                                                      ],
+                                            "minimalistic":  false,
+                                            "noise_amplitude":  0.12,
+                                            "noise_frequency":  0.25,
+                                            "pads":  [
+                                                         {
+                                                             "radius":  5,
+                                                             "center":  [
+                                                                            -10,
+                                                                            0
+                                                                        ],
+                                                             "height":  0
+                                                         },
+                                                         {
+                                                             "radius":  5,
+                                                             "center":  [
+                                                                            14,
+                                                                            12
+                                                                        ],
+                                                             "height":  1
+                                                         }
+                                                     ],
+                                            "playable_size":  [
+                                                                  90,
+                                                                  70
+                                                              ],
+                                            "resolution":  [
+                                                               241,
+                                                               201
+                                                           ],
+                                            "road":  [
+                                                         [
+                                                             -10,
+                                                             0,
+                                                             0
+                                                         ],
+                                                         [
+                                                             -3,
+                                                             0,
+                                                             -3
+                                                         ],
+                                                         [
+                                                             5,
+                                                             0,
+                                                             0
+                                                         ],
+                                                         [
+                                                             14,
+                                                             1,
+                                                             12
+                                                         ]
+                                                     ],
+                                            "road_color":  [
+                                                               0.46000000834465027,
+                                                               0.3100000023841858,
+                                                               0.15000000596046448
+                                                           ],
+                                            "road_end_width":  4.599999904632568,
+                                            "road_width":  3.200000047683716,
+                                            "rock_color":  [
+                                                               0.2800000011920929,
+                                                               0.3100000023841858,
+                                                               0.27000001072883606
+                                                           ],
+                                            "seed":  1701,
+                                            "size":  [
+                                                         480,
+                                                         400
+                                                     ]
+                                        },
+                        "role":  "grimlock.terrain"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -10,
+                                                           0,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        3,
+                                                        3,
+                                                        3
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large.glb",
+                        "name":  "Greenhaven Valley",
+                        "id":  "2",
+                        "role":  "grimlock.map_location:68369f21-3bfd-4d83-a5c2-c09c52922401"
+                    },
+                    {
+                        "id":  "3",
+                        "parent":  "2",
+                        "transform":  {
+                                          "position":  [
+                                                           0,
+                                                           1,
+                                                           0
+                                                       ],
+                                          "scale":  [
+                                                        1,
+                                                        1,
+                                                        1
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "role":  "grimlock.decoration",
+                        "name":  "Greenhaven roof",
+                        "model":  "environment/graveyard/crypt-large-roof.glb"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           14,
+                                                           1,
+                                                           12
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large.glb",
+                        "name":  "Gravewatch Hollow",
+                        "id":  "4",
+                        "role":  "grimlock.map_location:38d63a72-c95f-44be-85b1-e303f0c5e002",
+                        "tint":  [
+                                     0.72,
+                                     0.76,
+                                     0.95,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -36,
+                                                           0,
+                                                           -23
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "5",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           8.49844719,
+                                                           0,
+                                                           -3.1177490062400004
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "6",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -2.0062112399999847,
+                                                           0,
+                                                           8.529003975040002
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "7",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -29.507764049999977,
+                                                           0,
+                                                           -19.588745031200006
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "8",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           14.990683140000002,
+                                                           0,
+                                                           0.29350596255999761
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "9",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           31.987577520000031,
+                                                           0,
+                                                           -7.9419920499199961
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "10",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           4.4860247100000024,
+                                                           0,
+                                                           11.940258943840007
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "11",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -23.015528099999955,
+                                                           0,
+                                                           -16.177490062400011
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "12",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           21.482919090000024,
+                                                           0,
+                                                           3.7047609313600134
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "13",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -33.520186530000018,
+                                                           0,
+                                                           -4.53073708111998
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "14",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -16.523292149999932,
+                                                           0,
+                                                           -12.766235093599974
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "15",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           27.975155040000047,
+                                                           0,
+                                                           7.1160159001600078
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "16",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           0.47360223000002577,
+                                                           0,
+                                                           -21.00173310608001
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "17",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -27.027950579999995,
+                                                           0,
+                                                           -1.1194821123199858
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "18",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -10.031056199999909,
+                                                           0,
+                                                           -9.3549801248000222
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "19",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           34.467390990000069,
+                                                           0,
+                                                           10.527270868960045
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "20",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           6.9658381800000484,
+                                                           0,
+                                                           -17.590478137279973
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "21",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -20.535714629999973,
+                                                           0,
+                                                           2.2917728564800086
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "22",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -3.5388202499998869,
+                                                           0,
+                                                           -5.9437251560000277
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "23",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           2.9534157000001358,
+                                                           0,
+                                                           -2.532470187199948
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "24",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -7.5512427299999274,
+                                                           0,
+                                                           9.1142827940799975
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "25",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -35.052795539999948,
+                                                           0,
+                                                           -19.003466212160021
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "26",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           9.44565165000003,
+                                                           0,
+                                                           0.87878478160004647
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "27",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -28.560559589999798,
+                                                           0,
+                                                           -15.592211243359941
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "28",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           15.937887600000181,
+                                                           0,
+                                                           4.2900397503999557
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "29",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           32.934781980000139,
+                                                           0,
+                                                           -3.94545826207991
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "30",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -22.068323639999903,
+                                                           0,
+                                                           -12.180956274559946
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "31",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           22.430123550000076,
+                                                           0,
+                                                           7.70129471919995
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "32",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -5.0714292599999453,
+                                                           0,
+                                                           -20.416454287039983
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "33",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -32.572982069999966,
+                                                           0,
+                                                           -0.53420329327991567
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "34",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -15.576087689999753,
+                                                           0,
+                                                           -8.769701305759952
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "35",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           28.922359500000226,
+                                                           0,
+                                                           11.112549687999945
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "36",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           1.4208066900002052,
+                                                           0,
+                                                           -17.005199318239988
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "37",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -26.080746120000072,
+                                                           0,
+                                                           2.8770516755200788
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "38",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -19.588510169999665,
+                                                           0,
+                                                           6.2883066443200732
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "39",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -2.5916157899997074,
+                                                           0,
+                                                           -1.9471913681599631
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "40",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -13.096274219999771,
+                                                           0,
+                                                           9.6995616131200677
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "41",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           3.9006201600001873,
+                                                           0,
+                                                           1.4640636006400314
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "42",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -34.1055910799999,
+                                                           0,
+                                                           -15.006932424320041
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "43",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           10.392856110000082,
+                                                           0,
+                                                           4.8753185694400258
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "44",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           27.38975049000004,
+                                                           0,
+                                                           -3.3601794430400105
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "45",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -27.613355130000002,
+                                                           0,
+                                                           -11.595677455520047
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "46",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           16.885092059999977,
+                                                           0,
+                                                           8.28657353824002
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "47",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -10.616460749999533,
+                                                           0,
+                                                           -19.831175467999913
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "48",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           33.881986440000446,
+                                                           0,
+                                                           0.051075525759983975
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "49",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -21.121119179999596,
+                                                           0,
+                                                           -8.1844224867198818
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "50",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           23.377328010000383,
+                                                           0,
+                                                           11.697828507040185
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "51",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -4.124224799999638,
+                                                           0,
+                                                           -16.419920499200089
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "52",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -31.625777609999659,
+                                                           0,
+                                                           3.4623304945599784
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "53",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           2.3680111500002567,
+                                                           0,
+                                                           -13.008665530400094
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "54",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -25.133541659999764,
+                                                           0,
+                                                           6.8735854633599729
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "55",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -18.64130570999987,
+                                                           0,
+                                                           10.284840432159967
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "56",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -1.6444113299999117,
+                                                           0,
+                                                           2.0493424196801016
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "57",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           4.8478246200004946,
+                                                           0,
+                                                           5.460597388480096
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "58",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -22.653728189999526,
+                                                           0,
+                                                           -22.657151617759837
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "59",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -33.15838661999959,
+                                                           0,
+                                                           -11.010398636479977
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "60",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           11.340060570000389,
+                                                           0,
+                                                           8.87185235728009
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "61",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -16.161492240000143,
+                                                           0,
+                                                           -19.245896648959842
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "62",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           28.336954949999836,
+                                                           0,
+                                                           0.63635434479988362
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "63",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -26.666150669999183,
+                                                           0,
+                                                           -7.5991436676799822
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "64",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -9.6692562899992254,
+                                                           0,
+                                                           -15.834641680159848
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "65",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           34.829190900000754,
+                                                           0,
+                                                           4.0476093136002191
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "66",
+                        "role":  "grimlock.decoration",
+                        "tint":  [
+                                     0.45,
+                                     0.55,
+                                     0.65,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -20.173914719999289,
+                                                           0,
+                                                           -4.1878886988799877
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "67",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -3.1770203399993306,
+                                                           0,
+                                                           -12.423386711359854
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "68",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -30.678573149999352,
+                                                           0,
+                                                           7.4588642824002136
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "69",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           3.3152156100005641,
+                                                           0,
+                                                           -9.012131742559859
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "70",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -24.186337199999457,
+                                                           0,
+                                                           10.870119251200208
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "71",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           9.8074515600004588,
+                                                           0,
+                                                           -5.6008767737598646
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "72",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -0.69720686999960435,
+                                                           0,
+                                                           6.0458762075199957
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "73",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -28.198759679999625,
+                                                           0,
+                                                           -22.071872798719937
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "74",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           16.299687510000354,
+                                                           0,
+                                                           -2.18962180495987
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        2,
+                                                        2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/tree-pine.glb",
+                        "name":  "Kingdom pine",
+                        "id":  "75",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -27,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "76",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -24,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "77",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           -21,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "78",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           24,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "79",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           28,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "80",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           32,
+                                                           1,
+                                                           18
+                                                       ],
+                                          "scale":  [
+                                                        7,
+                                                        7,
+                                                        7
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/platformer/rocks.glb",
+                        "name":  "Mountain rocks",
+                        "id":  "81",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "id":  "82",
+                        "transform":  {
+                                          "position":  [
+                                                           18,
+                                                           -0.5,
+                                                           -12
+                                                       ],
+                                          "scale":  [
+                                                        12,
+                                                        0.05,
+                                                        9
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "role":  "grimlock.decoration",
+                        "name":  "Valley lake",
+                        "model":  "towers/structures/primitives/cube.glb",
+                        "tint":  [
+                                     0.05,
+                                     0.32,
+                                     0.48,
+                                     1
+                                 ]
+                    },
+                    {
+                        "id":  "83",
+                        "transform":  {
+                                          "position":  [
+                                                           24,
+                                                           -0.5,
+                                                           -23
+                                                       ],
+                                          "scale":  [
+                                                        2,
+                                                        0.05,
+                                                        10
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0.258819,
+                                                           0,
+                                                           0.965926
+                                                       ]
+                                      },
+                        "role":  "grimlock.decoration",
+                        "name":  "Eastern river",
+                        "model":  "towers/structures/primitives/cube.glb",
+                        "tint":  [
+                                     0.05,
+                                     0.32,
+                                     0.48,
+                                     1
+                                 ]
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           12,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large.glb",
+                        "name":  "Village house",
+                        "id":  "84",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           12,
+                                                           2.2,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large-roof.glb",
+                        "name":  "Village roof",
+                        "id":  "85",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           17,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large.glb",
+                        "name":  "Village house",
+                        "id":  "86",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           17,
+                                                           2.2,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.2,
+                                                        1.2,
+                                                        1.2
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/crypt-large-roof.glb",
+                        "name":  "Village roof",
+                        "id":  "87",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           8,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "88",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           10.1,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "89",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           12.2,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "90",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           14.3,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "91",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           16.4,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "92",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           18.5,
+                                                           1,
+                                                           7
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "93",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           8,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "94",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           10.1,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "95",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           12.2,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "96",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           14.3,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "97",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           16.4,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "98",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           18.5,
+                                                           1,
+                                                           10
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "99",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           8,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "100",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           10.1,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "101",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           12.2,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "102",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           14.3,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "103",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           16.4,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "104",
+                        "role":  "grimlock.decoration"
+                    },
+                    {
+                        "transform":  {
+                                          "position":  [
+                                                           18.5,
+                                                           1,
+                                                           13
+                                                       ],
+                                          "scale":  [
+                                                        1.4,
+                                                        1.4,
+                                                        1.4
+                                                    ],
+                                          "rotation":  [
+                                                           0,
+                                                           0,
+                                                           0,
+                                                           1
+                                                       ]
+                                      },
+                        "model":  "environment/graveyard/gravestone-cross.glb",
+                        "name":  "Gravewatch map burial ground",
+                        "id":  "105",
+                        "role":  "grimlock.decoration"
+                    }
+                ],
+    "name":  "Kingdom World Map",
+    "active_camera":  "main"
+}

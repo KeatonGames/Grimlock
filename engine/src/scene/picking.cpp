@@ -172,6 +172,8 @@ bool covered(const assets::ModelData& model,
 Geometry::Geometry(const assets::ModelData& model) {
     bounds_.reserve(model.meshes.size());
     jointBounds_.reserve(model.meshes.size());
+    trees_.resize(model.meshes.size());
+    stack_.reserve(64);
 
     for (const auto& mesh : model.meshes) {
         Bounds bounds{glm::dvec3{std::numeric_limits<double>::max()},
@@ -182,6 +184,14 @@ Geometry::Geometry(const assets::ModelData& model) {
         }
 
         bounds_.push_back(bounds);
+
+        auto& tree = trees_[bounds_.size() - 1];
+        if (mesh.morphTargetCount == 0 && mesh.indices.size() >= 192) {
+            for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
+                tree.triangles.push_back(i);
+            }
+            partition(tree, mesh, 0, tree.triangles.size());
+        }
 
         std::vector<Bounds> joints;
         bool convex = !mesh.vertices.empty() && mesh.morphTargetCount == 0;
@@ -216,6 +226,44 @@ Geometry::Geometry(const assets::ModelData& model) {
         }
         jointBounds_.push_back(convex ? std::move(joints) : std::vector<Bounds>{});
     }
+}
+
+std::size_t Geometry::partition(MeshTree& tree, const assets::MeshData& mesh, std::size_t first, std::size_t count) {
+    const auto index = tree.nodes.size();
+    Bounds bounds{glm::dvec3{std::numeric_limits<double>::max()}, glm::dvec3{std::numeric_limits<double>::lowest()}};
+    for (std::size_t i = first; i < first + count; ++i) {
+        for (int corner = 0; corner < 3; ++corner) {
+            const glm::dvec3 point = mesh.vertices[mesh.indices[tree.triangles[i] + corner]].position;
+            bounds.minimum = glm::min(bounds.minimum, point);
+            bounds.maximum = glm::max(bounds.maximum, point);
+        }
+    }
+    tree.nodes.push_back({bounds, first, count});
+    if (count <= 8) {
+        return index;
+    }
+    const auto extent = bounds.maximum - bounds.minimum;
+    const int axis = extent.x >= extent.y && extent.x >= extent.z ? 0 : extent.y >= extent.z ? 1 : 2;
+    const auto center = [&](std::size_t triangle) {
+        double value = 0;
+        for (int corner = 0; corner < 3; ++corner) {
+            value += mesh.vertices[mesh.indices[triangle + corner]].position[axis];
+        }
+        return value;
+    };
+    const auto middle = first + count / 2;
+    std::nth_element(tree.triangles.begin() + first,
+                     tree.triangles.begin() + middle,
+                     tree.triangles.begin() + first + count,
+                     [&](auto a, auto b) {
+                         return center(a) < center(b);
+                     });
+    const auto left = partition(tree, mesh, first, middle - first);
+    const auto right = partition(tree, mesh, middle, first + count - middle);
+    tree.nodes[index].count = 0;
+    tree.nodes[index].left = left;
+    tree.nodes[index].right = right;
+    return index;
 }
 
 std::optional<Geometry::Bounds> Geometry::skinBounds(std::size_t mesh, std::span<const glm::mat4> joints) const {
@@ -324,7 +372,7 @@ std::optional<double> Geometry::intersect(const Ray& ray,
 
             const auto& surface = model.materials.at(material.value_or(mesh.material));
 
-            for (std::size_t index = 0; index + 2 < mesh.indices.size(); index += 3) {
+            const auto test = [&](std::size_t index) {
                 const auto hit = triangle(origin,
                                           direction,
                                           point(mesh.indices[index]),
@@ -334,11 +382,42 @@ std::optional<double> Geometry::intersect(const Ray& ray,
                                           ray.minimum,
                                           nearest);
                 if (!hit || !covered(model, mesh, surface, index, *hit, opacity)) {
-                    continue;
+                    return;
                 }
 
                 nearest = hit->distance;
                 result = nearest;
+            };
+            const auto& tree = trees_[meshIndex];
+            if (deformed || tree.nodes.empty()) {
+                for (std::size_t index = 0; index + 2 < mesh.indices.size(); index += 3) {
+                    test(index);
+                }
+                continue;
+            }
+            // Shared immutable mesh bounds prune terrain and static props; animated meshes retain exact skin tests.
+            stack_.clear();
+            stack_.push_back(0);
+            while (!stack_.empty()) {
+                const auto& branch = tree.nodes[stack_.back()];
+                stack_.pop_back();
+                const glm::dvec3 branchPadding{1e-6};
+                if (!box(origin,
+                         direction,
+                         branch.bounds.minimum - branchPadding,
+                         branch.bounds.maximum + branchPadding,
+                         ray.minimum,
+                         nearest)) {
+                    continue;
+                }
+                if (branch.count) {
+                    for (std::size_t i = branch.first; i < branch.first + branch.count; ++i) {
+                        test(tree.triangles[i]);
+                    }
+                } else {
+                    stack_.push_back(branch.left);
+                    stack_.push_back(branch.right);
+                }
             }
         }
     }

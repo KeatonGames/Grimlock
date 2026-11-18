@@ -17,6 +17,9 @@ public:
     // Editor moves preserve world space; Scene's lower-level API retains local TRS.
     void reparent(ObjectId object, std::optional<ObjectId> parent);
     [[nodiscard]] ObjectId addModel(const std::filesystem::path& model);
+    [[nodiscard]] ObjectId addHeightfield();
+    void configureHeightfield(ObjectId object, HeightfieldConfiguration configuration);
+    bool groundObject(ObjectId object);
     [[nodiscard]] ObjectId duplicate(ObjectId source);
     void remove(ObjectId object);
     void rename(ObjectId object, const std::string& name);

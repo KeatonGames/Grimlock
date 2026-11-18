@@ -415,7 +415,8 @@ void Editor::objectMenu(ObjectId id) {
         };
     }
 
-    if (ImGui::MenuItem(scene.object(id).model ? "Delete Object..." : "Delete Group...")) {
+    if (ImGui::MenuItem((scene.object(id).model || scene.object(id).heightfield) ? "Delete Object..."
+                                                                                 : "Delete Group...")) {
         requestDelete(id);
     }
 
@@ -438,7 +439,7 @@ void Editor::objectRow(ObjectId id) {
     ImGui::SetItemTooltip("Show or hide this object and its children");
     ImGui::SameLine();
     auto flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_FramePadding;
-    const bool group = !object.model;
+    const bool group = !object.model && !object.heightfield;
     const bool leaf = scene.children(id).empty();
 
     if (leaf) {
@@ -567,6 +568,12 @@ void Editor::hierarchy() {
     if (ImGui::Button("Create Group", {width, 0})) {
         attempt([&] {
             (void)document_.createGroup();
+        });
+    }
+
+    if (ImGui::Button("Create Terrain")) {
+        attempt([&] {
+            (void)document_.addHeightfield();
         });
     }
 
@@ -848,7 +855,7 @@ void Editor::inspector() {
     const auto key = std::to_string(id);
     ImGui::PushID(key.c_str());
     ImGui::SeparatorText("General");
-    ImGui::TextDisabled("%s", object.model ? "MODEL INSTANCE" : "GROUP");
+    ImGui::TextDisabled("%s", object.heightfield ? "HEIGHTFIELD" : object.model ? "MODEL INSTANCE" : "GROUP");
     ImGui::SetNextItemWidth(-1);
     auto name = object.name;
 
@@ -868,6 +875,19 @@ void Editor::inspector() {
     }
 
     ImGui::TextDisabled("ID %s", key.c_str());
+    if (object.role.starts_with("grimlock.map_location:")) {
+        auto levelId = object.role.substr(std::string{"grimlock.map_location:"}.size());
+        bool locked = levelId.starts_with("locked:");
+        if (locked) {
+            levelId.erase(0, 7);
+        }
+        bool edited = ImGui::InputText("Map level ID", &levelId);
+        edited |= ImGui::Checkbox("Map location locked", &locked);
+        if (edited) {
+            scene.setRole(id, "grimlock.map_location:" + std::string{locked ? "locked:" : ""} + levelId);
+            document_.markChanged();
+        }
+    }
 
     if (object.model) {
         ImGui::TextWrapped("Model: %s", text(*object.model).c_str());
@@ -900,6 +920,86 @@ void Editor::inspector() {
     }
 
     ImGui::SeparatorText("Transform");
+    const bool hasHeightfield = std::any_of(scene.objects().begin(), scene.objects().end(), [](const auto& entry) {
+        return entry.second.heightfield != nullptr;
+    });
+    if (!object.heightfield && hasHeightfield && ImGui::Button("Ground on terrain")) {
+        attempt([&] {
+            if (!document_.groundObject(id)) {
+                throw std::runtime_error("No heightfield beneath this object");
+            }
+        });
+    }
+    if (object.heightfield && ImGui::CollapsingHeader("Terrain generation", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto c = object.heightfield->configuration();
+        bool changed = ImGui::InputFloat2("Visual size", &c.size.x);
+        changed |= ImGui::InputFloat2("Playable size", &c.playableSize.x);
+        int resolution[]{static_cast<int>(c.resolution.x), static_cast<int>(c.resolution.y)};
+        if (ImGui::InputInt2("Vertex resolution", resolution)) {
+            c.resolution = {std::clamp(resolution[0], 2, 513), std::clamp(resolution[1], 2, 513)};
+            changed = true;
+        }
+        changed |= ImGui::InputFloat("Base elevation", &c.baseHeight);
+        changed |= ImGui::InputFloat("Hill boundary height", &c.boundaryHeight);
+        changed |= ImGui::InputFloat("Noise amplitude", &c.noiseAmplitude);
+        changed |= ImGui::InputFloat("Noise frequency", &c.noiseFrequency);
+        changed |= ImGui::InputScalar("Seed", ImGuiDataType_U32, &c.seed);
+        changed |= ImGui::InputFloat("Road width", &c.roadWidth);
+        changed |= ImGui::InputFloat("Road end width", &c.roadEndWidth);
+        changed |= ImGui::ColorEdit3("Grass (linear)", &c.grassColor.x);
+        changed |= ImGui::ColorEdit3("Dirt (linear)", &c.roadColor.x);
+        changed |= ImGui::ColorEdit3("Rock (linear)", &c.rockColor.x);
+        for (auto& [label, features] : std::initializer_list<std::pair<const char*, std::vector<TerrainFeature>*>>{
+                 {"Hills", &c.hills},
+                 {"Flat building pads", &c.pads}}) {
+            if (ImGui::TreeNode(label)) {
+                for (std::size_t i = 0; i < features->size(); ++i) {
+                    ImGui::PushID(static_cast<int>(i));
+                    auto& f = (*features)[i];
+                    changed |= ImGui::InputFloat2("Center X/Z", &f.center.x);
+                    changed |= ImGui::InputFloat("Radius", &f.radius);
+                    changed |= ImGui::InputFloat("Elevation", &f.height);
+                    if (ImGui::Button("Remove")) {
+                        features->erase(features->begin() + i);
+                        changed = true;
+                        ImGui::PopID();
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+                if (features->size() < 256 && ImGui::Button("Add feature")) {
+                    features->push_back({});
+                    changed = true;
+                }
+                ImGui::TreePop();
+            }
+        }
+        if (ImGui::TreeNode("Road route")) {
+            for (std::size_t i = 0; i < c.road.size(); ++i) {
+                ImGui::PushID(static_cast<int>(i));
+                changed |= ImGui::InputFloat3("Point X/Y/Z", &c.road[i].x);
+                if (ImGui::Button("Remove point")) {
+                    c.road.erase(c.road.begin() + i);
+                    changed = true;
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::PopID();
+            }
+            if (c.road.size() < 256 && ImGui::Button("Add point")) {
+                c.road.push_back(c.road.empty() ? glm::vec3{0} : c.road.back() + glm::vec3{2, 0, 0});
+                changed = true;
+            }
+            ImGui::TreePop();
+        }
+        if (changed) {
+            attempt([&] {
+                document_.configureHeightfield(id, std::move(c));
+            });
+        }
+        ImGui::TextWrapped(
+            "Changes regenerate the saved surface. Ground moved props on terrain after editing elevations.");
+    }
     ImGui::TextDisabled("Local to %s", object.parent ? scene.object(*object.parent).name.c_str() : "Scene Root");
     auto transform = object.local;
 
@@ -947,11 +1047,11 @@ void Editor::inspector() {
     ImGui::SetItemTooltip("Copy this object's properties only, not its children");
     ImGui::SameLine();
 
-    if (ImGui::Button(object.model ? "Delete Object..." : "Delete Group...")) {
+    if (ImGui::Button((object.model || object.heightfield) ? "Delete Object..." : "Delete Group...")) {
         requestDelete(id);
     }
 
-    if (object.model && ImGui::CollapsingHeader("Materials")) {
+    if ((object.model || object.heightfield) && ImGui::CollapsingHeader("Materials")) {
         const auto& materials = scene.animation(id).model().materials;
         for (std::size_t index = 0; index < materials.size(); ++index) {
             const auto& material = materials[index];
@@ -971,7 +1071,7 @@ void Editor::inspector() {
             ImGui::PopID();
         }
     }
-    if (object.model && ImGui::CollapsingHeader("Object shadows")) {
+    if ((object.model || object.heightfield) && ImGui::CollapsingHeader("Object shadows")) {
         auto properties = object.shadows;
         bool shadowsChanged = ImGui::Checkbox("Cast shadows", &properties.cast);
         shadowsChanged |= ImGui::Checkbox("Receive shadows", &properties.receive);

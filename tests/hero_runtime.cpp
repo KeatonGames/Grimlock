@@ -416,6 +416,67 @@ void heroTypeChecks(Engine& engine) {
     require(engine.update(), "mixed hero rendering/cleanup failed");
 }
 
+void directMovementChecks(Engine& engine) {
+    auto scene = std::make_unique<Scene>("Direct hero control fixture");
+    scene->setNavigationGrid(GridConfiguration{20, 20, 1, {-10, 0, -10}});
+    for (std::uint32_t z = 0; z < 20; ++z) {
+        scene->navigationGrid()->setWalkable({10, z}, false);
+    }
+    engine.setScene(std::move(scene));
+    TowerSystem towers;
+    towers.synchronize(engine);
+    HeroSystem heroes{engine};
+    heroes.synchronize(towers);
+    const auto id = heroes.deploy({-3, 0, 0});
+    heroes.directControl(id, {1, 0});
+    for (int frame = 0; frame < 240; ++frame) {
+        heroes.update(1.0 / 60, true);
+    }
+    require(heroes.find(id)->position.x < 0 && heroes.navigation().contains(heroes.find(id)->position),
+            "Direct hero crossed a wall");
+    const auto before = heroes.find(id)->position;
+    heroes.directControl(id, {0, 0});
+    heroes.update(0.5, true);
+    require(glm::distance(before, heroes.find(id)->position) < 1e-5, "Released WASD kept moving the hero");
+    heroes.directControl({});
+    require(!heroes.find(id)->directlyControlled && heroes.command(id, {-5, 0, 0}),
+            "Direct release did not restore normal orders");
+    heroes.directControl(id);
+    EnemySystem enemies{engine, EnemyDefinition{.despawnOnArrival = false}};
+    const auto position = heroes.find(id)->position;
+    require(enemies.spawn(heroes.navigation(),
+                          {{position.x - 1, position.z}, {position.x - 1, position.z}, position.y},
+                          1) == 1,
+            "Direct combat enemy setup failed");
+    const auto enemy = enemies.enemies().front().id;
+    const auto health = enemies.find(enemy)->health;
+    HeroCombatSystem combat;
+    for (int frame = 0; frame < 120; ++frame) {
+        combat.update(heroes, enemies, 1.0 / 60, true);
+    }
+    require(!enemies.find(enemy) || enemies.find(enemy)->health < health,
+            "Directly controlled hero did not attack automatically");
+    require(glm::distance(heroes.find(id)->position, position) < 1e-5, "Direct hero AI overrode idle input");
+    double cardinal = 0;
+    for (const bool diagonal : {false, true}) {
+        heroes.clear();
+        const auto moving = heroes.deploy({-6, 0, -5});
+        heroes.directControl(moving, diagonal ? glm::dvec2{1, 1} : glm::dvec2{1, 0});
+        const int fps = diagonal ? 144 : 30;
+        for (int frame = 0; frame < fps / 2; ++frame) {
+            heroes.update(1.0 / fps, true);
+        }
+        const auto traveled = glm::distance(heroes.find(moving)->position, glm::dvec3{-6, 0, -5});
+        require(traveled <= heroes.definition().speed * 0.5 + 0.01, "Direct movement exceeded configured speed");
+        if (!diagonal) {
+            cardinal = traveled;
+        } else {
+            require(std::abs(traveled - cardinal) < 0.07, "Diagonal movement or frame rate changed hero speed");
+        }
+    }
+    heroes.clear();
+}
+
 void heroDeploymentChecks(Engine& engine) {
     LevelRuntime runtime;
     runtime.load(engine, "assets/test_fixtures/levels/first_watch.json");
@@ -432,6 +493,7 @@ void heroDeploymentChecks(Engine& engine) {
                     glm::length(hero.position - objective) <= 6.5,
                 "Hero spawned outside clear ground near the objective");
     }
+    require(!runtime.controlHeroSlot(0), "Preparation enabled direct hero control");
     const auto first = heroes.heroes().front().id;
     const auto initial = heroes.find(first)->position;
     const auto second = heroes.heroes()[1].position;
@@ -449,6 +511,25 @@ void heroDeploymentChecks(Engine& engine) {
     require(runtime.heroes()->heroes().size() == 3 && !runtime.selectedHero() &&
                 runtime.level().economy().gold() == gold,
             "Restart did not restore the full party");
+    runtime.startWave();
+    require(runtime.controlHeroSlot(0) && runtime.controlledHero(), "Wave did not enable direct hero control");
+    const auto controlled = *runtime.controlledHero();
+    require(runtime.controlHeroSlot(1) && runtime.controlledHero() != controlled, "Hero switch failed");
+    require(runtime.controlHeroSlot(1) && !runtime.controlledHero(), "Selected number did not release control");
+    require(runtime.controlHeroSlot(0), "Hero control reactivation failed");
+    require(runtime.heroes()->applyDamage(*runtime.controlledHero(), 100000), "Direct hero death setup failed");
+    runtime.update(engine, 0);
+    require(!runtime.controlledHero() && engine.cameraNavigationConfig().keyboardMovement,
+            "Hero death retained direct controls");
+    runtime.restart(engine);
+    require(!runtime.controlledHero(), "Restart retained direct hero control");
+    runtime.startWave();
+    require(runtime.controlHeroSlot(0), "Wave-exit control setup failed");
+    for (int frame = 0; frame < 3600 && runtime.level().waves()->phase() == LevelPhase::battle; ++frame) {
+        runtime.update(engine, 1.0 / 30);
+    }
+    require(runtime.level().waves()->phase() != LevelPhase::battle && !runtime.controlledHero(),
+            "Wave completion retained direct hero mode");
     runtime.unload(engine);
 }
 } // namespace
@@ -464,6 +545,7 @@ int main() {
         combatChecks(engine);
         heroTypeChecks(engine);
         heroDeploymentChecks(engine);
+        directMovementChecks(engine);
         auto scene = std::make_unique<Scene>("Hero obstacle fixture");
         scene->setNavigationGrid(GridConfiguration{16, 12, 1, {-8, 0, -6}});
         for (std::uint32_t row = 0; row < 9; ++row) {

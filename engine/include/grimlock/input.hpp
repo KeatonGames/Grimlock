@@ -7,6 +7,13 @@
 
 namespace grimlock {
 
+enum class Key : std::size_t {
+    a = 4,
+    d = 7,
+    s = 22,
+    w = 26
+};
+
 enum class MouseButton : std::size_t {
     left,
     middle,
@@ -30,6 +37,7 @@ struct InputState {
     std::optional<glm::vec2> rightPressPosition; // Retained through release, including relative mouse mode.
     float rightDragDistance = 0; // Total motion since right press; returning to the start still counts as a drag.
     bool focused = false;
+    bool keyboardCaptured = false;
 
     [[nodiscard]] const ButtonState& button(MouseButton button) const {
         return mouseButtons.at(static_cast<std::size_t>(button));
@@ -37,6 +45,10 @@ struct InputState {
 
     [[nodiscard]] const ButtonState& key(std::size_t scancode) const {
         return keys.at(scancode);
+    }
+
+    [[nodiscard]] const ButtonState& key(Key code) const {
+        return key(static_cast<std::size_t>(code));
     }
 };
 

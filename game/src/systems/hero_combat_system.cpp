@@ -172,7 +172,7 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         abandon(heroes, hero);
         return;
     }
-    if (state.playerMoving) {
+    if (state.playerMoving && !hero.directlyControlled) {
         if (hero.state != HeroState::moving) {
             state.playerMoving = false;
         }
@@ -202,8 +202,9 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         }
     }
     const auto* enemy = state.target ? enemies.find(*state.target) : nullptr;
-    if (enemy && (distance(state.pursuitOrigin, enemy->position) > stats.pursuitRange ||
-                  distance(state.pursuitOrigin, hero.position) > stats.pursuitRange)) {
+    if (enemy && !hero.directlyControlled &&
+        (distance(state.pursuitOrigin, enemy->position) > stats.pursuitRange ||
+         distance(state.pursuitOrigin, hero.position) > stats.pursuitRange)) {
         // Reacquiring the same fleeing target must not extend pursuit indefinitely.
         state.excludedTarget = enemy->id;
         state.excludedOrigin = state.pursuitOrigin;
@@ -219,13 +220,19 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
         enemy = state.target ? enemies.find(*state.target) : nullptr;
     }
     if (!enemy) {
-        returnToDefense(heroes, hero);
+        if (!hero.directlyControlled) {
+            returnToDefense(heroes, hero);
+        }
         return;
     }
     if (inRange(heroes, hero, *enemy, stats.range)) {
-        stop(hero);
+        if (!hero.directlyControlled) {
+            stop(hero);
+        }
         state.returning = false;
-        hero.yaw = std::atan2(enemy->position.x - hero.position.x, enemy->position.z - hero.position.z);
+        if (!hero.directlyControlled || glm::length(hero.directMovement) < 1e-6) {
+            hero.yaw = std::atan2(enemy->position.x - hero.position.x, enemy->position.z - hero.position.z);
+        }
         if (state.cooldown <= 1e-10) {
             state.swinging = true;
             state.abilitySwing = false;
@@ -234,6 +241,11 @@ void HeroCombatSystem::step(HeroSystem& heroes, EnemySystem& enemies, Hero& hero
             state.impactRemaining = stats.impactTime;
             heroes.playAttack(hero);
         }
+        return;
+    }
+    if (hero.directlyControlled) {
+        state.target.reset();
+        state.retryDelay = 0;
         return;
     }
     const bool changed = distance(state.pathTarget, enemy->position) > 0.35 ||
@@ -295,6 +307,9 @@ void HeroCombatSystem::acquire(HeroSystem& heroes, const EnemySystem& enemies, H
         const auto id = candidate.id;
         const auto& enemy = *enemies.find(id);
         const bool contact = inRange(heroes, hero, enemy, stats.range);
+        if (hero.directlyControlled && !contact) {
+            continue;
+        }
         if (!contact && !approachMelee(heroes.navigation(hero.type),
                                        hero.position,
                                        heroes.definition(hero).radius,

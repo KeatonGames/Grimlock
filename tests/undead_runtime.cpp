@@ -205,7 +205,7 @@ void mausoleumSiege(Engine& engine) {
         require(engine.scene()->object(105).model == "environment/graveyard/crypt-large.glb",
                 "Mausoleum model missing");
         const double approachZ = enemies.definition(type).combat.firstDetected ? 9.9 : 10.8;
-        require(navigation.spawnAt(engine, type, {{-8.5, approachZ}, {-8.5, approachZ}, 2}, 1) == 1,
+        require(navigation.spawnAt(engine, type, {{-8.5, approachZ}, {-8.5, approachZ}, 0}, 1) == 1,
                 "Mausoleum attacker could not spawn");
         const auto id = enemies.enemies().front().id;
         runtime.startWave();

@@ -1,16 +1,12 @@
 # Game menus
 
 The playable `game/assets/levels/` library contains only the existing **Level 01 -
-Forest Defense**. Its current reference-inspired layout is documented in the
+Greenhaven Valley**. Its current reference-inspired layout is documented in the
 [level guide](forest_defense.md). Five former demo definitions now live under
 `game/assets/test_fixtures/levels/`; automated tests and the existing Editor load
 shortcuts use those paths. Their reusable scenes and models remain available.
 
-**START GAME** opens Forest Defense directly. **LEVELS** shows discovered levels
-as responsive 16:9 preview cards with their configured names and completion state.
-Hover a card for saved attempts, victories and best time. Select and press **PLAY**,
-or double-click. Future valid files are discovered normally, without locked levels.
-Previews use `assets/previews/<level filename stem>.png`.
+**PLAY** opens the interactive [3D kingdom world map](world_map.md). Select a landmark, then press its triangular launch button. Marker clicks never launch gameplay. The former level-selection cards, double-click launch and LEVELS button have been removed.
 
 **OPTIONS** applies real SDL windowed/borderless fullscreen, windowed resolution,
 Vulkan VSync, supported MSAA modes (Off/2x/4x/8x), UI scale and world-health-bar preferences. Fullscreen uses the desktop
@@ -52,7 +48,7 @@ are used. For a main-menu review capture, supply an additional output PNG path.
 
 ## Validation
 
-`Game.LevelMenu` checks the single shipped level, captures, direct Start, real
+`Game.LevelMenu` checks the single shipped level, world-map selection and explicit launch, real
 fullscreen/windowed and VSync application, saved-options reload, future discovery,
 progression, switching, recovery, restart, quit and unchanged Level 1 metadata.
 Its Options and selection review captures are written beside the test executable.

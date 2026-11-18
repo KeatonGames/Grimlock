@@ -166,5 +166,33 @@
                    },
         "boss":  true,
         "kill_reward":  2
+    },
+    {
+        "name":  "Skeleton Captain",
+        "model":  "enemies/undead/character-skeleton.glb",
+        "maximum_health":  1050,
+        "speed":  0.95,
+        "radius":  0.42,
+        "height":  1.65,
+        "visual_height":  1.65,
+        "idle_animation":  "idle",
+        "movement_animation":  "walk",
+        "run_animation":  "sprint",
+        "death_animation":  "die",
+        "bone_health":  18,
+        "resurrection_time":  3,
+        "combat":  {
+                       "damage":  20,
+                       "range":  0.5,
+                       "attack_interval":  1.3,
+                       "impact_time":  0.22,
+                       "aggression_range":  2.6,
+                       "pursuit_range":  4,
+                       "targeting":  "first_detected",
+                       "attack_animation":  "attack-melee-right",
+                       "threat_memory":  0
+                   },
+        "boss":  true,
+        "kill_reward":  8
     }
 ]

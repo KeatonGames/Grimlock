@@ -157,6 +157,7 @@ public:
     [[nodiscard]] bool cameraNavigationEnabled() const noexcept;
     [[nodiscard]] const OrbitCameraConfig& cameraNavigationConfig() const noexcept;
     void configureCameraNavigation(const OrbitCameraConfig& config);
+    void followCameraTarget(glm::vec3 target, double delta);
     // Pauses scene and standalone animation clocks without affecting rendering or input.
     void setAnimationsPaused(bool paused) noexcept;
     // Disabled by default. Samples remain valid until the next enabled update.
